@@ -26,6 +26,12 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY startedAt DESC LIMIT 1")
     suspend fun getLatestSession(): SessionEntity?
 
+    @Query("SELECT * FROM sessions ORDER BY id ASC")
+    suspend fun getAllSessions(): List<SessionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessions(sessions: List<SessionEntity>)
+
     // ── Set logs ────────────────────────────────────────────────────
 
     @Insert
@@ -45,6 +51,9 @@ interface SessionDao {
 
     @Query("SELECT * FROM set_logs WHERE sessionId = :sessionId ORDER BY setIndex ASC")
     suspend fun getSetsForSession(sessionId: Long): List<SetLogEntity>
+
+    @Query("SELECT * FROM set_logs ORDER BY id ASC")
+    suspend fun getAllSetLogs(): List<SetLogEntity>
 
     @Query("""
         SELECT * FROM set_logs
