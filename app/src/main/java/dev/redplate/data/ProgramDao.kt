@@ -72,6 +72,9 @@ interface ProgramDao {
     @Query("SELECT * FROM template_slots WHERE templateId = :templateId ORDER BY orderIndex ASC")
     suspend fun getSlots(templateId: Long): List<TemplateSlotEntity>
 
+    @Query("SELECT * FROM template_slots WHERE id = :id")
+    suspend fun getSlotById(id: Long): TemplateSlotEntity?
+
     @Query("SELECT * FROM template_slots ORDER BY id ASC")
     suspend fun getAllSlots(): List<TemplateSlotEntity>
 }
