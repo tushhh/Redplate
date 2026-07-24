@@ -21,7 +21,9 @@ enum class MovementPattern {
 }
 
 @Serializable
-enum class EquipmentCategory { BARBELL, DUMBBELL, MACHINE, CABLE, BODYWEIGHT, BAND, KETTLEBELL, OTHER }
+enum class EquipmentCategory {
+    BARBELL, DUMBBELL, MACHINE, CABLE, BODYWEIGHT, BAND, KETTLEBELL, CARDIO_MACHINE, OTHER
+}
 
 /** Determines how load is selected and therefore how progression may step. */
 @Serializable
