@@ -30,6 +30,9 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercises WHERE name LIKE '%' || :query || '%' AND isExcluded = 0 ORDER BY name ASC")
     fun search(query: String): Flow<List<ExerciseEntity>>
 
+    @Query("SELECT * FROM exercises ORDER BY name ASC")
+    suspend fun getAll(): List<ExerciseEntity>
+
     @Query("SELECT COUNT(*) FROM exercises")
     suspend fun count(): Int
 

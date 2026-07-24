@@ -1,25 +1,30 @@
 package dev.redplate.data
 
 import androidx.room.*
+import kotlinx.serialization.Serializable
 
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
 
+@Serializable
 enum class MuscleGroup {
     CHEST, UPPER_BACK, LATS, LOWER_BACK, FRONT_DELTS, SIDE_DELTS, REAR_DELTS,
     BICEPS, TRICEPS, FOREARMS, QUADS, HAMSTRINGS, GLUTES, ADDUCTORS, CALVES,
     ABS, OBLIQUES, TRAPS, NECK
 }
 
+@Serializable
 enum class MovementPattern {
     HORIZONTAL_PUSH, VERTICAL_PUSH, HORIZONTAL_PULL, VERTICAL_PULL,
     SQUAT, HINGE, LUNGE, CARRY, ISOLATION, CORE
 }
 
+@Serializable
 enum class EquipmentCategory { BARBELL, DUMBBELL, MACHINE, CABLE, BODYWEIGHT, BAND, KETTLEBELL, OTHER }
 
 /** Determines how load is selected and therefore how progression may step. */
+@Serializable
 enum class LoadingScheme {
     PLATE_LOADED,     // barbell / plate machine — increment = 2x smallest plate pair
     FIXED_INCREMENT,  // dumbbells, kettlebells — only discrete sizes owned
@@ -28,18 +33,23 @@ enum class LoadingScheme {
     BANDED            // qualitative resistance
 }
 
+@Serializable
 enum class Goal { STRENGTH, HYPERTROPHY, GENERAL }
 
+@Serializable
 enum class ProgressionRule { DOUBLE_PROGRESSION, LOAD_PROGRESSION, RIR_AUTOREGULATED, NONE }
 
+@Serializable
 enum class Complexity { BEGINNER, INTERMEDIATE, ADVANCED }
 
+@Serializable
 enum class BlockPhase { ACCUMULATION, INTENSIFICATION, DELOAD }
 
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------
 
+@Serializable
 @Entity(tableName = "profile")
 data class ProfileEntity(
     @PrimaryKey val id: Int = 1,                 // single-user app: always row 1
@@ -58,6 +68,7 @@ data class ProfileEntity(
 // Equipment — see COACHING.md §2. This is the differentiator.
 // ---------------------------------------------------------------------------
 
+@Serializable
 @Entity(tableName = "equipment")
 data class EquipmentEntity(
     @PrimaryKey val id: String,
@@ -98,6 +109,7 @@ data class EquipmentEntity(
 // Exercises
 // ---------------------------------------------------------------------------
 
+@Serializable
 @Entity(
     tableName = "exercises",
     indices = [Index("primaryMuscle"), Index("pattern")]
@@ -132,6 +144,7 @@ data class ExerciseEntity(
 // Programming: Mesocycle -> Week -> Session template -> prescribed slots
 // ---------------------------------------------------------------------------
 
+@Serializable
 @Entity(tableName = "mesocycles")
 data class MesocycleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -144,6 +157,7 @@ data class MesocycleEntity(
     val completedAt: Long? = null
 )
 
+@Serializable
 @Entity(
     tableName = "session_templates",
     foreignKeys = [ForeignKey(
@@ -160,7 +174,7 @@ data class SessionTemplateEntity(
     val dayIndex: Int                            // 0-based position in the weekly rotation
 )
 
-/** One prescribed exercise slot within a session template. */
+@Serializable
 @Entity(
     tableName = "template_slots",
     foreignKeys = [ForeignKey(
@@ -190,6 +204,7 @@ data class TemplateSlotEntity(
 // Logging
 // ---------------------------------------------------------------------------
 
+@Serializable
 @Entity(
     tableName = "sessions",
     indices = [Index("startedAt"), Index("templateId")]
@@ -206,6 +221,7 @@ data class SessionEntity(
     val notes: String? = null
 )
 
+@Serializable
 @Entity(
     tableName = "set_logs",
     foreignKeys = [ForeignKey(
@@ -233,7 +249,7 @@ data class SetLogEntity(
     fun estimated1Rm(): Double = loadKg * (1 + reps / 30.0)
 }
 
-/** Snapshot written at the close of each week so history survives landmark retuning. */
+@Serializable
 @Entity(tableName = "volume_snapshots", primaryKeys = ["mesocycleId", "weekNumber", "muscle"])
 data class VolumeSnapshotEntity(
     val mesocycleId: Long,
@@ -245,7 +261,7 @@ data class VolumeSnapshotEntity(
     val mrv: Int
 )
 
-/** Per-muscle landmarks. Seeded from defaults, then tuned by observed response. */
+@Serializable
 @Entity(tableName = "volume_landmarks")
 data class VolumeLandmarkEntity(
     @PrimaryKey val muscle: MuscleGroup,

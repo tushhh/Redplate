@@ -23,6 +23,12 @@ interface ProgramDao {
     @Query("SELECT * FROM mesocycles ORDER BY startedAt DESC")
     fun observeAllMesocycles(): Flow<List<MesocycleEntity>>
 
+    @Query("SELECT * FROM mesocycles ORDER BY id ASC")
+    suspend fun getAllMesocycles(): List<MesocycleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMesocycles(mesocycles: List<MesocycleEntity>)
+
     // ── Session templates ───────────────────────────────────────────
 
     @Insert
@@ -39,6 +45,12 @@ interface ProgramDao {
 
     @Query("SELECT * FROM session_templates WHERE id = :id")
     suspend fun getTemplateById(id: Long): SessionTemplateEntity?
+
+    @Query("SELECT * FROM session_templates ORDER BY id ASC")
+    suspend fun getAllTemplates(): List<SessionTemplateEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTemplates(templates: List<SessionTemplateEntity>)
 
     // ── Template slots ──────────────────────────────────────────────
 
@@ -59,4 +71,7 @@ interface ProgramDao {
 
     @Query("SELECT * FROM template_slots WHERE templateId = :templateId ORDER BY orderIndex ASC")
     suspend fun getSlots(templateId: Long): List<TemplateSlotEntity>
+
+    @Query("SELECT * FROM template_slots ORDER BY id ASC")
+    suspend fun getAllSlots(): List<TemplateSlotEntity>
 }

@@ -40,4 +40,10 @@ interface VolumeDao {
 
     @Query("SELECT * FROM volume_landmarks WHERE muscle = :muscle")
     suspend fun getLandmark(muscle: MuscleGroup): VolumeLandmarkEntity?
+
+    @Query("SELECT * FROM volume_snapshots ORDER BY mesocycleId ASC, weekNumber ASC, muscle ASC")
+    suspend fun getAllSnapshots(): List<VolumeSnapshotEntity>
+
+    @Query("SELECT * FROM volume_landmarks ORDER BY muscle ASC")
+    suspend fun getAllLandmarks(): List<VolumeLandmarkEntity>
 }

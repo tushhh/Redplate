@@ -19,6 +19,9 @@ interface EquipmentDao {
     suspend fun getById(id: String): EquipmentEntity?
 
     @Query("SELECT * FROM equipment ORDER BY displayName ASC")
+    suspend fun getAll(): List<EquipmentEntity>
+
+    @Query("SELECT * FROM equipment ORDER BY displayName ASC")
     fun observeAll(): Flow<List<EquipmentEntity>>
 
     @Query("SELECT * FROM equipment WHERE isAvailable = 1 ORDER BY displayName ASC")
