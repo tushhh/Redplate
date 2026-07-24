@@ -19,7 +19,7 @@ class DatabaseSeeder @Inject constructor(
         if (db.exerciseDao().count() > 0) return
 
         val exercises = parseExercises()
-        val equipment = defaultEquipment()
+        val equipment = GymEquipmentSeed.seed()
 
         db.withTransaction {
             db.equipmentDao().insertAll(equipment)
@@ -52,6 +52,7 @@ class DatabaseSeeder @Inject constructor(
             val primary = primaryMuscles.firstNotNullOfOrNull { mapMuscle(it) } ?: return null
             val secondary = secondaryMuscles.mapNotNull { mapMuscle(it) }
             val compound = mechanic != "isolation"
+            val resolved = resolveEquipment(equipment)
 
             return ExerciseEntity(
                 id = id,
@@ -59,7 +60,7 @@ class DatabaseSeeder @Inject constructor(
                 pattern = derivePattern(force, primary, compound),
                 primaryMuscle = primary,
                 secondaryMuscles = secondary,
-                requiredEquipmentIds = listOf(mapEquipmentId(equipment)),
+                requiredEquipmentIds = resolved.equipmentIds,
                 complexity = when (level) {
                     "beginner" -> Complexity.BEGINNER
                     "expert" -> Complexity.ADVANCED
@@ -70,6 +71,7 @@ class DatabaseSeeder @Inject constructor(
                 defaultProgression = ProgressionRule.DOUBLE_PROGRESSION,
                 instructions = instructions.joinToString("\n").ifEmpty { null },
                 imageAssetPaths = images,
+                isExcluded = resolved.excluded,
             )
         }
     }
@@ -116,19 +118,25 @@ class DatabaseSeeder @Inject constructor(
             }
         }
 
-        internal fun mapEquipmentId(equipment: String?): String = when (equipment?.lowercase()) {
-            "barbell" -> "barbell_olympic"
-            "dumbbell" -> "dumbbell_set"
-            "machine" -> "machine_generic"
-            "cable" -> "cable_machine"
-            "body only", null -> "bodyweight"
-            "kettlebells" -> "kettlebell_set"
-            "bands" -> "band_set"
-            "e-z curl bar" -> "ez_curl_bar"
-            "medicine ball" -> "medicine_ball"
-            "exercise ball" -> "exercise_ball"
-            "foam roll" -> "foam_roller"
-            else -> "other"
+        internal data class EquipmentResolution(val equipmentIds: List<String>, val excluded: Boolean)
+
+        /**
+         * Resolves free-exercise-db's broad `equipment` string against the real gym
+         * inventory in [GymEquipmentSeed.looseEquipmentMapping]. A string that maps to
+         * an explicit (possibly empty) list is trusted as-is — "body only" genuinely
+         * needs no equipment. A string absent from the map ("machine", "e-z curl bar",
+         * "exercise ball", "other", or anything unrecognised) is too coarse to match to
+         * real hardware, so the exercise is excluded rather than guessing — fail closed,
+         * per COACHING.md §2 / GYM.md.
+         */
+        internal fun resolveEquipment(equipment: String?): EquipmentResolution {
+            val key = equipment?.lowercase() ?: "body only"
+            val ids = GymEquipmentSeed.looseEquipmentMapping[key]
+            return if (ids != null) {
+                EquipmentResolution(ids, excluded = false)
+            } else {
+                EquipmentResolution(emptyList(), excluded = true)
+            }
         }
 
         internal fun deriveFatigueCost(
@@ -145,92 +153,5 @@ class DatabaseSeeder @Inject constructor(
                 else -> 3
             }
         }
-
-        internal fun defaultEquipment(): List<EquipmentEntity> = listOf(
-            EquipmentEntity(
-                id = "barbell_olympic",
-                displayName = "Olympic Barbell",
-                category = EquipmentCategory.BARBELL,
-                loadingScheme = LoadingScheme.PLATE_LOADED,
-                barWeightKg = 20.0,
-                platePairs = mapOf(
-                    25.0 to 1, 20.0 to 1, 15.0 to 1,
-                    10.0 to 2, 5.0 to 2, 2.5 to 2, 1.25 to 2,
-                ),
-            ),
-            EquipmentEntity(
-                id = "dumbbell_set",
-                displayName = "Dumbbells",
-                category = EquipmentCategory.DUMBBELL,
-                loadingScheme = LoadingScheme.FIXED_INCREMENT,
-                availableLoads = (1..20).map { it * 2.0 },
-            ),
-            EquipmentEntity(
-                id = "machine_generic",
-                displayName = "Machine",
-                category = EquipmentCategory.MACHINE,
-                loadingScheme = LoadingScheme.PIN_STACK,
-                availableLoads = (1..20).map { it * 5.0 },
-            ),
-            EquipmentEntity(
-                id = "cable_machine",
-                displayName = "Cable Machine",
-                category = EquipmentCategory.CABLE,
-                loadingScheme = LoadingScheme.PIN_STACK,
-                availableLoads = (1..20).map { it * 5.0 },
-            ),
-            EquipmentEntity(
-                id = "bodyweight",
-                displayName = "Bodyweight",
-                category = EquipmentCategory.BODYWEIGHT,
-                loadingScheme = LoadingScheme.BODYWEIGHT,
-            ),
-            EquipmentEntity(
-                id = "kettlebell_set",
-                displayName = "Kettlebells",
-                category = EquipmentCategory.KETTLEBELL,
-                loadingScheme = LoadingScheme.FIXED_INCREMENT,
-                availableLoads = listOf(8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0),
-            ),
-            EquipmentEntity(
-                id = "band_set",
-                displayName = "Resistance Bands",
-                category = EquipmentCategory.BAND,
-                loadingScheme = LoadingScheme.BANDED,
-            ),
-            EquipmentEntity(
-                id = "ez_curl_bar",
-                displayName = "EZ Curl Bar",
-                category = EquipmentCategory.BARBELL,
-                loadingScheme = LoadingScheme.PLATE_LOADED,
-                barWeightKg = 10.0,
-                platePairs = mapOf(10.0 to 1, 5.0 to 2, 2.5 to 2, 1.25 to 2),
-            ),
-            EquipmentEntity(
-                id = "medicine_ball",
-                displayName = "Medicine Ball",
-                category = EquipmentCategory.OTHER,
-                loadingScheme = LoadingScheme.FIXED_INCREMENT,
-                availableLoads = listOf(3.0, 5.0, 8.0, 10.0),
-            ),
-            EquipmentEntity(
-                id = "exercise_ball",
-                displayName = "Exercise Ball",
-                category = EquipmentCategory.OTHER,
-                loadingScheme = LoadingScheme.BODYWEIGHT,
-            ),
-            EquipmentEntity(
-                id = "foam_roller",
-                displayName = "Foam Roller",
-                category = EquipmentCategory.OTHER,
-                loadingScheme = LoadingScheme.BODYWEIGHT,
-            ),
-            EquipmentEntity(
-                id = "other",
-                displayName = "Other",
-                category = EquipmentCategory.OTHER,
-                loadingScheme = LoadingScheme.BODYWEIGHT,
-            ),
-        )
     }
 }
