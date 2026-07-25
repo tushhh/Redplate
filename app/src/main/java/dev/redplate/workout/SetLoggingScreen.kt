@@ -194,8 +194,17 @@ private fun InputScreen(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         ) {
-            // Movement window placeholder (wger images land in Phase 5)
-            MovementWindowPlaceholder()
+            // Movement window — wger exercise stills
+            ExerciseImage(
+                imageUri = state.imageUri,
+                muscle = state.primaryMuscle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .height(164.dp)
+                    .clip(RoundedCornerShape(18.dp)),
+                contentDescription = state.exerciseName,
+            )
 
             // Load section
             Column(
@@ -495,27 +504,6 @@ private fun Header(
         } else {
             Spacer(Modifier.width(64.dp))
         }
-    }
-}
-
-@Composable
-private fun MovementWindowPlaceholder() {
-    val colors = RedplateTheme.colors
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 2.dp)
-            .height(164.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFEDEEE9)),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Placeholder — wger images will be loaded here
-        Text(
-            text = "Movement guide",
-            style = RedplateType.body,
-            color = Color(0xFF8B939E),
-        )
     }
 }
 

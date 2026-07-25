@@ -1,5 +1,6 @@
 package dev.redplate.workout
 
+import dev.redplate.data.MuscleGroup
 import dev.redplate.data.PlateMath
 
 /**
@@ -10,7 +11,10 @@ data class SetLoggingUiState(
     val isLoading: Boolean = true,
 
     // ── Read-only prescription (top zone) ──
+    val exerciseId: String = "",
     val exerciseName: String = "",
+    val primaryMuscle: MuscleGroup = MuscleGroup.CHEST,
+    val imageUri: String? = null,
     val supersetLabel: String? = null,        // e.g. "SUPERSET A"; null when not supersetted
     val hasGuidance: Boolean = false,
     val setNumber: Int = 1,                   // 1-based working-set counter

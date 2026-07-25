@@ -1,16 +1,34 @@
 *.iml
 .gradle
 /local.properties
+local.properties
+
+# IDE
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
+/.idea/appInsightsSettings.xml
+/.idea/deviceManager.xml
+
+# Build outputs
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media working directory (raw/intermediate files, images bundled in assets/)
 media/
+
+# Claude Code
+.claude/
+
+# Design source files
+gym-workout-planner-app-revamp/

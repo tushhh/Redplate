@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.MediaResolver
 import dev.redplate.data.PlateMath
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
@@ -28,6 +29,7 @@ import javax.inject.Inject
 class SetLoggingViewModel @Inject constructor(
     private val repo: WorkoutRepository,
     savedState: SavedStateHandle,
+    val mediaResolver: MediaResolver,
 ) : ViewModel() {
 
     private val sessionId: Long = savedState.get<Long>(ARG_SESSION_ID) ?: 0L
@@ -71,7 +73,10 @@ class SetLoggingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     isLoading = false,
+                    exerciseId = exerciseId,
                     exerciseName = ex?.name ?: "Exercise",
+                    primaryMuscle = ex?.primaryMuscle ?: dev.redplate.data.MuscleGroup.CHEST,
+                    imageUri = mediaResolver.startImage(exerciseId),
                     supersetLabel = supersetLabel(sl?.supersetGroup),
                     hasGuidance = ex?.instructions != null,
                     targetSets = targetSets,
