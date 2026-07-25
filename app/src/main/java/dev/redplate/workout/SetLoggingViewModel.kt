@@ -65,16 +65,21 @@ class SetLoggingViewModel @Inject constructor(
             val repHigh = sl?.repRangeHigh ?: DEFAULT_REP_HIGH
             val startLoad = resolveStartLoad(sl, eq)
 
+            val targetSets = sl?.targetSets ?: DEFAULT_TARGET_SETS
+            val repLow = sl?.repRangeLow ?: DEFAULT_REP_LOW
+
             _state.update {
                 it.copy(
                     isLoading = false,
                     exerciseName = ex?.name ?: "Exercise",
                     supersetLabel = supersetLabel(sl?.supersetGroup),
                     hasGuidance = ex?.instructions != null,
-                    targetSets = sl?.targetSets ?: DEFAULT_TARGET_SETS,
-                    repRangeLow = sl?.repRangeLow ?: DEFAULT_REP_LOW,
+                    targetSets = targetSets,
+                    repRangeLow = repLow,
                     repRangeHigh = repHigh,
                     targetRir = sl?.targetRir,
+                    headerSubtitle = buildHeaderSubtitle(1, targetSets, repLow, repHigh, targetSets),
+                    coachReasoningLine = if (sl?.workingLoadKg != null) "Prescribed weight —" else "",
                     reps = repHigh,
                     rir = sl?.targetRir,
                     loadKg = startLoad,
@@ -118,11 +123,28 @@ class SetLoggingViewModel @Inject constructor(
 
                 Triple(logged, previous, workingCount)
             }.collect { (logged, previous, workingCount) ->
+                val setNum = workingCount + 1
+                val ts = _state.value.targetSets
+                val remaining = (ts - workingCount).coerceAtLeast(0)
+                val lastLogged = logged.lastOrNull { !it.isWarmup }
+                val hasPr = lastLogged?.isPr == true
+
                 _state.update {
                     it.copy(
                         loggedSets = logged,
                         previousSets = previous,
-                        setNumber = workingCount + 1,
+                        setNumber = setNum,
+                        headerSubtitle = buildHeaderSubtitle(
+                            setNum, ts, it.repRangeLow, it.repRangeHigh, remaining
+                        ),
+                        coachReasoningLine = buildReasoningLine(logged, previous),
+                        prBadgeText = if (hasPr && lastLogged != null)
+                            "Best set you've done at ${formatKg(lastLogged.loadKg)} kg."
+                        else null,
+                        restCoachText = buildRestCoachText(remaining, it.loadKg),
+                        restPrimaryLabel = if (remaining > 0)
+                            "I'm ready — set $setNum"
+                        else "Done",
                     )
                 }
             }
@@ -174,6 +196,16 @@ class SetLoggingViewModel @Inject constructor(
             0 -> null
             else -> r - 1
         })
+    }
+
+    /** Set difficulty via chips (replaces RIR stepper in revamped UI). */
+    fun setDifficulty(difficulty: Difficulty?) {
+        _state.update {
+            it.copy(
+                difficulty = difficulty,
+                rir = difficulty?.rir?.coerceAtLeast(0),
+            )
+        }
     }
 
     fun toggleWarmup() = _state.update { it.copy(isWarmup = !it.isWarmup) }
@@ -268,6 +300,33 @@ class SetLoggingViewModel @Inject constructor(
 
     private fun supersetLabel(group: Int?): String? =
         group?.takeIf { it >= 1 }?.let { "SUPERSET " + ('A' + (it - 1)) }
+
+    private fun buildHeaderSubtitle(setNum: Int, total: Int, repLow: Int, repHigh: Int, remaining: Int): String {
+        return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
+    }
+
+    private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
+        val lastWorking = logged.lastOrNull { !it.isWarmup }
+        return when {
+            lastWorking != null -> "Same weight as your last set —"
+            previous.isNotEmpty() -> "Based on your last session —"
+            else -> ""
+        }
+    }
+
+    private fun buildRestCoachText(remaining: Int, loadKg: Double): String {
+        val restSeconds = slot?.restSeconds ?: DEFAULT_REST_SECONDS
+        val restMinutes = restSeconds / 60
+        val restLabel = if (restMinutes >= 1) "$restMinutes minute${if (restMinutes > 1) "s" else ""}" else "$restSeconds seconds"
+        return if (remaining > 0) {
+            "$restLabel is the prescription. Next set: same ${formatKg(loadKg)} kg."
+        } else {
+            "Last set done. Nice work."
+        }
+    }
+
+    private fun formatKg(kg: Double): String =
+        if (kg % 1.0 == 0.0) kg.toInt().toString() else kg.toString().trimEnd('0').trimEnd('.')
 
     companion object {
         const val ARG_SESSION_ID = "sessionId"

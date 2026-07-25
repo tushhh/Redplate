@@ -20,6 +20,8 @@ import dev.redplate.R
  *   ibm_plex_sans_regular.ttf
  *   ibm_plex_sans_medium.ttf
  *   ibm_plex_mono_regular.ttf
+ *   ibm_plex_sans_semibold.ttf
+ *   ibm_plex_mono_medium.ttf
  */
 val PlexCondensed = FontFamily(
     Font(R.font.ibm_plex_sans_condensed_medium, FontWeight.Medium),
@@ -28,11 +30,13 @@ val PlexCondensed = FontFamily(
 
 val PlexSans = FontFamily(
     Font(R.font.ibm_plex_sans_regular, FontWeight.Normal),
-    Font(R.font.ibm_plex_sans_medium, FontWeight.Medium)
+    Font(R.font.ibm_plex_sans_medium, FontWeight.Medium),
+    Font(R.font.ibm_plex_sans_semibold, FontWeight.SemiBold)
 )
 
 val PlexMono = FontFamily(
-    Font(R.font.ibm_plex_mono_regular, FontWeight.Normal)
+    Font(R.font.ibm_plex_mono_regular, FontWeight.Normal),
+    Font(R.font.ibm_plex_mono_medium, FontWeight.Medium)
 )
 
 object RedplateType {
@@ -90,6 +94,49 @@ object RedplateType {
         letterSpacing = 0.12.em
     )
 
+    /** Coach headlines: "Push day. About an hour." */
+    val headline = TextStyle(
+        fontFamily = PlexCondensed,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+        letterSpacing = (-0.015).em
+    )
+
+    /** Section titles: session names, screen headers. */
+    val title = TextStyle(
+        fontFamily = PlexCondensed,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 30.sp
+    )
+
+    /** Larger body text for coach descriptions. */
+    val bodyLarge = TextStyle(
+        fontFamily = PlexSans,
+        fontWeight = FontWeight.Normal,
+        fontSize = 17.sp,
+        lineHeight = 25.sp
+    )
+
+    /** Button labels and card titles that need emphasis. */
+    val action = TextStyle(
+        fontFamily = PlexSans,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 22.sp
+    )
+
+    /** Mono eyebrow: "FRIDAY MORNING · WEEK 3 OF 5". Always uppercase. */
+    val mono = TextStyle(
+        fontFamily = PlexMono,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.1.em,
+        fontFeatureSettings = "tnum"
+    )
+
     /** Set history rows and export previews — alignment matters more than warmth. */
     val data = TextStyle(
         fontFamily = PlexMono,
@@ -103,8 +150,12 @@ object RedplateType {
 val RedplateTypography = Typography(
     displayLarge = RedplateType.timer,
     displayMedium = RedplateType.load,
+    headlineLarge = RedplateType.headline,
     headlineMedium = RedplateType.figure,
+    titleLarge = RedplateType.title,
     titleMedium = RedplateType.exerciseName,
+    bodyLarge = RedplateType.bodyLarge,
     bodyMedium = RedplateType.body,
-    labelSmall = RedplateType.label
+    labelMedium = RedplateType.action,
+    labelSmall = RedplateType.label,
 )

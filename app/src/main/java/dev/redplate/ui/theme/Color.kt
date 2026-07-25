@@ -4,19 +4,25 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 /**
- * Palette per CLAUDE.md §3. Instrument-grade, not consumer-app.
- * True black ground: AMOLED power saving, minimal glare under gym lighting,
- * and maximum contrast for numerals read at arm's length.
+ * Palette per CLAUDE.md §3, updated for the revamp design.
+ * Ground lifted off true black; new elevation/ink tiers added.
  */
 @Immutable
 data class RedplateColors(
-    val ground: Color = Color(0xFF000000),
-    val surface: Color = Color(0xFF121417),
+    val ground: Color = Color(0xFF101317),
+    val surface: Color = Color(0xFF1A1E24),
+    val surfaceRaised: Color = Color(0xFF242A32),
     val line: Color = Color(0xFF2A2F36),
     val ink: Color = Color(0xFFF5F5F0),
     val inkMuted: Color = Color(0xFF8B939E),
+    val inkSecondary: Color = Color(0xFFB9C0C9),
+    val inkSubtle: Color = Color(0xFF7B838E),
+    val inkBright: Color = Color(0xFFDDE2E8),
+    val inkOnLight: Color = Color(0xFF0C0E11),
     /** The single warm accent. One use per screen: the live set, or the running timer. */
-    val live: Color = Color(0xFFFF5C1A)
+    val live: Color = Color(0xFFFF5C1A),
+    val info: Color = Color(0xFF2F9BD8),
+    val safe: Color = Color(0xFF3FB55C),
 )
 
 /**

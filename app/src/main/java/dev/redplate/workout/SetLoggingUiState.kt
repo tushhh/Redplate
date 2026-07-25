@@ -21,6 +21,12 @@ data class SetLoggingUiState(
     val previousSets: List<PreviousSetLine> = emptyList(),
     val loggedSets: List<LoggedSetLine> = emptyList(),
 
+    /** Subtitle under exercise name: "SET 3 OF 4 · 6–10 REPS · 2 LEFT" */
+    val headerSubtitle: String = "",
+
+    /** Coach reasoning line above the load: "Same weight as your last set —" */
+    val coachReasoningLine: String = "",
+
     // ── Readout (signature element) ──
     val loadKg: Double = 20.0,
     val isPlateLoaded: Boolean = false,
@@ -31,11 +37,30 @@ data class SetLoggingUiState(
     val reps: Int = 0,
     val rir: Int? = null,
     val isWarmup: Boolean = false,
+    val difficulty: Difficulty? = null,
 
     // ── Rest timer ──
     val rest: RestState = RestState.Idle,
+
+    // ── Rest screen extras ──
+    val prBadgeText: String? = null,          // "Best set you've done at 102.5 kg."
+    val restCoachText: String = "",           // Coach advice during rest
+    val restPrimaryLabel: String = "",        // "I'm ready — set 4"
 ) {
     val canCompleteSet: Boolean get() = !isLoading && reps >= 1
+}
+
+/**
+ * Plain-language difficulty chips that map to RIR values.
+ * Design: 2 rows of 3 chips.
+ */
+enum class Difficulty(val label: String, val rir: Int) {
+    EASY("Easy", 4),
+    THREE_LEFT("3 more in me", 3),
+    TWO_LEFT("2 more in me", 2),
+    ONE_LEFT("1 more, maybe", 1),
+    ALL_OUT("All I had", 0),
+    FAILED("Failed the rep", -1),
 }
 
 sealed interface RestState {
