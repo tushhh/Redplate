@@ -72,13 +72,11 @@ object GymEquipmentSeed {
             platePairs = commercialPlatePool
         ),
 
-        // --- Dumbbells (#19+20, treated as one continuous rack) — HIGH STAKES ASSUMPTION ---
+        // --- Dumbbells (#19+20, treated as one continuous rack) ---
         EquipmentEntity(
             id = "dumbbells", displayName = "Dumbbells",
             category = EquipmentCategory.DUMBBELL, loadingScheme = LoadingScheme.FIXED_INCREMENT,
-            /* ASSUMPTION: 2.5kg increments to 50kg. CONFIRM your gym's actual max pair and
-               increment — this is the single biggest lever on dumbbell progression accuracy. */
-            availableLoads = generateSequence(2.5) { it + 2.5 }.takeWhile { it <= 50.0 }.toList()
+            availableLoads = generateSequence(10.0) { it + 2.0 }.takeWhile { it <= 40.0 }.toList()
         ),
 
         // --- Barbell (#14 bumper plates + #21 barbells & rack) ---
