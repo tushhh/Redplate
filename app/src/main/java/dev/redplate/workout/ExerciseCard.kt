@@ -1,6 +1,5 @@
 package dev.redplate.workout
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
@@ -33,33 +31,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.MuscleGroup
+import dev.redplate.ui.components.MuscleGlyphPlaceholder
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
-
-// ── MuscleGroup glyph abbreviations ──────────────────────────────────────────
-
-val MuscleGroup.glyph: String
-    get() = when (this) {
-        MuscleGroup.CHEST        -> "CH"
-        MuscleGroup.UPPER_BACK   -> "UB"
-        MuscleGroup.LATS         -> "LA"
-        MuscleGroup.LOWER_BACK   -> "LB"
-        MuscleGroup.FRONT_DELTS  -> "FD"
-        MuscleGroup.SIDE_DELTS   -> "SD"
-        MuscleGroup.REAR_DELTS   -> "RD"
-        MuscleGroup.BICEPS       -> "BI"
-        MuscleGroup.TRICEPS      -> "TR"
-        MuscleGroup.FOREARMS     -> "FA"
-        MuscleGroup.QUADS        -> "QU"
-        MuscleGroup.HAMSTRINGS   -> "HA"
-        MuscleGroup.GLUTES       -> "GL"
-        MuscleGroup.ADDUCTORS    -> "AD"
-        MuscleGroup.CALVES       -> "CA"
-        MuscleGroup.ABS          -> "AB"
-        MuscleGroup.OBLIQUES     -> "OB"
-        MuscleGroup.TRAPS        -> "TP"
-        MuscleGroup.NECK         -> "NK"
-    }
 
 // ── Exercise image with placeholder fallback ─────────────────────────────────
 
@@ -85,47 +59,7 @@ fun ExerciseImage(
             modifier = modifier.background(Color(0xFFEDEEE9)),
         )
     } else {
-        ExerciseImagePlaceholder(muscle = muscle, modifier = modifier)
-    }
-}
-
-/**
- * Hatched muscle-glyph placeholder shown when no image is available.
- */
-@Composable
-fun ExerciseImagePlaceholder(
-    muscle: MuscleGroup,
-    modifier: Modifier = Modifier,
-) {
-    val hatchColor = Color(0xFF3A414B)
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.background(Color(0xFFEDEEE9)),
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val spacing = 12f
-            val lineColor = hatchColor.copy(alpha = 0.18f)
-            val totalSteps = ((size.width + size.height) / spacing).toInt() + 2
-            for (i in 0..totalSteps) {
-                val offset = i * spacing
-                val startX = (offset - size.height).coerceAtLeast(0f)
-                val startY = (size.height - offset).coerceAtLeast(0f)
-                val endX = offset.coerceAtMost(size.width)
-                val endY = (offset - size.width + size.height).coerceAtLeast(0f)
-                    .coerceAtMost(size.height)
-                drawLine(
-                    color = lineColor,
-                    start = Offset(startX, startY),
-                    end = Offset(endX, endY),
-                    strokeWidth = 1f,
-                )
-            }
-        }
-        Text(
-            text = muscle.glyph,
-            style = RedplateType.figure.copy(fontSize = 26.sp, color = Color(0xFFB0B5BA)),
-        )
+        MuscleGlyphPlaceholder(muscle = muscle, modifier = modifier)
     }
 }
 

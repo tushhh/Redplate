@@ -12,17 +12,28 @@ data class RedplateColors(
     val ground: Color = Color(0xFF101317),
     val surface: Color = Color(0xFF1A1E24),
     val surfaceRaised: Color = Color(0xFF242A32),
+    /** Recessed panel — sits *below* surface. Info cards, dimmed browser cards. */
+    val surfaceSunken: Color = Color(0xFF171B21),
     val line: Color = Color(0xFF2A2F36),
+    /** Hairline under a screen header, one step darker than [line]. */
+    val lineSubtle: Color = Color(0xFF1E232A),
     val ink: Color = Color(0xFFF5F5F0),
     val inkMuted: Color = Color(0xFF8B939E),
     val inkSecondary: Color = Color(0xFFB9C0C9),
     val inkSubtle: Color = Color(0xFF7B838E),
     val inkBright: Color = Color(0xFFDDE2E8),
     val inkOnLight: Color = Color(0xFF0C0E11),
+    val inkOnLightMuted: Color = Color(0xFF4A5158),
     /** The single warm accent. One use per screen: the live set, or the running timer. */
     val live: Color = Color(0xFFFF5C1A),
     val info: Color = Color(0xFF2F9BD8),
     val safe: Color = Color(0xFF3FB55C),
+    /** Four-week-average tick inside a volume track. */
+    val tick: Color = Color(0xFF4A525C),
+    /** Sheet drag handle. */
+    val handle: Color = Color(0xFF3E454E),
+    /** Dashed outline for an untrained body-map region. */
+    val outlineDashed: Color = Color(0xFF6B737D),
 )
 
 /**
@@ -61,4 +72,11 @@ object StateColor {
     val pr = Color(0xFFFFD100)          // matches the 15 kg plate; PRs read as "yellow"
     val regression = Color(0xFF8B939E)  // muted, not alarming — a bad set is information
     val deload = Color(0xFF0057B8)
+
+    /**
+     * Dark stripe of the near-cap hatch. Pairs with [pr] at 3dp intervals, 135°.
+     * Going over a weekly cap is never red — one heavy week is a scheduling fact,
+     * not a mistake (design 10b).
+     */
+    val capHatchDark = Color(0xFF8A7200)
 }

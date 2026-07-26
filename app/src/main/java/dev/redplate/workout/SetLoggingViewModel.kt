@@ -94,6 +94,7 @@ class SetLoggingViewModel @Inject constructor(
                     exerciseName = ex?.name ?: "Exercise",
                     primaryMuscle = ex?.primaryMuscle ?: dev.redplate.data.MuscleGroup.CHEST,
                     imageUri = mediaResolver.startImage(exerciseId),
+                    endImageUri = mediaResolver.endImage(exerciseId),
                     supersetLabel = supersetLabel(sl?.supersetGroup),
                     // Guidance is worth opening whenever there is anything to show:
                     // stills, the muscles worked, or equipment-valid swaps. Gating it on
@@ -226,6 +227,7 @@ class SetLoggingViewModel @Inject constructor(
                         headerSubtitle = buildHeaderSubtitle(
                             setNum, ts, it.repRangeLow, it.repRangeHigh, remaining
                         ),
+                        restSubtitle = buildRestSubtitle(workingCount, remaining),
                         coachReasoningLine = buildReasoningLine(logged, previous),
                         prBadgeText = if (hasPr && lastLogged != null)
                             "Best set you've done at ${formatKg(lastLogged.loadKg)} kg."
@@ -439,6 +441,12 @@ class SetLoggingViewModel @Inject constructor(
 
     private fun buildHeaderSubtitle(setNum: Int, total: Int, repLow: Int, repHigh: Int, remaining: Int): String {
         return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
+    }
+
+    /** Resting, so the subtitle reports what is behind you, not what is next. */
+    private fun buildRestSubtitle(logged: Int, remaining: Int): String = when {
+        remaining > 0 -> "SET $logged LOGGED · $remaining TO GO"
+        else -> "SET $logged LOGGED · LAST ONE"
     }
 
     private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {

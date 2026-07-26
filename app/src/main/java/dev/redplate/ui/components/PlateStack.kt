@@ -38,24 +38,31 @@ import dev.redplate.ui.theme.RedplateTheme
 // Calibrated for S24 Ultra (384 dp wide). Competition bumpers share
 // a height (like the real 450 mm diameter); change plates scale down.
 
-private val FULL_PLATE_HEIGHT = 120.dp
-private val BAR_HEIGHT = 10.dp
+/**
+ * Competition bumpers share a height (like the real 450 mm diameter); change plates
+ * scale down from it. [PlateStack] takes the full height as a parameter because the set
+ * screen and the guidance sheet give the stack very different amounts of room — 66 dp
+ * beside a movement window (design 8a), 88 dp when the stack is the hero (design 1b).
+ */
+val PLATE_HEIGHT_FULL = 120.dp
+val PLATE_HEIGHT_COMPACT = 66.dp
+
+private val BAR_HEIGHT = 7.dp
 private val BAR_END_WIDTH = 6.dp
-private val BAR_END_HEIGHT = 22.dp
-private val COLLAR_WIDTH = 12.dp
-private val COLLAR_HEIGHT = 34.dp
-private val PLATE_GAP = 1.5.dp
+private val COLLAR_WIDTH = 11.dp
+private val PLATE_GAP = 2.dp
 private val PLATE_CORNER = 3.dp
 private val OUTLINE_WIDTH = 1.5.dp
 
-private val BAR_COLOR = Color(0xFF3A3A3A)
+private val BAR_COLOR = Color(0xFF2A2F36)
 private val COLLAR_COLOR = Color(0xFF555555)
 
-private fun plateHeight(kg: Double): Dp = when {
-    kg >= 10.0 -> FULL_PLATE_HEIGHT
-    kg == 5.0  -> 96.dp
-    kg == 2.5  -> 72.dp
-    else       -> 56.dp
+/** Change plates read as smaller discs, in the same proportions as real ones. */
+private fun plateHeight(kg: Double, full: Dp): Dp = when {
+    kg >= 10.0 -> full
+    kg == 5.0 -> full * 0.80f
+    kg == 2.5 -> full * 0.60f
+    else -> full * 0.47f
 }
 
 private fun plateWidth(kg: Double): Dp = when {
@@ -73,11 +80,12 @@ private fun plateWidth(kg: Double): Dp = when {
 fun PlateStack(
     plateLoad: PlateMath.PlateLoad,
     modifier: Modifier = Modifier,
+    plateHeight: Dp = PLATE_HEIGHT_FULL,
 ) {
     val outlineColor = RedplateTheme.colors.line
 
     Box(
-        modifier = modifier.heightIn(min = FULL_PLATE_HEIGHT),
+        modifier = modifier.heightIn(min = plateHeight),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -93,25 +101,27 @@ fun PlateStack(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            BarEnd()
+            BarEnd(plateHeight)
             Spacer(Modifier.weight(1f))
 
             PlateRun(
                 plates = plateLoad.perSide.asReversed(),
                 slideDirection = -1,
                 outlineColor = outlineColor,
+                fullHeight = plateHeight,
             )
 
-            Collar()
+            Collar(plateHeight)
 
             PlateRun(
                 plates = plateLoad.perSide,
                 slideDirection = 1,
                 outlineColor = outlineColor,
+                fullHeight = plateHeight,
             )
 
             Spacer(Modifier.weight(1f))
-            BarEnd()
+            BarEnd(plateHeight)
         }
     }
 }
@@ -123,6 +133,7 @@ private fun PlateRun(
     plates: List<Double>,
     slideDirection: Int,
     outlineColor: Color,
+    fullHeight: Dp,
 ) {
     AnimatedContent(
         targetState = plates,
@@ -157,7 +168,7 @@ private fun PlateRun(
             horizontalArrangement = Arrangement.spacedBy(PLATE_GAP),
         ) {
             currentPlates.forEach { kg ->
-                PlateDisc(kg = kg, outlineColor = outlineColor)
+                PlateDisc(kg = kg, outlineColor = outlineColor, fullHeight = fullHeight)
             }
         }
     }
@@ -166,7 +177,7 @@ private fun PlateRun(
 // ── Single disc ─────────────────────────────────────────────────────
 
 @Composable
-private fun PlateDisc(kg: Double, outlineColor: Color) {
+private fun PlateDisc(kg: Double, outlineColor: Color, fullHeight: Dp) {
     val color = PlateColor.forPlate(kg)
     val outlined = PlateColor.needsOutline(kg)
     val shape = RoundedCornerShape(PLATE_CORNER)
@@ -174,7 +185,7 @@ private fun PlateDisc(kg: Double, outlineColor: Color) {
     Box(
         Modifier
             .width(plateWidth(kg))
-            .height(plateHeight(kg))
+            .height(plateHeight(kg, fullHeight))
             .clip(shape)
             .then(if (outlined) Modifier.border(OUTLINE_WIDTH, outlineColor, shape) else Modifier)
             .background(color)
@@ -184,22 +195,22 @@ private fun PlateDisc(kg: Double, outlineColor: Color) {
 // ── Collar + bar end ────────────────────────────────────────────────
 
 @Composable
-private fun Collar() {
+private fun Collar(fullHeight: Dp) {
     Box(
         Modifier
             .width(COLLAR_WIDTH)
-            .height(COLLAR_HEIGHT)
+            .height(fullHeight * 0.36f)
             .clip(RoundedCornerShape(2.dp))
             .background(COLLAR_COLOR)
     )
 }
 
 @Composable
-private fun BarEnd() {
+private fun BarEnd(fullHeight: Dp) {
     Box(
         Modifier
             .width(BAR_END_WIDTH)
-            .height(BAR_END_HEIGHT)
+            .height(fullHeight * 0.24f)
             .clip(RoundedCornerShape(2.dp))
             .background(BAR_COLOR)
     )

@@ -3,25 +3,24 @@ package dev.redplate.workout
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -40,18 +38,20 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.Text
 import dev.redplate.data.PlateMath
+import dev.redplate.ui.components.MovementWindow
+import dev.redplate.ui.components.PLATE_HEIGHT_COMPACT
 import dev.redplate.ui.components.PlateStack
+import dev.redplate.ui.components.PrimaryBar
+import dev.redplate.ui.components.ScreenHeader
+import dev.redplate.ui.components.SectionLabel
 import dev.redplate.ui.theme.KeepScreenOn
 import dev.redplate.ui.theme.PlexCondensed
-import dev.redplate.ui.theme.PlexMono
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
 import dev.redplate.ui.theme.StateColor
@@ -97,7 +97,6 @@ fun SetLoggingRoute(
         onRepsDown = viewModel::repsDown,
         onRepsUp = viewModel::repsUp,
         onSetDifficulty = viewModel::setDifficulty,
-        onToggleWarmup = viewModel::toggleWarmup,
         onCompleteSet = viewModel::completeSet,
         // One button, three jobs, chosen by the ViewModel so the label and the
         // behaviour cannot disagree: another set, the next lift, or close the session.
@@ -108,8 +107,10 @@ fun SetLoggingRoute(
                 RestAction.FINISH_SESSION -> viewModel.finishSession(onSessionFinished)
             }
         },
-        onAddRest = { viewModel.adjustRest(30) },
+        // Three real controls, as drawn: −15s, Add 30s, +15s.
         onSubRest = { viewModel.adjustRest(-15) },
+        onAddRest = { viewModel.adjustRest(30) },
+        onAddShortRest = { viewModel.adjustRest(15) },
         modifier = modifier,
     )
 
@@ -154,11 +155,11 @@ fun SetLoggingScreen(
     onRepsDown: () -> Unit,
     onRepsUp: () -> Unit,
     onSetDifficulty: (Difficulty?) -> Unit,
-    onToggleWarmup: () -> Unit,
     onCompleteSet: () -> Unit,
     onRestPrimary: () -> Unit,
-    onAddRest: () -> Unit,
     onSubRest: () -> Unit,
+    onAddRest: () -> Unit,
+    onAddShortRest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val resting = state.rest is RestState.Running
@@ -174,6 +175,7 @@ fun SetLoggingScreen(
                 onBack = onBack,
                 onSub = onSubRest,
                 onAdd = onAddRest,
+                onAddShort = onAddShortRest,
                 onPrimary = onRestPrimary,
                 modifier = modifier,
             )
@@ -187,16 +189,20 @@ fun SetLoggingScreen(
                 onRepsDown = onRepsDown,
                 onRepsUp = onRepsUp,
                 onSetDifficulty = onSetDifficulty,
-                onToggleWarmup = onToggleWarmup,
                 onCompleteSet = onCompleteSet,
                 modifier = modifier,
             )
         }
     }
 }
-
-// ── INPUT SCREEN ──
-// Header → Movement window (placeholder) → Load/plates → Reps → Difficulty → Primary bar
+// ─────────────────────────────────────────────────────────────────────
+// INPUT — design 8a
+// Header → movement window → readout + plates → reps → difficulty → primary
+//
+// Note on warm-ups: the revamp draws no warm-up control on this screen, so there
+// isn't one. `isWarmup` stays in the model — import/export and volume credit still
+// honour it — but nothing on the set screen sets it.
+// ─────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun InputScreen(
@@ -208,7 +214,6 @@ private fun InputScreen(
     onRepsDown: () -> Unit,
     onRepsUp: () -> Unit,
     onSetDifficulty: (Difficulty?) -> Unit,
-    onToggleWarmup: () -> Unit,
     onCompleteSet: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -220,144 +225,119 @@ private fun InputScreen(
             .background(colors.ground)
             .systemBarsPadding(),
     ) {
-        // ── Header ──
-        Header(
+        SetHeader(
             exerciseName = state.exerciseName,
-            subtitle = listOf(state.exercisePositionLabel, state.headerSubtitle)
-                .filter { it.isNotEmpty() }
-                .joinToString("  ·  "),
+            subtitle = state.headerSubtitle,
             hasGuidance = state.hasGuidance,
             onBack = onBack,
             onOpenGuidance = onOpenGuidance,
         )
 
-        // ── Scrollable content ──
+        // Movement window: start and end cross-fading, so the picture shows the
+        // movement rather than a pose.
+        MovementWindow(
+            startImageUri = state.imageUri,
+            endImageUri = state.endImageUri,
+            muscle = state.primaryMuscle,
+            contentDescription = state.exerciseName,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(top = 2.dp)
+                .height(164.dp)
+                .clip(RoundedCornerShape(18.dp)),
+        )
+
+        // Readout. Centre band flexes so the load sits in the optical middle
+        // whatever the header and window take.
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Center,
         ) {
-            // Movement window — start-position still, or a muscle-group placeholder
-            ExerciseImage(
-                imageUri = state.imageUri,
-                muscle = state.primaryMuscle,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp)
-                    .height(164.dp)
-                    .clip(RoundedCornerShape(18.dp)),
-                contentDescription = state.exerciseName,
-            )
-
-            // Load section
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-            ) {
-                // Coach reasoning line
-                if (state.coachReasoningLine.isNotEmpty()) {
-                    Text(
-                        text = state.coachReasoningLine,
-                        style = RedplateType.body.copy(fontSize = 15.5.sp),
-                        color = colors.inkSecondary,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                }
-
-                // Weight readout and its stepper. The steppers flank the number so the
-                // thumb lands either side of what it is changing, and each step is a
-                // load the equipment can actually make — never a 6 kg dumbbell.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    StepButton("−", "Decrease weight", onClick = onLoadDown)
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(
-                                text = formatKg(state.loadKg),
-                                style = RedplateType.load.copy(fontSize = 64.sp),
-                                color = colors.ink,
-                                modifier = Modifier.semantics {
-                                    contentDescription = "Weight ${formatKg(state.loadKg)} kilograms"
-                                },
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "KG",
-                                style = RedplateType.mono.copy(fontSize = 14.sp),
-                                color = colors.inkMuted,
-                                modifier = Modifier.padding(bottom = 9.dp),
-                            )
-                        }
-                        // Plate maths could not hit the number asked for. Say so, rather
-                        // than silently showing a weight that cannot be loaded.
-                        if (!state.isExactLoad) {
-                            Text(
-                                text = "closest the plates allow",
-                                style = RedplateType.mono.copy(fontSize = 10.sp),
-                                color = colors.inkMuted,
-                            )
-                        }
-                    }
-
-                    StepButton("+", "Increase weight", onClick = onLoadUp)
-                }
+            if (state.coachReasoningLine.isNotEmpty()) {
+                Text(
+                    text = state.coachReasoningLine,
+                    style = RedplateType.body.copy(fontSize = 15.sp),
+                    color = colors.inkSecondary,
+                )
+                Spacer(Modifier.height(2.dp))
             }
 
-            // Plate stack
-            if (state.isPlateLoaded && state.plateLoad != null) {
-                PlateStack(
-                    plateLoad = state.plateLoad,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "Working weight ${formatKg(state.loadKg)} kilograms"
+                },
+            ) {
+                Text(
+                    text = formatKg(state.loadKg),
+                    style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
+                    color = colors.ink,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "KG",
+                    style = RedplateType.mono.copy(fontSize = 14.sp),
+                    color = colors.inkMuted,
+                    modifier = Modifier.padding(bottom = 9.dp),
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            if (!state.isExactLoad) {
+                Text(
+                    text = "Closest the plates allow.",
+                    style = RedplateType.mono.copy(fontSize = 10.sp),
+                    color = colors.inkMuted,
+                )
+            }
 
-            // Rep counter
+            if (state.isPlateLoaded && state.plateLoad != null) {
+                PlateStack(
+                    plateLoad = state.plateLoad,
+                    plateHeight = PLATE_HEIGHT_COMPACT,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                )
+            }
+        }
+
+        // Controls.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp),
+        ) {
             RepCounter(
                 reps = state.reps,
                 onDown = onRepsDown,
                 onUp = onRepsUp,
+                onLoadDown = onLoadDown,
+                onLoadUp = onLoadUp,
             )
-
-            Spacer(Modifier.height(12.dp))
-
-            // Difficulty chips
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                DifficultyChips(
-                    selected = state.difficulty,
-                    onSelect = onSetDifficulty,
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Warm-up toggle. This used to render only when already on, so there was no
-            // way to turn it back on once cleared — the control disappeared with the state
-            // it controlled. It is now always present and always says which way it is set.
-            WarmupToggle(isWarmup = state.isWarmup, onToggle = onToggleWarmup)
-
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            DifficultyChips(
+                selected = state.difficulty,
+                onSelect = onSetDifficulty,
+            )
         }
 
-        // ── Primary bar ──
-        InputPrimaryBar(
-            enabled = state.canCompleteSet,
+        PrimaryBar(
+            label = "Done — start rest",
             onClick = onCompleteSet,
+            enabled = state.canCompleteSet,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
 }
 
-// ── REST SCREEN ──
-// Header → PR badge → Timer → Progress → Coach text → Set history → Controls → Primary
+// ─────────────────────────────────────────────────────────────────────
+// REST — design 2b
+// ─────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun RestScreen(
@@ -365,6 +345,7 @@ private fun RestScreen(
     onBack: () -> Unit,
     onSub: () -> Unit,
     onAdd: () -> Unit,
+    onAddShort: () -> Unit,
     onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -377,16 +358,14 @@ private fun RestScreen(
             .background(colors.ground)
             .systemBarsPadding(),
     ) {
-        // Header
-        Header(
+        SetHeader(
             exerciseName = state.exerciseName,
-            subtitle = "SET ${state.setNumber - 1} LOGGED · ${(state.targetSets - state.setNumber + 1).coerceAtLeast(0)} TO GO",
+            subtitle = state.restSubtitle,
             hasGuidance = false,
             onBack = onBack,
             onOpenGuidance = {},
         )
 
-        // Scrollable rest content
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -395,7 +374,7 @@ private fun RestScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Center,
         ) {
-            // PR badge
+            // The one earned celebration in the app.
             if (state.prBadgeText != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -410,40 +389,44 @@ private fun RestScreen(
                         Text(
                             text = "★ PR",
                             style = RedplateType.mono.copy(
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                             ),
-                            color = Color(0xFF0C0E11),
+                            color = colors.inkOnLight,
                         )
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = state.prBadgeText,
-                        style = RedplateType.body,
+                        style = RedplateType.body.copy(fontSize = 15.sp),
                         color = colors.ink,
                     )
                 }
             }
 
-            // REST label
             Text(
                 text = "REST",
-                style = RedplateType.mono,
+                style = RedplateType.mono.copy(fontSize = 10.5.sp),
                 color = colors.inkMuted,
             )
+            Spacer(Modifier.height(2.dp))
 
-            // Timer
+            // 112sp, tabular — readable with the phone on the floor.
             Text(
                 text = formatClock(running.remainingSeconds),
-                style = RedplateType.timer,
+                style = RedplateType.timer.copy(textAlign = TextAlign.Start),
                 color = colors.live,
+                modifier = Modifier.semantics {
+                    contentDescription = "${running.remainingSeconds} seconds of rest left"
+                },
             )
 
-            // Progress bar
+            Spacer(Modifier.height(14.dp))
             val progress = if (running.totalSeconds > 0) {
                 1f - (running.remainingSeconds.toFloat() / running.totalSeconds)
-            } else 0f
-
-            Spacer(Modifier.height(14.dp))
+            } else {
+                0f
+            }
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -453,16 +436,13 @@ private fun RestScreen(
             ) {
                 Box(
                     Modifier
-                        .fillMaxWidth(progress)
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
                         .background(colors.live),
                 )
             }
-
             Spacer(Modifier.height(20.dp))
 
-            // Coach text
             if (state.restCoachText.isNotEmpty()) {
                 Text(
                     text = state.restCoachText,
@@ -472,56 +452,38 @@ private fun RestScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            // Set history card
-            if (state.loggedSets.isNotEmpty()) {
+            if (state.loggedSets.any { !it.isWarmup }) {
                 SetHistoryCard(sets = state.loggedSets)
             }
         }
 
-        // Rest controls
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Two controls, both real. There used to be a third "+15s" pill with an
-            // empty handler sitting next to a "+30s" one, so the row had a button that
-            // did nothing and two that looked like they did the same thing.
             RestPill("−15s", "Take 15 seconds off the rest", onClick = onSub,
+                modifier = Modifier.width(92.dp), mono = true)
+            RestPill("Add 30s", "Add 30 seconds to the rest", onClick = onAdd,
                 modifier = Modifier.weight(1f))
-            RestPill("+30s", "Add 30 seconds to the rest", onClick = onAdd,
-                modifier = Modifier.weight(1f))
+            RestPill("+15s", "Add 15 seconds to the rest", onClick = onAddShort,
+                modifier = Modifier.width(92.dp), mono = true)
         }
 
-        // Primary bar
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .heightIn(min = 88.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(colors.live)
-                .clickable(onClick = onPrimary)
-                .semantics {
-                    contentDescription = state.restPrimaryLabel
-                    role = Role.Button
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = state.restPrimaryLabel,
-                style = RedplateType.action.copy(fontSize = 20.sp),
-                color = Color(0xFF0C0E11),
-            )
-        }
+        PrimaryBar(
+            label = state.restPrimaryLabel,
+            onClick = onPrimary,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
 }
 
-// ── Shared composables ──
+// ── Shared ──────────────────────────────────────────────────────────
 
 @Composable
-private fun Header(
+private fun SetHeader(
     exerciseName: String,
     subtitle: String,
     hasGuidance: Boolean,
@@ -529,126 +491,168 @@ private fun Header(
     onOpenGuidance: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TapTarget(description = "Back", onClick = onBack) {
-            Text("‹", style = RedplateType.load, color = colors.inkMuted)
-        }
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = exerciseName,
-                style = RedplateType.exerciseName.copy(fontSize = 16.sp, fontWeight = FontWeight.Medium),
-                color = colors.ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle.isNotEmpty()) {
-                Text(
-                    text = subtitle,
-                    style = RedplateType.mono.copy(fontSize = 10.sp),
-                    color = colors.inkMuted,
-                )
-            }
-        }
-        if (hasGuidance) {
-            TapTarget(description = "Exercise guidance", onClick = onOpenGuidance) {
+    ScreenHeader(
+        title = exerciseName,
+        subtitle = subtitle.ifEmpty { null },
+        onBack = onBack,
+        trailing = if (!hasGuidance) {
+            null
+        } else {
+            {
                 Box(
                     Modifier
                         .sizeIn(minWidth = 64.dp, minHeight = 64.dp)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(colors.surface),
+                        .background(colors.surface)
+                        .clickable(onClick = onOpenGuidance)
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "How to do this exercise"
+                            role = Role.Button
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("?", style = RedplateType.body.copy(fontSize = 14.sp), color = colors.inkMuted)
+                    Text(
+                        text = "?",
+                        style = RedplateType.body.copy(fontSize = 14.sp),
+                        color = colors.inkMuted,
+                    )
                 }
             }
-        } else {
-            Spacer(Modifier.width(64.dp))
-        }
-    }
+        },
+    )
 }
 
+/**
+ * Reps in the middle with its own steppers, and the load steppers on the outside.
+ *
+ * 8a draws only the rep steppers, because the engine prescribes the load. The load
+ * pair is kept because COACHING.md requires an override to always be possible and the
+ * plan doc is explicit that "steppers stay for overriding" — they sit outboard so the
+ * rep question still reads as the primary one.
+ */
 @Composable
 private fun RepCounter(
     reps: Int,
     onDown: () -> Unit,
     onUp: () -> Unit,
+    onLoadDown: () -> Unit,
+    onLoadUp: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            StepButton("−", "Decrease reps", onClick = onDown)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = reps.toString(),
-                    style = RedplateType.figure.copy(fontSize = 38.sp, fontWeight = FontWeight.SemiBold),
-                    color = colors.ink,
-                )
-                Text(
-                    text = "reps done",
-                    style = RedplateType.mono,
-                    color = colors.inkMuted,
-                )
+        StepButton("−", "Decrease reps", onClick = onDown)
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = reps.toString(),
+                style = RedplateType.figure.copy(
+                    fontSize = 38.sp,
+                    lineHeight = 38.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = colors.ink,
+            )
+            Text(
+                text = "reps done",
+                style = RedplateType.body.copy(fontSize = 12.sp),
+                color = colors.inkMuted,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LoadNudge("− kg", "Decrease weight", onLoadDown)
+                LoadNudge("+ kg", "Increase weight", onLoadUp)
             }
-            StepButton("+", "Increase reps", onClick = onUp)
         }
+
+        StepButton("+", "Increase reps", onClick = onUp)
     }
 }
 
 @Composable
-private fun WarmupToggle(isWarmup: Boolean, onToggle: () -> Unit) {
+private fun LoadNudge(label: String, description: String, onClick: () -> Unit) {
     val colors = RedplateTheme.colors
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Box(
-            Modifier
-                .heightIn(min = 64.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (isWarmup) colors.surfaceRaised else colors.ground)
-                .border(
-                    1.dp,
-                    if (isWarmup) colors.ink else colors.line,
-                    RoundedCornerShape(10.dp),
-                )
-                .toggleable(
-                    value = isWarmup,
-                    role = Role.Switch,
-                    onValueChange = { onToggle() },
-                )
-                .semantics {
-                    contentDescription =
-                        "Warm-up set. ${if (isWarmup) "On" else "Off"}. " +
-                            "Warm-up sets are logged but do not count toward weekly volume."
-                }
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = if (isWarmup) "WARM-UP  ●" else "WARM-UP  ○",
-                style = RedplateType.label,
-                color = if (isWarmup) colors.ink else colors.inkMuted,
-            )
-        }
+    Box(
+        Modifier
+            .sizeIn(minWidth = 64.dp, minHeight = 40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surface)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = RedplateType.mono.copy(fontSize = 11.sp),
+            color = colors.inkMuted,
+        )
     }
 }
 
+@Composable
+private fun StepButton(symbol: String, description: String, onClick: () -> Unit) {
+    val colors = RedplateTheme.colors
+    Box(
+        Modifier
+            .sizeIn(minWidth = 64.dp, minHeight = 64.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = symbol,
+            style = RedplateType.figure.copy(fontFamily = PlexCondensed, fontSize = 26.sp),
+            color = colors.ink,
+        )
+    }
+}
+
+@Composable
+private fun RestPill(
+    text: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    mono: Boolean = false,
+) {
+    val colors = RedplateTheme.colors
+    Box(
+        modifier
+            .height(64.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                role = Role.Button
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = if (mono) {
+                RedplateType.mono.copy(fontSize = 12.sp)
+            } else {
+                RedplateType.body.copy(fontSize = 14.5.sp)
+            },
+            color = colors.inkSecondary,
+        )
+    }
+}
+
+/** "SO FAR" — the session's own sets, in mono so the columns line up. */
 @Composable
 private fun SetHistoryCard(sets: List<LoggedSetLine>) {
     val colors = RedplateTheme.colors
@@ -659,19 +663,23 @@ private fun SetHistoryCard(sets: List<LoggedSetLine>) {
             .background(colors.surface)
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
-        Text(
-            text = "SO FAR",
-            style = RedplateType.mono.copy(fontSize = 9.5.sp, letterSpacing = 0.14.sp),
-            color = colors.inkMuted,
-        )
+        SectionLabel("So far")
         Spacer(Modifier.height(7.dp))
         sets.filter { !it.isWarmup }.forEach { line ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${line.setIndex + 1}  ${formatKg(line.loadKg)} × ${line.reps}  ${line.rir?.let { "$it left" } ?: ""}",
-                    style = RedplateType.data.copy(fontSize = 12.5.sp, lineHeight = 24.sp),
+                    text = "${line.setIndex + 1}  ${formatKg(line.loadKg)} × ${line.reps}",
+                    style = RedplateType.data.copy(fontSize = 12.5.sp, lineHeight = 21.sp),
                     color = colors.inkSecondary,
                 )
+                if (line.rir != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${line.rir} left",
+                        style = RedplateType.data.copy(fontSize = 12.5.sp, lineHeight = 21.sp),
+                        color = colors.inkMuted,
+                    )
+                }
                 if (line.isPr) {
                     Spacer(Modifier.width(8.dp))
                     Text("★", style = RedplateType.data, color = StateColor.pr)
@@ -681,84 +689,7 @@ private fun SetHistoryCard(sets: List<LoggedSetLine>) {
     }
 }
 
-@Composable
-private fun InputPrimaryBar(enabled: Boolean, onClick: () -> Unit) {
-    val colors = RedplateTheme.colors
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .heightIn(min = 88.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (enabled) colors.live else colors.surface)
-            .clickable(enabled = enabled) { onClick() }
-            .semantics {
-                contentDescription = "Done — start rest"
-                role = Role.Button
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Done — start rest",
-            style = RedplateType.action.copy(fontSize = 20.sp),
-            color = if (enabled) Color(0xFF0C0E11) else colors.inkMuted,
-        )
-    }
-}
-
-@Composable
-private fun TapTarget(description: String, onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        Modifier
-            .sizeIn(minWidth = 64.dp, minHeight = 64.dp)
-            .clickable { onClick() }
-            .semantics(mergeDescendants = true) {
-                contentDescription = description
-                role = Role.Button
-            },
-        contentAlignment = Alignment.Center,
-    ) { content() }
-}
-
-@Composable
-private fun StepButton(symbol: String, description: String, onClick: () -> Unit) {
-    val colors = RedplateTheme.colors
-    Box(
-        Modifier
-            .sizeIn(minWidth = 64.dp, minHeight = 64.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.surfaceRaised)
-            .clickable { onClick() }
-            .semantics(mergeDescendants = true) {
-                contentDescription = description
-                role = Role.Button
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(symbol, style = RedplateType.figure, color = colors.ink)
-    }
-}
-
-@Composable
-private fun RestPill(text: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = RedplateTheme.colors
-    Box(
-        modifier
-            .height(64.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(colors.surface)
-            .clickable { onClick() }
-            .semantics(mergeDescendants = true) {
-                contentDescription = description
-                role = Role.Button
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = RedplateType.body.copy(fontSize = 14.5.sp), color = colors.inkSecondary)
-    }
-}
-
-// ── Formatting ──
+// ── Formatting ──────────────────────────────────────────────────────
 
 private fun formatKg(kg: Double): String =
     if (kg % 1.0 == 0.0) kg.toInt().toString() else kg.toString().trimEnd('0').trimEnd('.')
@@ -770,14 +701,8 @@ private fun formatClock(totalSeconds: Int): String {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Previews
+// Previews — device-sized, so the 370/490 dp zones can be checked by eye
 // ─────────────────────────────────────────────────────────────────────
-
-private val PREVIOUS = listOf(
-    PreviousSetLine(80.0, 8, 2),
-    PreviousSetLine(80.0, 7, 1),
-    PreviousSetLine(80.0, 6, 0),
-)
 
 @Composable
 private fun PreviewScreen(state: SetLoggingUiState) {
@@ -787,60 +712,32 @@ private fun PreviewScreen(state: SetLoggingUiState) {
             onBack = {}, onOpenGuidance = {},
             onLoadDown = {}, onLoadUp = {},
             onRepsDown = {}, onRepsUp = {},
-            onSetDifficulty = {},
-            onToggleWarmup = {}, onCompleteSet = {},
-            onRestPrimary = {}, onAddRest = {}, onSubRest = {},
+            onSetDifficulty = {}, onCompleteSet = {},
+            onRestPrimary = {}, onSubRest = {}, onAddRest = {}, onAddShortRest = {},
         )
     }
 }
 
-@Preview(name = "Input · first set", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "8a · logging a set", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
-private fun FirstSetPreview() {
+private fun InputPreview() {
     PreviewScreen(
         SetLoggingUiState(
             isLoading = false,
             exerciseName = "Bench Press",
             hasGuidance = true,
-            exercisePositionLabel = "EXERCISE 1 OF 5",
             setNumber = 3, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
             headerSubtitle = "SET 3 OF 4 · 6–10 REPS · 2 LEFT",
             coachReasoningLine = "Same weight as your last set —",
-            loadKg = 102.5, reps = 8,
-            difficulty = Difficulty.TWO_LEFT,
-            isPlateLoaded = true,
-            plateLoad = PlateMath.PlateLoad(102.5, listOf(20.0, 20.0, 1.25), false),
-            previousSets = PREVIOUS,
-        )
-    )
-}
-
-@Preview(name = "Resting · PR", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
-@Composable
-private fun RestingPreview() {
-    PreviewScreen(
-        SetLoggingUiState(
-            isLoading = false,
-            exerciseName = "Bench Press",
-            setNumber = 4, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
-            headerSubtitle = "SET 3 LOGGED · 1 TO GO",
             loadKg = 102.5, reps = 9,
+            difficulty = Difficulty.ONE_LEFT,
             isPlateLoaded = true,
-            plateLoad = PlateMath.PlateLoad(102.5, listOf(20.0, 20.0, 1.25), false),
-            loggedSets = listOf(
-                LoggedSetLine(0, 102.5, 10, 2, isWarmup = false, isPr = false),
-                LoggedSetLine(1, 102.5, 9, 1, isWarmup = false, isPr = false),
-                LoggedSetLine(2, 102.5, 9, 1, isWarmup = false, isPr = true),
-            ),
-            rest = RestState.Running(remainingSeconds = 134, totalSeconds = 180),
-            prBadgeText = "Best set you've done at 102.5 kg.",
-            restCoachText = "Three minutes is the prescription for a heavy compound. Next set: same 102.5 kg, and 8 reps is a good day.",
-            restPrimaryLabel = "I'm ready — set 4",
+            plateLoad = PlateMath.PlateLoad(102.5, listOf(25.0, 20.0, 10.0), true),
         )
     )
 }
 
-@Preview(name = "Input · unloadable weight", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "8a · weight not loadable", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun InexactLoadPreview() {
     PreviewScreen(
@@ -848,28 +745,50 @@ private fun InexactLoadPreview() {
             isLoading = false,
             exerciseName = "Barbell Back Squat",
             hasGuidance = true,
-            exercisePositionLabel = "EXERCISE 1 OF 5",
-            setNumber = 1, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
+            setNumber = 1, targetSets = 4, repRangeLow = 6, repRangeHigh = 10,
             headerSubtitle = "SET 1 OF 4 · 6–10 REPS · 4 LEFT",
             coachReasoningLine = "Based on your last session —",
             loadKg = 97.5, reps = 8,
-            isPlateLoaded = true,
-            isExactLoad = false,
+            isPlateLoaded = true, isExactLoad = false,
             plateLoad = PlateMath.PlateLoad(97.5, listOf(25.0, 10.0, 3.75), false),
-            isWarmup = true,
         )
     )
 }
 
-@Preview(name = "Resting · last set of lift", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "2b · rest with a PR", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun RestingPrPreview() {
+    PreviewScreen(
+        SetLoggingUiState(
+            isLoading = false,
+            exerciseName = "Bench Press",
+            setNumber = 4, targetSets = 4, repRangeLow = 6, repRangeHigh = 10,
+            restSubtitle = "SET 3 LOGGED · 1 TO GO",
+            loadKg = 102.5, reps = 9,
+            loggedSets = listOf(
+                LoggedSetLine(0, 102.5, 10, 2, isWarmup = false, isPr = false),
+                LoggedSetLine(1, 102.5, 9, 1, isWarmup = false, isPr = false),
+                LoggedSetLine(2, 102.5, 9, 1, isWarmup = false, isPr = true),
+            ),
+            rest = RestState.Running(remainingSeconds = 134, totalSeconds = 180),
+            prBadgeText = "Best set you've done at 102.5 kg.",
+            restCoachText = "Three minutes is the prescription for a heavy compound. " +
+                "Next set: same 102.5 kg, and 8 reps is a good day.",
+            restPrimaryLabel = "I'm ready — set 4",
+            restPrimaryAction = RestAction.NEXT_SET,
+        )
+    )
+}
+
+@Preview(name = "2b · rest, lift done", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun RestingNextExercisePreview() {
     PreviewScreen(
         SetLoggingUiState(
             isLoading = false,
             exerciseName = "Bench Press",
-            exercisePositionLabel = "EXERCISE 1 OF 5",
-            setNumber = 5, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
+            setNumber = 5, targetSets = 4,
+            restSubtitle = "SET 4 LOGGED · LAST ONE",
             loadKg = 102.5, reps = 8,
             loggedSets = listOf(
                 LoggedSetLine(0, 102.5, 10, 2, isWarmup = false, isPr = false),
@@ -886,30 +805,7 @@ private fun RestingNextExercisePreview() {
     )
 }
 
-@Preview(name = "Resting · session end", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
-@Composable
-private fun RestingFinishPreview() {
-    PreviewScreen(
-        SetLoggingUiState(
-            isLoading = false,
-            exerciseName = "Hanging Leg Raise",
-            exercisePositionLabel = "EXERCISE 5 OF 5",
-            setNumber = 4, targetSets = 3, repRangeLow = 10, repRangeHigh = 15,
-            loadKg = 0.0, reps = 12,
-            loggedSets = listOf(
-                LoggedSetLine(0, 0.0, 14, 2, isWarmup = false, isPr = false),
-                LoggedSetLine(1, 0.0, 12, 1, isWarmup = false, isPr = false),
-                LoggedSetLine(2, 0.0, 11, 0, isWarmup = false, isPr = false),
-            ),
-            rest = RestState.Running(remainingSeconds = 42, totalSeconds = 90),
-            restCoachText = "Last set of the session. Nice work.",
-            restPrimaryLabel = "Finish session",
-            restPrimaryAction = RestAction.FINISH_SESSION,
-        )
-    )
-}
-
-@Preview(name = "Input · loading", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "8a · loading", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun LoadingPreview() {
     PreviewScreen(SetLoggingUiState())

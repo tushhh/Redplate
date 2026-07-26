@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,11 +24,11 @@ import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
 
 /**
- * 2×3 grid of plain-language difficulty chips.
- * Selected = white bg with bold text, unselected = surface bg.
+ * Six 64dp chips in two rows of three — the hero of the set screen.
  *
- * Row 1: Easy / 3 more in me / 2 more in me
- * Row 2: 1 more, maybe / All I had / Failed the rep
+ * A stepper is two taps and an abstraction; a chip is one tap and a sentence. Each maps
+ * to an RIR value the engine uses, but the user never has to learn the acronym to answer
+ * the question. Selected chip inverts to ink (design 8a).
  */
 @Composable
 fun DifficultyChips(
@@ -60,7 +61,7 @@ private fun ChipRow(
         chips.forEach { difficulty ->
             val isSelected = difficulty == selected
             DifficultyChip(
-                label = difficulty.label,
+                label = difficulty.chipLabel,
                 isSelected = isSelected,
                 onClick = { onSelect(difficulty) },
                 modifier = Modifier.weight(1f),
@@ -79,8 +80,8 @@ private fun DifficultyChip(
     val colors = RedplateTheme.colors
     Box(
         modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(64.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(if (isSelected) colors.ink else colors.surface)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -89,9 +90,11 @@ private fun DifficultyChip(
             text = label,
             style = RedplateType.body.copy(
                 fontSize = 13.sp,
+                lineHeight = 15.sp,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             ),
             color = if (isSelected) colors.inkOnLight else colors.inkSecondary,
+            textAlign = TextAlign.Center,
         )
     }
 }

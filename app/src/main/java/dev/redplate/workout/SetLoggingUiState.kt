@@ -14,7 +14,10 @@ data class SetLoggingUiState(
     val exerciseId: String = "",
     val exerciseName: String = "",
     val primaryMuscle: MuscleGroup = MuscleGroup.CHEST,
+    /** Start position still. Half of the movement window. */
     val imageUri: String? = null,
+    /** End position still. The window cross-fades to this; null holds the start frame. */
+    val endImageUri: String? = null,
     val supersetLabel: String? = null,        // e.g. "SUPERSET A"; null when not supersetted
     val hasGuidance: Boolean = false,
     /** "EXERCISE 2 OF 6"; empty on a freestyle session with no running order. */
@@ -39,8 +42,11 @@ data class SetLoggingUiState(
     val previousSets: List<PreviousSetLine> = emptyList(),
     val loggedSets: List<LoggedSetLine> = emptyList(),
 
-    /** Subtitle under exercise name: "SET 3 OF 4 · 6–10 REPS · 2 LEFT" */
+    /** Subtitle under exercise name while logging: "SET 3 OF 4 · 6–10 REPS · 2 LEFT" */
     val headerSubtitle: String = "",
+
+    /** Subtitle while resting: "SET 3 LOGGED · 1 TO GO" */
+    val restSubtitle: String = "",
 
     /** Coach reasoning line above the load: "Same weight as your last set —" */
     val coachReasoningLine: String = "",
@@ -94,7 +100,21 @@ enum class Difficulty(val label: String, val rir: Int) {
     TWO_LEFT("2 more in me", 2),
     ONE_LEFT("1 more, maybe", 1),
     ALL_OUT("All I had", 0),
-    FAILED("Failed the rep", -1),
+    FAILED("Failed the rep", -1);
+
+    /**
+     * The chip face, broken where the design breaks it so all six read as one grid
+     * rather than three wide chips and three narrow ones (design 8a).
+     */
+    val chipLabel: String
+        get() = when (this) {
+            EASY -> "Easy"
+            THREE_LEFT -> "3 more\nin me"
+            TWO_LEFT -> "2 more\nin me"
+            ONE_LEFT -> "1 more,\nmaybe"
+            ALL_OUT -> "All I\nhad"
+            FAILED -> "Failed\nthe rep"
+        }
 }
 
 sealed interface RestState {
