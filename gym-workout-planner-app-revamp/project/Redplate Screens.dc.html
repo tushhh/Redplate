@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>@keyframes rp-frame{0%,38%{opacity:0}52%,92%{opacity:1}100%{opacity:0}}body{margin:0;background:#f0eee9;font-family:'IBM Plex Sans',system-ui,sans-serif}a{color:#2a78d6;text-decoration:none}a:hover{color:#1a5cae}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'IBM Plex Sans',system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'IBM Plex Sans',system-ui,sans-serif;color:rgba(0,0,0,.55);max-width:400px}.dv-opt:target .dv-oid{background:#FF5C1A;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:rgba(0,0,0,.5)}</style></helmet>
+
+<section class="dv-turn" id="t10">
+<div class="dv-thd"><a class="dv-tid" href="#t10">10</a><span class="dv-tname">The full balance chart, living at the bottom of the Plan tab — scrolled to, not tabbed to. Plus the over-cap state the Today footer never had.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="10a"><div class="dv-olabel"><a class="dv-oid" href="#10a">10a</a><span><strong>Plan, scrolled down.</strong> The week list scrolls away and all eleven groups appear beneath it — same row grammar as the Today footer, so it reads as the same object made complete rather than a new chart. The faint tick in each track is your four-week average, which is what makes a single week legible.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;padding:14px 22px 10px;border-bottom:1px solid #1E232A;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:19px;font-weight:600">Week 3 of 5</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#FF5C1A">ON TRACK</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:-34px;opacity:.55">
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">WED</div><div style="flex:1"><div style="font-size:15px;color:#B9C0C9">Upper B</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7B838E;margin-top:1px">20 SETS · 7.8 T</div></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#2F9BD8">DONE</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">THU</div><div style="flex:1;font-size:15px;color:#7B838E">Rest</div></div>
+      <div style="background:#1A1E24;border:1px solid #FF5C1A;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#FF5C1A;width:30px">FRI</div><div style="flex:1"><div style="font-size:16px;font-weight:600">Upper A</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">20 SETS · 58 MIN · TODAY</div></div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#FF5C1A">›</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">SAT</div><div style="flex:1"><div style="font-size:15px">Lower B</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">18 SETS · PLANNED</div></div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">SUN</div><div style="flex:1;font-size:15px;color:#7B838E">Rest</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 3px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E">BALANCE · WEEK 3 SO FAR</div>
+      <div style="display:flex;align-items:center;gap:6px"><div style="width:2px;height:9px;background:#4A525C"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;color:#7B838E">4-WK AVG</span></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:13px 16px">
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Chest</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:61%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:70%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">11/18</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Back</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:100%;height:100%;background:#FFD100"></div><div style="position:absolute;top:0;bottom:0;left:81%;width:2px;background:#8a7200"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FFD100;width:36px;text-align:right">21/20</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Shoulders</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:54%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:62%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">13/24</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Biceps</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:64%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:59%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">9/14</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Triceps</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:75%;height:100%;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></div><div style="position:absolute;top:0;bottom:0;left:70%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">12/16</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Quads</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:22%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:67%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">4/18</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Hamstrings</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:43%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:64%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">6/14</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Glutes</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:50%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:56%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">8/16</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Calves</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:20%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:34%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">2/10</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Abs</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:42%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:48%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">5/12</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:74px;color:#B9C0C9">Forearms</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;position:relative;overflow:hidden"><div style="width:38%;height:100%;background:#2F9BD8"></div><div style="position:absolute;top:0;bottom:0;left:40%;width:2px;background:#4A525C"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">3/8</span></div>
+      </div>
+      <div style="font-size:12.5px;line-height:1.5;color:#B9C0C9;margin-top:12px;padding-top:11px;border-top:1px solid #242A32;text-wrap:pretty">Back is a set over its cap — Saturday drops a row. Quads are the real gap: 4 of 18 with two days left.</div>
+    </div>
+  </div>
+  <div style="flex:none;padding:12px 16px 0;display:flex;gap:10px">
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Edit program</div>
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Adjust targets</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="10b"><div class="dv-olabel"><a class="dv-oid" href="#10b">10b</a><span><strong>Three bar states, settled.</strong> This closes the open question from the Today footer: what happens past the cap.</span></div>
+<div class="dv-card" style="width:420px;background:#101317;border:1px solid #2A2F36;border-radius:18px;padding:24px 26px;color:#F5F5F0;font-family:'IBM Plex Sans',sans-serif">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:16px">BAR STATES · SETS VS TARGET</div>
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:55%;height:100%;background:#2F9BD8"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">11/20</span></div>
+      <div style="font-size:13px;line-height:1.5;color:#B9C0C9">Under 75% of cap. Solid blue, count in grey. No comment unless the week is nearly over.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:80%;height:100%;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:36px;text-align:right">16/20</span></div>
+      <div style="font-size:13px;line-height:1.5;color:#B9C0C9">75–100%. Hatched — you're in the last few sets. Count stays grey; this is the target working, not a warning.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:100%;height:100%;background:#FFD100"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FFD100;width:36px;text-align:right">21/20</span></div>
+      <div style="font-size:13px;line-height:1.5;color:#B9C0C9">Over cap. Track fills solid, count turns yellow, and the coach line names the day that will absorb it. Never red — going over one week is a scheduling fact, not a mistake.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">The Today footer (<a href="#2a">2a</a>) keeps its three-row summary and now ends with "see the full week" pointing here. Balance rows are tappable in principle — a group opens its exercises for the week — not drawn yet.</p>
+</section>
+
+<section class="dv-turn" id="t9">
+<div class="dv-thd"><a class="dv-tid" href="#t9">9</a><span class="dv-tname">The rest of round 8, as its own turn: the You tab, backup and export, the plateau/deload state, and what the app looks like the day you install it.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="9a"><div class="dv-olabel"><a class="dv-oid" href="#9a">9a</a><span><strong>You.</strong> Settings that are all consequences, not preferences — every row says what it changes about the training, and the two that can silently ruin a session (plates, units) sit at the top with their current value visible without tapping in.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:22px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">YOU · SINCE MARCH 2026</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div style="width:56px;height:56px;border-radius:18px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;font-weight:600;color:#B9C0C9">T</div>
+      <div style="flex:1">
+        <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px;font-weight:600;line-height:1.1">Tushar</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;margin-top:2px">82.4 KG · 146 SESSIONS · 4 PRS THIS BLOCK</div>
+      </div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">GETS THE NUMBERS WRONG IF WRONG</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Plates in your gym</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Sets what the stack can round to</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#DDE2E8">20·15·10·5·2.5·1.25</span>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Units</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Converts history, never re-rounds it</div></div>
+        <div style="display:flex;gap:0;border-radius:11px;overflow:hidden;background:#242A32">
+          <span style="padding:9px 14px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#F5F5F0;color:#0C0E11;font-weight:500">KG</span>
+          <span style="padding:9px 14px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#8B939E">LB</span>
+        </div>
+      </div>
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Equipment</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Filters every suggestion and swap</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#DDE2E8">18 items</span>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">HOW LOUD THE COACH IS</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Rest timer</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Auto-starts, buzzes at zero</div></div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#DDE2E8">2:30 / 1:30</span>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Deload prompts</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Flags a stall after 3 flat weeks</div></div>
+        <div style="width:50px;height:30px;border-radius:15px;background:#FF5C1A;display:flex;align-items:center;justify-content:flex-end;padding:0 3px;box-sizing:border-box"><div style="width:24px;height:24px;border-radius:12px;background:#0C0E11"></div></div>
+      </div>
+      <div style="height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Backup</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Last night, 04:12 — all 146 sessions</div></div>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+    </div>
+  </div>
+  <div style="height:62px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">You</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="9b"><div class="dv-olabel"><a class="dv-oid" href="#9b">9b</a><span><strong>Backup, stated as a date.</strong> Losing 146 sessions is the only failure you can't undo, so this screen never says "enabled" — it says when, how many, and how big. Export is two formats: one a spreadsheet opens, one that restores byte-for-byte.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;padding:4px 8px;flex:none">
+    <div style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;color:#8B939E">‹</div>
+    <div style="flex:1;text-align:center;font-size:16px;font-weight:500">Backup &amp; export</div>
+    <div style="width:64px"></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:4px 22px 0">
+    <div style="background:#1A1E24;border-radius:22px;padding:18px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div style="width:8px;height:8px;border-radius:4px;background:#3FB55C"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#3FB55C">SAFE</span></div>
+      <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:28px;font-weight:600;line-height:1.1;margin-bottom:6px">Backed up 6 hours ago</div>
+      <p style="margin:0;font-size:14.5px;line-height:1.5;color:#B9C0C9;text-wrap:pretty">All 146 sessions, 3,912 sets and your plate setup — 1.4&nbsp;MB in your Google Drive. Nightly, on wi-fi.</p>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-size:14px;color:#DDE2E8">Back up now</div>
+        <div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center"><div style="width:50px;height:30px;border-radius:15px;background:#FF5C1A;display:flex;align-items:center;justify-content:flex-end;padding:0 3px;box-sizing:border-box"><div style="width:24px;height:24px;border-radius:12px;background:#0C0E11"></div></div></div>
+      </div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">TAKE A COPY OUT</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <div style="height:68px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Spreadsheet (CSV)</div><div style="font-size:12px;color:#8B939E;margin-top:1px">One row per set. Opens anywhere, restores nothing.</div></div>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+      <div style="height:68px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px">
+        <div style="flex:1"><div style="font-size:14.5px">Full archive (JSON)</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Everything, including PRs and settings. Restores exactly.</div></div>
+        <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+      </div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">BRING A COPY IN</div>
+    <div style="height:68px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;gap:12px;padding:0 16px;margin-bottom:12px">
+      <div style="flex:1"><div style="font-size:14.5px">Restore from a file</div><div style="font-size:12px;color:#8B939E;margin-top:1px">Merges by date — never overwrites blind</div></div>
+      <span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span>
+    </div>
+    <div style="border-radius:16px;border:1px solid #2A2F36;padding:13px 15px;display:flex;gap:11px;align-items:flex-start">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#FFD100;line-height:1.3">!</span>
+      <div style="font-size:12.5px;line-height:1.5;color:#8B939E;text-wrap:pretty">Uninstalling clears the device copy. The Drive copy survives — restoring it is the only way back.</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="9c"><div class="dv-olabel"><a class="dv-oid" href="#9c">9c</a><span><strong>Stall detected.</strong> Fires on the Today screen, not as a notification — three flat weeks on one lift, shown as the evidence rather than a verdict, with the deload spelled out in kilos so you can see it isn't quitting.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:22px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#FFD100;margin-bottom:10px">BENCH PRESS · WEEK 6 OF 5</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.08;letter-spacing:-.015em;margin-bottom:6px">Bench hasn't moved in three weeks.</div>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#B9C0C9;max-width:34ch;text-wrap:pretty">Same 102.5&nbsp;kg, and the last rep got harder each time. That's a stall, not a bad day.</p>
+    <div style="background:#1A1E24;border-radius:22px;padding:16px 18px;margin-bottom:12px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:14px">ESTIMATED 1RM · LAST 6 WEEKS</div>
+      <div style="display:flex;align-items:flex-end;gap:9px;height:96px">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:52px;border-radius:5px;background:#242A32"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#8B939E">W1</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:63px;border-radius:5px;background:#242A32"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#8B939E">W2</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:74px;border-radius:5px;background:#242A32"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#8B939E">W3</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:76px;border-radius:5px;background:#FFD100"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#FFD100">W4</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:75px;border-radius:5px;background:#FFD100"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#FFD100">W5</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;height:74px;border-radius:5px;background:#FFD100"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#FFD100">W6</span></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:14px;padding-top:13px;border-top:1px solid #242A32">
+        <div style="flex:1"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#8B939E;margin-bottom:3px">SLEEP</div><div style="font-size:13.5px">6h 10m avg</div></div>
+        <div style="flex:1"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#8B939E;margin-bottom:3px">SETS / WEEK</div><div style="font-size:13.5px">22, at your cap</div></div>
+      </div>
+    </div>
+    <div style="border-radius:20px;border:1px solid #2A2F36;padding:15px 17px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">A DELOAD WEEK MEANS</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:#DDE2E8">
+        <div style="display:flex;justify-content:space-between"><span>Bench</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">102.5 → 82.5 kg</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Sets per lift</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px">4 → 2</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Then week 1 restarts at</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#FF5C1A">105 kg</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:12px 22px 0;flex:none;display:flex;flex-direction:column;gap:8px">
+    <div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Take the deload week</span></div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14px;color:#B9C0C9">Swap the lift instead</div>
+      <div style="flex:none;width:112px;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14px;color:#8B939E">Push on</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="9d"><div class="dv-olabel"><a class="dv-oid" href="#9d">9d</a><span><strong>Day one.</strong> The Today screen with no history behind it. Nothing is greyed out or apologising — the session is real, the weights are blanks the first session fills, and the chart says what will appear rather than showing zeroes.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:22px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">SATURDAY · WEEK 1, SESSION 1</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.08;letter-spacing:-.015em;margin-bottom:5px">First one. Go light on purpose.</div>
+    <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#B9C0C9;max-width:34ch;text-wrap:pretty">Pick a weight you could manage two more reps with. Today sets the baseline — every number after this is built off it.</p>
+    <div style="background:#1A1E24;border-radius:22px;padding:16px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><span style="font-size:17px;font-weight:600">Upper A</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E">14 SETS · ~45 MIN</span></div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">01</div><div style="flex:1"><div style="font-size:14.5px">Barbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">4 × 6–10 · you choose</div></div></div>
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">02</div><div style="flex:1"><div style="font-size:14.5px">Barbell Row</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">4 × 6–10 · you choose</div></div></div>
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">03</div><div style="flex:1"><div style="font-size:14.5px">Overhead Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">3 × 8–12 · you choose</div></div></div>
+      </div>
+      <div style="height:64px;box-sizing:border-box;margin-top:12px;border-radius:16px;background:#242A32;display:flex;align-items:center;gap:10px;padding:0 16px"><span style="flex:1;font-size:14.5px;color:#DDE2E8">2 more exercises · edit today</span><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:11px 18px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:9px">THIS WEEK · SETS VS TARGET</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#8B939E">Chest</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">0/18</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#8B939E">Back</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32"></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">0/20</span></div>
+      </div>
+      <div style="font-size:12.5px;line-height:1.5;color:#8B939E;margin-top:10px">Fills in as you log. Trends need three sessions.</div>
+    </div>
+  </div>
+  <div style="padding:12px 22px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Start Upper A</span></div></div>
+  <div style="height:62px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">You</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Round 8's remaining items are covered. Still open before a build: the wger stills are hot-linked in the mockup — production needs the 264 pairs copied into the app bundle with the CC BY-SA attribution file. Empty History (one session logged, no curve yet) is the one empty state not drawn.</p>
+</section>
+
+<section class="dv-turn" id="t8">
+<div class="dv-thd"><a class="dv-tid" href="#t8">8</a><span class="dv-tname">A movement window on every exercise — real wger artwork, cross-fading between the start and end position. Set screen, guidance sheet, browser cards, swap list.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="8a"><div class="dv-olabel"><a class="dv-oid" href="#8a">8a</a><span><strong>Set screen with the movement window.</strong> Bench Press, drawn by Everkinetic in wger's CC BY-SA set. Two positions cross-fading on a 2.6s loop — enough to read the movement, cheap enough to bundle. The plate stack keeps the bottom half: the window tells you the movement, the plates tell you the load.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;padding:4px 8px;flex:none">
+    <div style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;color:#8B939E">‹</div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:500">Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8B939E;margin-top:2px">SET 3 OF 4 · 6–10 REPS · 2 LEFT</div></div>
+    <div style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:18px;background:#1A1E24;font-size:14px;color:#8B939E">?</div>
+  </div>
+  <div style="flex:none;padding:2px 16px 0;position:relative">
+    <div style="position:relative;width:100%;height:164px;border-radius:18px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/192/Bench-press-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"><img src="https://wger.de/media/exercise-images/192/Bench-press-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;animation:rp-frame 2.6s 0s ease-in-out infinite"></div>
+    <div style="position:absolute;right:24px;bottom:10px;background:rgba(245,245,240,.82);border-radius:8px;padding:4px 7px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:#0C0E11;pointer-events:none">wger · Everkinetic · CC BY-SA</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;overflow:hidden;padding:0 20px">
+    <div style="font-size:15px;line-height:1.5;color:#B9C0C9;margin-bottom:2px">Same weight as your last set —</div>
+    <div style="display:flex;align-items:flex-end;gap:8px"><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:64px;font-weight:600;line-height:1;letter-spacing:-.02em">102.5</span><span style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.1em;color:#8B939E;padding-bottom:9px">KG</span></div>
+    <div style="position:relative;height:74px;display:flex;align-items:center;margin-top:4px">
+      <div style="position:absolute;left:0;right:0;height:7px;border-radius:4px;background:#2A2F36"></div>
+      <div style="position:relative;display:flex;align-items:center;gap:2px;margin:0 auto">
+        <div style="width:10px;height:66px;border-radius:3px;background:#00843D"></div>
+        <div style="width:14px;height:66px;border-radius:3px;background:#0057B8"></div>
+        <div style="width:17px;height:66px;border-radius:3px;background:#C8102E"></div>
+        <div style="width:11px;height:24px;border-radius:2px;background:#555;margin:0 3px"></div>
+        <div style="width:17px;height:66px;border-radius:3px;background:#C8102E"></div>
+        <div style="width:14px;height:66px;border-radius:3px;background:#0057B8"></div>
+        <div style="width:10px;height:66px;border-radius:3px;background:#00843D"></div>
+      </div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px 8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="width:64px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px">−</div>
+      <div style="text-align:center"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:38px;font-weight:600;line-height:1">9</div><div style="font-size:12px;color:#8B939E;margin-top:-2px">reps done</div></div>
+      <div style="width:64px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px">+</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px"><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:13px;color:#B9C0C9;text-align:center;padding:0 4px;line-height:1.15">Easy</div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:13px;color:#B9C0C9;text-align:center;padding:0 4px;line-height:1.15">3 more<br>in me</div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:13px;color:#B9C0C9;text-align:center;padding:0 4px;line-height:1.15">2 more<br>in me</div></div>
+      <div style="display:flex;gap:8px"><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#F5F5F0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#0C0E11;font-weight:600;text-align:center;padding:0 4px;line-height:1.15">1 more,<br>maybe</div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:13px;color:#B9C0C9;text-align:center;padding:0 4px;line-height:1.15">All I<br>had</div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:13px;color:#B9C0C9;text-align:center;padding:0 4px;line-height:1.15">Failed<br>the rep</div></div>
+    </div>
+  </div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Done — start rest</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="8b"><div class="dv-olabel"><a class="dv-oid" href="#8b">8b</a><span><strong>Guidance sheet, animated.</strong> One window that alternates start and finish instead of two stills side by side — same two files, twice the information, and the written cues sit under it where they can be read while it plays.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;padding:14px 22px 0;opacity:.32">
+    <div style="font-size:16px;font-weight:500">Incline Dumbbell Press</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8B939E;margin-top:3px">SET 1 OF 3 · NEW TO YOU</div>
+  </div>
+  <div style="flex:1"></div>
+  <div style="flex:none;background:#1A1E24;border-radius:26px 26px 0 0;padding:12px 20px 0">
+    <div style="width:44px;height:4px;border-radius:2px;background:#3E454E;margin:0 auto 12px"></div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:25px;font-weight:600;letter-spacing:-.01em;line-height:1.15">Incline Dumbbell Press</div>
+    <div style="display:flex;gap:7px;margin:9px 0 12px">
+      <span style="background:#242A32;border-radius:9px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#DDE2E8">UPPER CHEST</span>
+      <span style="background:#242A32;border-radius:9px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#8B939E">FRONT DELTS</span>
+      <span style="background:#242A32;border-radius:9px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#8B939E">TRICEPS</span>
+    </div>
+    <div style="position:relative;margin-bottom:12px">
+      <div style="position:relative;width:100%;height:186px;border-radius:16px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/16/Incline-press-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"><img src="https://wger.de/media/exercise-images/16/Incline-press-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;animation:rp-frame 2.6s 0s ease-in-out infinite"></div>
+      <div style="position:absolute;left:12px;bottom:10px;background:rgba(245,245,240,.82);border-radius:8px;padding:4px 7px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:#0C0E11;pointer-events:none">wger · Everkinetic · CC BY-SA</div>
+    </div>
+    <div style="font-size:14px;line-height:1.55;color:#DDE2E8;margin-bottom:5px;text-wrap:pretty"><span style="color:#8B939E">1&nbsp;&nbsp;</span>Set the bench to about 30°. Steeper turns it into a shoulder press.</div>
+    <div style="font-size:14px;line-height:1.55;color:#DDE2E8;margin-bottom:5px;text-wrap:pretty"><span style="color:#8B939E">2&nbsp;&nbsp;</span>Press up and slightly together, elbows tucked to roughly 45°.</div>
+    <div style="font-size:14px;line-height:1.55;color:#DDE2E8;margin-bottom:12px;text-wrap:pretty"><span style="color:#8B939E">3&nbsp;&nbsp;</span>Lower until the top of the chest stretches, then drive.</div>
+    <div style="height:64px;box-sizing:border-box;border-radius:18px;background:#242A32;display:flex;align-items:center;gap:12px;padding:0 18px;margin-bottom:10px"><span style="flex:1;font-size:14.5px;color:#DDE2E8">Swap for something else</span><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span></div>
+    <div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><span style="font-size:20px;font-weight:600;color:#0C0E11">Got it — first set</span></div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="8c"><div class="dv-olabel"><a class="dv-oid" href="#8c">8c</a><span><strong>Browser cards, animated.</strong> Staggered loops make the grid scannable without reading a single name. The Chest Press has only one image in wger, so it simply sits still — the design has to survive that, and does.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:14px 20px 10px;flex:none">
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.015em;line-height:1.12">Add to Upper A</div>
+    <div style="font-size:13px;color:#8B939E;margin-top:3px">Yours first · 873 in the archive</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">IN THIS SESSION</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
+      <div style="background:#1A1E24;border-radius:16px;overflow:hidden"><div style="position:relative;width:100%;height:131px;border-radius:0px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/192/Bench-press-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"><img src="https://wger.de/media/exercise-images/192/Bench-press-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;animation:rp-frame 2.6s 0s ease-in-out infinite"></div><div style="padding:9px 11px 11px"><div style="font-size:13.5px;line-height:1.3">Barbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8B939E;margin-top:4px">BARBELL</div></div></div>
+      <div style="background:#1A1E24;border-radius:16px;overflow:hidden"><div style="position:relative;width:100%;height:131px;border-radius:0px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"><img src="https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;animation:rp-frame 2.6s 0.4s ease-in-out infinite"></div><div style="padding:9px 11px 11px"><div style="font-size:13.5px;line-height:1.3">Barbell Row</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8B939E;margin-top:4px">BARBELL</div></div></div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">YOU TRAIN THESE MOST</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <div style="background:#1A1E24;border:3px solid #F5F5F0;box-sizing:border-box;border-radius:16px;overflow:hidden;position:relative"><div style="position:relative;width:100%;height:125px;border-radius:0px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/16/Incline-press-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"><img src="https://wger.de/media/exercise-images/16/Incline-press-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;animation:rp-frame 2.6s 0.8s ease-in-out infinite"></div><div style="position:absolute;right:7px;top:7px;width:26px;height:26px;border-radius:13px;background:#F5F5F0;color:#0C0E11;display:flex;align-items:center;justify-content:center;font-size:14px;pointer-events:none">✓</div><div style="padding:9px 9px 11px"><div style="font-size:13.5px;line-height:1.3;font-weight:600">Incline Dumbbell Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8B939E;margin-top:4px">DUMBBELL · 34 SETS</div></div></div>
+      <div style="background:#171B21;border-radius:16px;overflow:hidden"><div style="position:relative;width:100%;height:131px;border-radius:0px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/129/dbad8cd0-5eeb-4de2-8d9e-80c7770735fd.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"></div><div style="padding:9px 11px 11px"><div style="font-size:13.5px;line-height:1.3;color:#7B838E">Pec Deck</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8B939E;margin-top:4px">NO EQUIPMENT</div></div></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px 8px;display:flex;gap:8px">
+    <div style="flex:1;height:64px;box-sizing:border-box;background:#F5F5F0;color:#0C0E11;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;font-weight:500">MY KIT</div>
+    <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">CHEST</div>
+    <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">COMPOUND</div>
+  </div>
+  <div style="flex:none;padding:0 16px 8px"><div style="height:64px;box-sizing:border-box;border-radius:18px;background:#1A1E24;display:flex;align-items:center;padding:0 20px;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B939E">⌕</span><span style="font-size:14.5px;color:#8B939E">Search all 873</span></div></div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Add Incline Dumbbell Press</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="8d"><div class="dv-olabel"><a class="dv-oid" href="#8d">8d</a><span><strong>Swap list, animated.</strong> A 76×60 thumb per substitute — the fastest way to tell a machine press from a dip without reading the equipment tag. Two of these three have one image only.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;padding:14px 22px 0;opacity:.32">
+    <div style="font-size:16px;font-weight:500">Barbell Bench Press</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8B939E;margin-top:3px">SET 3 OF 4 · 102.5 KG</div>
+  </div>
+  <div style="flex:1"></div>
+  <div style="flex:none;background:#1A1E24;border-radius:26px 26px 0 0;padding:12px 20px 0">
+    <div style="width:44px;height:4px;border-radius:2px;background:#3E454E;margin:0 auto 12px"></div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:25px;font-weight:600;letter-spacing:-.01em;line-height:1.15">Swap the bench press</div>
+    <div style="font-size:14px;line-height:1.55;color:#8B939E;margin:6px 0 12px;text-wrap:pretty">Two sets already logged — they stay. Same muscles, kit you have.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <div style="min-height:64px;box-sizing:border-box;border-radius:18px;background:#242A32;display:flex;align-items:center;gap:12px;padding:9px 12px 9px 9px">
+        <div style="position:relative;width:76px;height:60px;flex:none;border-radius:12px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/97/Dumbbell-bench-press-1.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"><img src="https://wger.de/media/exercise-images/97/Dumbbell-bench-press-2.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;animation:rp-frame 2.6s 0s ease-in-out infinite"></div>
+        <div style="flex:1"><div style="font-size:15px">Dumbbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">96% OVERLAP · 40 KG PER SIDE</div></div>
+        <div style="width:44px;height:44px;flex:none;border-radius:13px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div>
+      </div>
+      <div style="min-height:64px;box-sizing:border-box;border-radius:18px;background:#242A32;display:flex;align-items:center;gap:12px;padding:9px 12px 9px 9px">
+        <div style="position:relative;width:76px;height:60px;flex:none;border-radius:12px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/129/dbad8cd0-5eeb-4de2-8d9e-80c7770735fd.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></div>
+        <div style="flex:1"><div style="font-size:15px">Machine Chest Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">88% OVERLAP · 75 KG</div></div>
+        <div style="width:44px;height:44px;flex:none;border-radius:13px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div>
+      </div>
+      <div style="min-height:64px;box-sizing:border-box;border-radius:18px;background:#242A32;display:flex;align-items:center;gap:12px;padding:9px 12px 9px 9px">
+        <div style="position:relative;width:76px;height:60px;flex:none;border-radius:12px;overflow:hidden;background:#EDEEE9"><img src="https://wger.de/media/exercise-images/194/34600351-8b0b-4cb0-8daa-583537be15b0.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></div>
+        <div style="flex:1"><div style="font-size:15px">Weighted Dip</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">71% OVERLAP · MORE TRICEPS</div></div>
+        <div style="width:44px;height:44px;flex:none;border-radius:13px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div>
+      </div>
+    </div>
+    <div style="height:88px;border-radius:22px;background:#242A32;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><span style="font-size:19px;font-weight:600;color:#B9C0C9">Keep the bench press</span></div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Current: the movement window ships on all four screens here. Open before a build — the wger stills are hot-linked; production needs the 264 pairs bundled locally with their CC BY-SA attribution file.</p>
+</section>
+
+<section class="dv-turn" id="t7">
+<div class="dv-thd"><a class="dv-tid" href="#t7">7</a><span class="dv-tname">Finishing a workout — what happened, what moved, and what it changes about next time.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="7d"><div class="dv-olabel"><a class="dv-oid" href="#7d">7d</a><span><strong>Session done.</strong> The one screen no tracker gets right: not a trophy cabinet, but what happened and what it changed. Every number here is a consequence, not a stat.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:20px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">UPPER A · 61 MINUTES</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:34px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:8px">That was a good one.</div>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#B9C0C9;max-width:33ch;text-wrap:pretty">Twenty sets, one PR, and every set inside its rep range — which is exactly what week 3 is supposed to look like.</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;background:#1A1E24;border-radius:18px;padding:13px 15px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#8B939E;margin-bottom:5px">SETS</div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:25px;font-weight:600;line-height:1.1">20</div></div>
+      <div style="flex:1;background:#1A1E24;border-radius:18px;padding:13px 15px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#8B939E;margin-bottom:5px">LIFTED</div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:25px;font-weight:600;line-height:1.1">8.6<span style="font-size:14px;color:#8B939E"> t</span></div></div>
+      <div style="flex:1;background:#1A1E24;border-radius:18px;padding:13px 15px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#8B939E;margin-bottom:5px">PRs</div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:25px;font-weight:600;line-height:1.1;color:#FFD100">1</div></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:15px 17px;margin-bottom:10px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">WHAT CHANGES NEXT TIME</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;gap:11px;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FF5C1A;width:38px">+2.5</span><span style="flex:1;font-size:13.5px;line-height:1.45;color:#DDE2E8">Bench press — you finished at 1 rep left, so it goes to 105 kg</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:38px">HOLD</span><span style="flex:1;font-size:13.5px;line-height:1.45;color:#DDE2E8">Overhead press — 8 reps twice in a row, stay at 45 kg</span></div>
+        <div style="display:flex;gap:11px;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:38px">−5</span><span style="flex:1;font-size:13.5px;line-height:1.45;color:#DDE2E8">Lat pulldown — fell 4 reps short, dropping to 59 kg</span></div>
+      </div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:14px 17px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:9px">WEEK SO FAR</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px"><span style="font-size:12.5px;width:62px;color:#B9C0C9">Chest</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:89%;height:100%;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">16/18</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#B9C0C9">Back</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:100%;height:100%;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">20/20</span></div>
+      <div style="font-size:12.5px;line-height:1.5;color:#8B939E;margin-top:10px">Back is at its cap — Saturday drops a row.</div>
+    </div>
+  </div>
+  <div style="flex:none;padding:10px 16px 8px;display:flex;gap:8px">
+    <div style="flex:1;height:64px;box-sizing:border-box;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">See the log</div>
+    <div style="flex:1;height:64px;box-sizing:border-box;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Add a note</div>
+  </div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Done</span></div></div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Superseded: the static browser, guidance sheet and swap list from round 7 now live as the animated <a href="#8a">8a</a>–<a href="#8d">8d</a>. Session summary <a href="#7d">7d</a> is unchanged and current.</p>
+</section>
+
+<section class="dv-turn" id="t6">
+<div class="dv-thd"><a class="dv-tid" href="#t6">6</a><span class="dv-tname">The long game — the week, editing what the engine wrote, and looking back.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="6a"><div class="dv-olabel"><a class="dv-oid" href="#6a">6a</a><span><strong>The week.</strong> The Plan tab. Where you are in the block, what each day is, and the deload stated up front rather than sprung on you. Moving a day is a visible control, never drag-only.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:18px 22px 12px;flex:none">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:30px;font-weight:600;letter-spacing:-.015em">Week 3 of 5</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#FF5C1A">ON TRACK</div></div>
+    <div style="font-size:13.5px;color:#8B939E;margin-top:4px">Upper / Lower · building volume · 4 days</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">MON</div><div style="flex:1"><div style="font-size:15px;color:#B9C0C9">Lower A</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7B838E;margin-top:1px">18 SETS · 9.1 T</div></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#2F9BD8">DONE</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">TUE</div><div style="flex:1;font-size:15px;color:#7B838E">Rest</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">WED</div><div style="flex:1"><div style="font-size:15px;color:#B9C0C9">Upper B</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7B838E;margin-top:1px">20 SETS · 7.8 T</div></div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#2F9BD8">DONE</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">THU</div><div style="flex:1;font-size:15px;color:#7B838E">Rest</div></div>
+      <div style="background:#1A1E24;border:1px solid #FF5C1A;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#FF5C1A;width:30px">FRI</div><div style="flex:1"><div style="font-size:16px;font-weight:600">Upper A</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">20 SETS · 58 MIN · TODAY</div></div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#FF5C1A">›</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">SAT</div><div style="flex:1"><div style="font-size:15px">Lower B</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">18 SETS · PLANNED</div></div><div style="width:44px;height:44px;border-radius:13px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+      <div style="background:#1A1E24;border-radius:16px;padding:10px 15px;display:flex;align-items:center;gap:13px"><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#8B939E;width:30px">SUN</div><div style="flex:1;font-size:15px;color:#7B838E">Rest</div></div>
+    </div>
+    <div style="background:#171B21;border-radius:18px;padding:14px 16px;margin-top:12px;display:flex;gap:11px;align-items:flex-start">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FF5C1A;margin-top:1px">i</span>
+      <div style="font-size:12.5px;line-height:1.5;color:#B9C0C9;text-wrap:pretty">Sets climb again next week, then week 5 is a deload — same movements, about 10% lighter, stopping well short. That week is where the growth actually lands.</div>
+    </div>
+  </div>
+  <div style="flex:none;padding:12px 16px 10px;display:flex;gap:10px">
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Edit program</div>
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Move a day</div>
+  </div>
+  <div style="height:62px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">You</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="6b"><div class="dv-olabel"><a class="dv-oid" href="#6b">6b</a><span><strong>Program builder.</strong> Editing what the engine wrote. The point of this screen is the panel at the bottom: change a set count and watch the weekly total move against your cap, before you commit.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:18px 22px 10px;flex:none;display:flex;align-items:baseline;justify-content:space-between">
+    <div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-.015em">Upper A</div><div style="font-size:13px;color:#8B939E;margin-top:3px">Editing the template, not just today</div></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="background:#1A1E24;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0"><div style="font-size:15px">Barbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">6–10 REPS · DOUBLE PROGRESSION</div></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:none"><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">−</div><div style="width:22px;text-align:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;font-weight:600">4</div><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">+</div></div>
+      </div>
+      <div style="background:#1A1E24;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0"><div style="font-size:15px">Barbell Row</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">6–10 REPS · DOUBLE PROGRESSION</div></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:none"><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">−</div><div style="width:22px;text-align:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;font-weight:600">4</div><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">+</div></div>
+      </div>
+      <div style="background:#242A32;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0"><div style="font-size:15px">Incline Dumbbell Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#FF5C1A;margin-top:2px">3 → 4 SETS · JUST CHANGED</div></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:none"><div style="width:64px;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">−</div><div style="width:22px;text-align:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;font-weight:600;color:#FF5C1A">4</div><div style="width:64px;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">+</div></div>
+      </div>
+      <div style="background:#1A1E24;border-radius:18px;padding:8px 10px 8px 14px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0"><div style="font-size:15px">Lat Pulldown</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">10–15 REPS · DOUBLE PROGRESSION</div></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:none"><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">−</div><div style="width:22px;text-align:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;font-weight:600">3</div><div style="width:64px;height:64px;border-radius:16px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px">+</div></div>
+      </div>
+      <div style="border:1px dashed #2A2F36;border-radius:18px;height:64px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 14px"><div style="width:40px;height:40px;border-radius:12px;background:#171B21;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;color:#8B939E">+</div><div style="flex:1;font-size:14.5px;color:#8B939E">Add an exercise</div></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:10px 16px 0">
+    <div style="background:#1A1E24;border-radius:20px;padding:12px 17px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:11px">WEEKLY EFFECT OF THIS EDIT</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:13px;width:62px;color:#B9C0C9">Chest</span><div style="flex:1;height:7px;border-radius:4px;background:#242A32;overflow:hidden;display:flex"><div style="width:61%;height:100%;background:#2F9BD8"></div><div style="width:11%;height:100%;background:#FF5C1A"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#F5F5F0;width:44px;text-align:right">13/18</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;width:62px;color:#B9C0C9">Shoulders</span><div style="flex:1;height:7px;border-radius:4px;background:#242A32;overflow:hidden;display:flex"><div style="width:54%;height:100%;background:#2F9BD8"></div><div style="width:8%;height:100%;background:#FF5C1A"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#F5F5F0;width:44px;text-align:right">15/24</span></div>
+      <div style="font-size:12.5px;line-height:1.5;color:#8B939E;margin-top:11px;text-wrap:pretty">Two more chest sets a week — still inside your cap, and it lands on the angle you're weakest at.</div>
+    </div>
+  </div>
+  <div style="padding:10px 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Save the change</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="6c"><div class="dv-olabel"><a class="dv-oid" href="#6c">6c</a><span><strong>History.</strong> One lift at a time, because "all my data" is a spreadsheet, not a screen. Estimated 1RM as the trend line, PRs as facts, and the raw log in mono underneath.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:18px 20px 10px;flex:none">
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:28px;font-weight:600;letter-spacing:-.015em">Bench Press</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#F5F5F0;color:#0C0E11;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;font-weight:500">12 WEEKS</div>
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">6 MONTHS</div>
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">ALL</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 20px">
+    <div style="background:#1A1E24;border-radius:20px;padding:13px 16px 9px;margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E">ESTIMATED 1RM</span><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px;font-weight:600;line-height:1">128<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;letter-spacing:.08em"> KG</span></span></div>
+      <svg viewBox="0 0 320 132" style="display:block;width:100%;height:auto">
+        <line x1="0" y1="8" x2="320" y2="8" stroke="#242A32" stroke-width="1"></line>
+        <line x1="0" y1="62" x2="320" y2="62" stroke="#242A32" stroke-width="1"></line>
+        <line x1="0" y1="116" x2="320" y2="116" stroke="#242A32" stroke-width="1"></line>
+        <polyline points="6,104 32,99 58,101 84,90 110,86 136,88 162,74 188,66 214,68 240,52 266,44 292,34 312,26" fill="none" stroke="#2F9BD8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle cx="240" cy="52" r="4" fill="#1A1E24" stroke="#FFD100" stroke-width="2.5"></circle>
+        <circle cx="312" cy="26" r="5.5" fill="#FF5C1A"></circle>
+        <text x="0" y="130" fill="#8B939E" font-family="'IBM Plex Mono',monospace" font-size="11">MAY</text>
+        <text x="150" y="130" fill="#8B939E" font-family="'IBM Plex Mono',monospace" font-size="11">JUN</text>
+        <text x="292" y="130" fill="#8B939E" font-family="'IBM Plex Mono',monospace" font-size="11">JUL</text>
+      </svg>
+      <div style="font-size:12.5px;line-height:1.5;color:#B9C0C9;margin-top:8px;text-wrap:pretty">Up 14 kg in twelve weeks. No stall — the yellow ring is where you deloaded.</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;background:#1A1E24;border-radius:18px;padding:13px 15px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#8B939E;margin-bottom:5px">BEST SET</div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:21px;font-weight:600;line-height:1.15">102.5 × 9</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7B838E;margin-top:3px">TODAY</div></div>
+      <div style="flex:1;background:#1A1E24;border-radius:18px;padding:13px 15px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:#8B939E;margin-bottom:5px">HEAVIEST</div><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:21px;font-weight:600;line-height:1.15">110 × 3</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7B838E;margin-top:3px">2 WEEKS AGO</div></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:18px;padding:14px 16px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">EVERY SESSION</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:#B9C0C9">24 JUL&nbsp;&nbsp;102.5 × 10 · 9 · 9 <span style="color:#FFD100">★</span><br>21 JUL&nbsp;&nbsp;100 × 10 · 10 · 9 · 8<br>17 JUL&nbsp;&nbsp;100 × 9 · 9 · 8 · 8<br>14 JUL&nbsp;&nbsp;97.5 × 10 · 10 · 9</div>
+    </div>
+  </div>
+  <div style="flex:none;padding:10px 16px 10px;display:flex;gap:10px">
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">All lifts</div>
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Every PR</div>
+  </div>
+  <div style="height:62px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">You</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Current: the week (<a href="#6a">6a</a>) now carries the full balance chart below the fold — see <a href="#10a">10a</a>. Deload and stall states landed in <a href="#9c">9c</a>.</p>
+</section>
+
+<section class="dv-turn" id="t5">
+<div class="dv-thd"><a class="dv-tid" href="#t5">5</a><span class="dv-tname">Your image, used properly — it solves the map without an illustrator.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="5a"><div class="dv-olabel"><a class="dv-oid" href="#5a">5a</a><span><strong>Your artwork, background removed.</strong> The figure is the drawing; the app paints translucent volume tints and traced hit zones <em>on top</em>, so nothing needs recolouring. Regions are the exact outlines you drew on the calibration sheet.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:16px 20px 8px;flex:none;display:flex;align-items:flex-start;gap:12px">
+    <div style="flex:1"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:27px;font-weight:600;line-height:1.12;letter-spacing:-.015em">What are we training?</div></div>
+    <div style="flex:none;display:flex;gap:4px;background:#1A1E24;border-radius:18px;padding:4px"><div style="width:64px;height:64px;border-radius:15px;background:#F5F5F0;color:#0C0E11;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;font-weight:500">FRONT</div><div style="width:64px;height:64px;border-radius:15px;color:#8B939E;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em">BACK</div></div>
+  </div>
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+    <div style="position:relative;width:198px;height:447px;flex:none">
+      <img src="assets/body-front-cut.png" alt="Front view of the body" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block">
+      <svg viewBox="0 0 230 520" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">
+        <defs><pattern id="hatchF" width="9" height="9" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="9" height="9" fill="#FFD100" fill-opacity=".34"></rect><rect width="4.5" height="9" fill="#FFD100" fill-opacity=".85"></rect></pattern></defs>
+        <path d="M88.6 96.4 L88.1 97.5 L88.1 98.0 L83.1 104.7 L82.0 105.2 L68.1 111.9 L67.6 112.4 L79.2 118.5 L81.4 119.1 L96.4 122.4 L96.9 122.4 L96.9 119.1 L96.9 118.5 L94.7 112.4 L94.2 111.9 L92.0 105.2 L92.0 104.7 L89.7 98.0 L89.7 97.5 L89.2 96.4 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M119.1 95.8 L118.0 97.5 L118.0 98.0 L115.8 104.7 L115.2 105.2 L113.5 111.9 L113.0 112.4 L110.8 118.5 L110.2 119.1 L110.2 123.0 L110.2 123.0 L126.3 119.1 L130.2 118.5 L140.1 112.4 L139.0 111.9 L126.3 105.2 L125.2 104.7 L119.6 98.0 L119.6 97.5 L119.1 95.8 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M70.3 260.9 L68.7 265.9 L68.1 266.4 L65.4 272.5 L65.4 273.1 L62.0 279.7 L61.5 280.3 L58.7 286.9 L55.9 293.6 L55.4 294.1 L53.2 300.8 L53.2 301.3 L52.1 308.0 L51.5 314.6 L51.5 315.2 L51.5 321.8 L51.5 322.4 L52.6 328.5 L52.6 329.0 L53.7 335.7 L53.7 336.2 L55.4 342.9 L55.9 343.4 L58.2 349.5 L58.7 350.1 L77.0 356.7 L77.5 357.3 L80.9 360.6 L82.0 360.6 L86.4 357.3 L87.0 356.7 L90.3 350.1 L90.3 349.5 L91.4 343.4 L91.4 342.9 L90.8 336.2 L90.8 335.7 L89.7 329.0 L89.7 328.5 L88.1 322.4 L88.1 321.8 L86.4 315.2 L85.8 314.6 L83.6 308.0 L82.5 301.3 L82.0 300.8 L79.2 294.1 L79.2 293.6 L77.0 286.9 L74.8 280.3 L74.8 279.7 L73.1 273.1 L72.6 272.5 L71.5 266.4 L71.5 265.9 L70.3 260.9 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M136.3 259.2 L135.2 265.9 L135.2 266.4 L134.0 272.5 L134.0 273.1 L133.5 279.7 L132.9 280.3 L130.7 286.9 L128.0 293.6 L128.0 294.1 L125.2 300.8 L125.2 301.3 L123.5 308.0 L121.3 314.6 L120.8 315.2 L119.1 321.8 L119.1 322.4 L116.9 328.5 L117.4 329.0 L116.3 335.7 L116.3 336.2 L116.9 342.9 L116.9 343.4 L117.4 349.5 L117.4 350.1 L120.8 356.7 L120.8 357.3 L126.8 360.6 L126.8 360.6 L130.2 357.3 L130.2 356.7 L149.0 350.1 L149.0 349.5 L151.8 343.4 L151.8 342.9 L154.0 336.2 L154.0 335.7 L154.5 329.0 L155.1 328.5 L155.6 322.4 L155.6 321.8 L155.6 315.2 L155.6 314.6 L155.1 308.0 L154.0 301.3 L154.0 300.8 L152.3 294.1 L151.8 293.6 L149.0 286.9 L145.7 280.3 L146.2 279.7 L142.3 273.1 L141.8 272.5 L139.6 266.4 L139.0 265.9 L136.3 259.2 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M51.0 118.5 L48.2 119.1 L38.2 125.7 L38.8 126.3 L33.2 132.9 L32.1 139.6 L32.1 140.1 L31.6 146.8 L31.6 147.3 L32.1 154.0 L34.3 160.6 L33.8 161.2 L35.5 161.2 L36.0 160.6 L42.6 154.0 L49.9 147.3 L50.4 146.8 L54.3 140.1 L54.3 139.6 L58.7 132.9 L63.7 126.3 L64.3 125.7 L61.5 119.1 L59.3 118.5 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M151.2 118.0 L147.9 118.5 L146.2 119.1 L142.9 125.7 L143.5 126.3 L149.0 132.9 L152.3 139.6 L152.9 140.1 L157.3 146.8 L157.9 147.3 L164.5 154.0 L171.7 160.6 L172.3 161.2 L173.4 161.2 L173.4 160.6 L175.6 154.0 L176.1 147.3 L176.1 146.8 L175.6 140.1 L175.6 139.6 L173.4 132.9 L168.9 126.3 L168.9 125.7 L159.0 119.1 L157.3 118.5 L154.5 118.0 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M95.8 171.2 L89.2 174.5 L88.6 175.0 L83.6 181.7 L83.1 182.2 L92.5 188.9 L92.0 189.4 L84.2 195.5 L83.6 196.1 L88.1 224.3 L85.8 231.0 L87.5 237.6 L87.5 238.2 L89.2 244.8 L89.7 245.4 L91.4 251.5 L92.0 252.0 L93.6 258.7 L94.2 259.2 L97.5 265.9 L98.0 266.4 L99.7 267.5 L100.8 267.5 L100.8 266.4 L100.8 265.9 L100.8 259.2 L100.8 258.7 L100.8 252.0 L100.8 251.5 L100.8 245.4 L100.8 244.8 L100.8 238.2 L100.8 237.6 L100.3 231.0 L89.2 224.3 L100.3 196.1 L100.3 195.5 L100.3 189.4 L99.7 188.9 L96.9 182.2 L97.5 181.7 L100.3 175.0 L100.3 174.5 L96.4 171.2 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M108.0 171.2 L106.9 174.5 L106.9 175.0 L109.1 181.7 L110.2 182.2 L107.5 188.9 L107.5 189.4 L106.3 195.5 L106.9 196.1 L118.5 224.3 L107.5 231.0 L106.3 237.6 L106.3 238.2 L106.3 244.8 L106.3 245.4 L106.3 251.5 L106.3 252.0 L106.9 258.7 L106.9 259.2 L106.9 265.9 L106.9 266.4 L106.9 267.5 L108.6 267.5 L109.7 266.4 L110.2 265.9 L113.0 259.2 L113.0 258.7 L115.8 252.0 L115.8 251.5 L118.0 245.4 L118.0 244.8 L120.2 238.2 L120.2 237.6 L121.9 231.0 L120.2 224.3 L124.1 196.1 L124.1 195.5 L115.8 189.4 L114.1 188.9 L124.6 182.2 L124.1 181.7 L119.1 175.0 L118.0 174.5 L111.3 171.2 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M70.9 124.6 L69.8 125.7 L69.2 126.3 L62.6 132.9 L58.7 139.6 L58.2 140.1 L54.8 146.8 L54.8 147.3 L57.0 154.0 L60.4 160.6 L60.9 161.2 L68.1 167.8 L68.7 168.4 L71.5 170.0 L83.1 170.0 L87.0 168.4 L88.6 167.8 L98.6 161.2 L98.6 160.6 L99.7 154.0 L99.7 147.3 L99.7 146.8 L99.7 140.1 L99.7 139.6 L97.5 132.9 L88.1 126.3 L85.8 125.7 L79.2 124.6 Z" fill="url(#hatchF)" stroke="#F5F5F0" stroke-width="3"></path>
+        <path d="M129.6 124.6 L122.4 125.7 L120.8 126.3 L109.7 132.9 L107.5 139.6 L107.5 140.1 L107.5 146.8 L107.5 147.3 L107.5 154.0 L108.6 160.6 L108.6 161.2 L118.0 167.8 L119.1 168.4 L124.6 170.0 L136.3 170.0 L137.9 168.4 L139.0 167.8 L147.3 161.2 L147.9 160.6 L151.2 154.0 L152.9 147.3 L152.9 146.8 L149.6 140.1 L149.0 139.6 L144.6 132.9 L138.5 126.3 L137.9 125.7 L136.3 124.6 Z" fill="url(#hatchF)" stroke="#F5F5F0" stroke-width="3"></path>
+        <path d="M51.5 151.8 L48.2 154.0 L40.4 160.6 L39.9 161.2 L36.0 167.8 L35.5 168.4 L33.8 174.5 L33.2 175.0 L32.1 181.7 L32.1 182.2 L31.0 188.9 L31.0 189.4 L31.6 195.5 L31.6 196.1 L32.7 202.7 L33.2 203.3 L33.8 204.9 L33.8 204.9 L36.0 203.3 L36.6 202.7 L43.2 196.1 L44.3 195.5 L47.6 189.4 L48.2 188.9 L50.4 182.2 L50.4 181.7 L52.1 175.0 L52.1 174.5 L53.2 168.4 L53.2 167.8 L53.2 161.2 L53.2 160.6 L52.6 154.0 L51.5 151.8 Z" fill="#F5F5F0" fill-opacity=".18" stroke="#F5F5F0" stroke-width="3"></path>
+        <path d="M155.6 152.3 L155.6 154.0 L154.0 160.6 L154.0 161.2 L154.5 167.8 L154.5 168.4 L155.1 174.5 L155.6 175.0 L157.3 181.7 L157.3 182.2 L159.5 188.9 L160.1 189.4 L163.4 195.5 L163.9 196.1 L170.6 202.7 L171.2 203.3 L173.9 205.5 L174.5 205.5 L175.6 203.3 L175.6 202.7 L176.1 196.1 L176.1 195.5 L176.1 189.4 L176.1 188.9 L175.6 182.2 L175.6 181.7 L174.5 175.0 L174.5 174.5 L172.3 168.4 L171.7 167.8 L167.8 161.2 L167.3 160.6 L159.0 154.0 L157.3 152.3 Z" fill="#F5F5F0" fill-opacity=".18" stroke="#F5F5F0" stroke-width="3"></path>
+        <line x1="-6" y1="176" x2="34" y2="176" stroke="#8B939E" stroke-width="1.6"></line>
+        <g><rect x="-72" y="156" width="66" height="42" rx="11" fill="#242A32"></rect><text x="-39" y="174" text-anchor="middle" fill="#F5F5F0" font-family="'IBM Plex Mono',monospace" font-size="15" letter-spacing="0.4">BICEPS</text><text x="-39" y="190" text-anchor="middle" fill="#8B939E" font-family="'IBM Plex Mono',monospace" font-size="13" letter-spacing="0.4">4 / 16</text></g>
+        <line x1="234" y1="146" x2="150" y2="146" stroke="#8B939E" stroke-width="1.6"></line>
+        <g><rect x="234" y="126" width="66" height="42" rx="11" fill="#242A32"></rect><text x="267" y="144" text-anchor="middle" fill="#FFD100" font-family="'IBM Plex Mono',monospace" font-size="15" letter-spacing="0.4">CHEST</text><text x="267" y="160" text-anchor="middle" fill="#8B939E" font-family="'IBM Plex Mono',monospace" font-size="13" letter-spacing="0.4">16 / 18</text></g>
+      </svg>
+    </div>
+    <div style="flex:none;display:flex;flex-wrap:wrap;gap:7px 16px;justify-content:center;padding:0 14px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:transparent;border:1.8px dashed #6B737D;box-sizing:border-box"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">UNDER-TRAINED</span></div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:#2F9BD8"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">ON TARGET</span></div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">NEAR CAP</span></div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:#101317;border:3px solid #F5F5F0;box-sizing:border-box"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#F5F5F0">PICKED</span></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px;margin-bottom:8px"><div style="height:64px;box-sizing:border-box;border-radius:18px;background:#1A1E24;display:flex;align-items:center;padding:0 20px;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B939E">⌕</span><span style="font-size:14.5px;color:#8B939E">Or search an exercise</span></div></div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Build the session · 2 picked</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="5b"><div class="dv-olabel"><a class="dv-oid" href="#5b">5b</a><span><strong>Back view.</strong> Same treatment, back crop — traps near their cap, lats, glutes and calves on target, triceps, lower back and hamstrings still untouched this week.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:16px 20px 8px;flex:none;display:flex;align-items:flex-start;gap:12px">
+    <div style="flex:1"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:27px;font-weight:600;line-height:1.12;letter-spacing:-.015em">What are we training?</div></div>
+    <div style="flex:none;display:flex;gap:4px;background:#1A1E24;border-radius:18px;padding:4px"><div style="width:64px;height:64px;border-radius:15px;color:#8B939E;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em">FRONT</div><div style="width:64px;height:64px;border-radius:15px;background:#F5F5F0;color:#0C0E11;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;font-weight:500">BACK</div></div>
+  </div>
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+    <div style="position:relative;width:198px;height:447px;flex:none">
+      <img src="assets/body-back-cut.png" alt="Back view of the body" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block">
+      <svg viewBox="0 0 230 520" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">
+        <defs><pattern id="hatchB" width="9" height="9" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="9" height="9" fill="#FFD100" fill-opacity=".34"></rect><rect width="4.5" height="9" fill="#FFD100" fill-opacity=".85"></rect></pattern></defs>
+        <path d="M52.6 147.9 L42.6 154.0 L36.6 160.6 L36.0 161.2 L33.2 167.8 L32.7 168.4 L31.6 174.5 L31.6 175.0 L30.5 181.7 L30.5 182.2 L30.5 188.9 L30.5 189.4 L30.5 195.5 L31.0 196.1 L31.0 196.1 L31.6 195.5 L31.6 189.4 L31.6 188.9 L53.7 182.2 L54.3 181.7 L56.5 175.0 L57.0 174.5 L56.5 168.4 L56.5 167.8 L55.4 161.2 L55.4 160.6 L54.3 154.0 L53.2 147.9 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M168.4 147.9 L165.6 154.0 L165.1 160.6 L165.1 161.2 L163.9 167.8 L163.9 168.4 L163.9 174.5 L163.9 175.0 L166.2 181.7 L166.7 182.2 L173.4 188.9 L188.3 189.4 L188.9 195.5 L188.9 196.1 L188.9 197.7 L189.4 197.7 L190.0 196.1 L190.0 195.5 L190.5 189.4 L190.5 188.9 L190.0 182.2 L189.4 181.7 L188.9 175.0 L188.9 174.5 L187.8 168.4 L187.2 167.8 L184.4 161.2 L184.4 160.6 L178.3 154.0 L168.4 147.9 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M104.7 201.6 L103.0 202.7 L103.0 203.3 L99.7 209.9 L94.7 216.6 L94.7 217.1 L92.0 223.8 L92.0 224.3 L89.2 231.0 L95.8 237.6 L96.9 238.2 L104.1 244.8 L104.7 245.4 L108.6 251.5 L108.6 252.0 L110.8 254.2 L110.8 254.2 L111.3 252.0 L111.9 251.5 L116.3 245.4 L116.9 244.8 L124.1 238.2 L124.6 237.6 L131.3 231.0 L129.6 224.3 L129.6 223.8 L127.4 217.1 L126.8 216.6 L121.3 209.9 L116.3 203.3 L116.3 202.7 L115.2 201.6 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M85.3 296.9 L77.0 300.8 L76.4 301.3 L71.5 308.0 L69.2 314.6 L68.7 315.2 L67.0 321.8 L67.0 322.4 L65.9 328.5 L65.9 329.0 L64.8 335.7 L64.8 336.2 L64.8 342.9 L64.8 343.4 L64.8 349.5 L64.8 350.1 L64.8 356.7 L64.8 357.3 L64.8 363.9 L64.8 370.6 L64.8 371.1 L88.1 377.8 L88.6 378.3 L89.2 380.0 L89.7 380.0 L91.4 378.3 L92.0 377.8 L93.0 371.1 L93.0 370.6 L94.7 363.9 L95.3 357.3 L95.8 356.7 L95.8 350.1 L95.8 349.5 L96.4 343.4 L96.4 342.9 L97.5 336.2 L97.5 335.7 L96.4 329.0 L96.4 328.5 L96.9 322.4 L96.9 321.8 L95.8 315.2 L95.8 314.6 L93.6 308.0 L92.0 301.3 L92.0 300.8 L89.7 296.9 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M130.2 296.9 L128.5 300.8 L126.8 301.3 L126.8 308.0 L124.1 314.6 L124.1 315.2 L124.1 321.8 L124.1 322.4 L123.5 328.5 L123.5 329.0 L124.1 335.7 L124.1 336.2 L123.5 342.9 L124.1 343.4 L124.6 349.5 L125.2 350.1 L125.7 356.7 L125.7 357.3 L125.7 363.9 L127.4 370.6 L127.4 371.1 L129.1 377.8 L129.6 378.3 L129.6 382.2 L129.6 382.2 L132.4 378.3 L132.4 377.8 L134.6 371.1 L134.6 370.6 L155.1 363.9 L155.1 357.3 L155.1 356.7 L155.1 350.1 L155.1 349.5 L155.1 343.4 L155.1 342.9 L154.5 336.2 L154.5 335.7 L154.0 329.0 L153.4 328.5 L152.9 322.4 L152.9 321.8 L151.2 315.2 L151.2 314.6 L149.0 308.0 L144.0 301.3 L143.5 300.8 L131.3 296.9 Z" fill="#F5F5F0" fill-opacity=".05" stroke="#6B737D" stroke-width="1.8" stroke-dasharray="6 5"></path>
+        <path d="M59.8 161.7 L60.4 167.8 L59.8 168.4 L62.6 174.5 L62.6 175.0 L64.8 181.7 L64.8 182.2 L67.0 188.9 L67.0 189.4 L69.8 195.5 L69.8 196.1 L73.1 202.7 L73.7 203.3 L77.0 209.9 L80.9 216.6 L81.4 217.1 L85.3 223.8 L85.8 224.3 L85.8 224.9 L87.0 224.9 L87.5 224.3 L87.5 223.8 L89.2 217.1 L89.2 216.6 L93.6 209.9 L98.0 203.3 L98.6 202.7 L100.8 196.1 L101.4 195.5 L102.5 189.4 L102.5 188.9 L100.8 182.2 L100.3 181.7 L96.4 175.0 L95.8 174.5 L92.5 168.4 L92.5 167.8 L89.2 161.7 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M159.5 161.7 L128.0 167.8 L128.0 168.4 L124.6 174.5 L124.6 175.0 L120.2 181.7 L120.2 182.2 L118.0 188.9 L118.0 189.4 L118.5 195.5 L119.1 196.1 L122.4 202.7 L122.4 203.3 L126.8 209.9 L130.7 216.6 L131.3 217.1 L133.5 223.8 L133.5 224.3 L133.5 224.9 L133.5 224.9 L134.0 224.3 L133.5 223.8 L138.5 217.1 L139.0 216.6 L142.9 209.9 L146.8 203.3 L147.3 202.7 L150.1 196.1 L150.7 195.5 L152.9 189.4 L152.9 188.9 L155.1 182.2 L155.6 181.7 L157.3 175.0 L157.3 174.5 L159.0 168.4 L159.0 167.8 L160.1 161.7 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M90.3 131.3 L90.3 132.9 L90.8 139.6 L90.8 140.1 L90.8 146.8 L90.8 147.3 L91.4 154.0 L93.0 160.6 L93.0 161.2 L96.9 167.8 L97.5 168.4 L100.8 174.5 L101.4 175.0 L104.7 181.7 L105.8 181.7 L105.8 175.0 L105.8 174.5 L105.8 168.4 L105.8 167.8 L105.8 161.2 L106.3 160.6 L105.8 154.0 L105.8 147.3 L105.8 146.8 L100.3 140.1 L99.7 139.6 L93.0 132.9 L90.3 131.3 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M129.6 131.3 L127.4 132.9 L120.2 139.6 L120.2 140.1 L114.7 146.8 L114.1 147.3 L114.1 154.0 L114.1 160.6 L114.1 161.2 L114.1 167.8 L114.1 168.4 L114.1 174.5 L114.1 175.0 L114.7 181.7 L115.2 181.7 L119.1 175.0 L119.6 174.5 L122.4 168.4 L122.4 167.8 L126.8 161.2 L127.4 160.6 L128.5 154.0 L129.1 147.3 L129.1 146.8 L129.1 140.1 L129.1 139.6 L130.2 132.9 L130.2 131.3 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M78.7 236.0 L72.6 237.6 L72.6 238.2 L68.7 244.8 L68.7 245.4 L67.6 251.5 L67.6 252.0 L68.7 258.7 L68.7 259.2 L69.8 265.9 L69.8 266.4 L69.8 272.5 L69.8 273.1 L70.3 279.7 L70.3 280.3 L72.6 286.9 L81.4 293.6 L80.9 294.1 L92.0 294.7 L93.0 294.7 L93.0 294.1 L94.2 293.6 L105.2 286.9 L107.5 280.3 L108.0 279.7 L108.0 273.1 L108.0 272.5 L108.0 266.4 L108.0 265.9 L106.9 259.2 L106.9 258.7 L103.6 252.0 L103.0 251.5 L98.6 245.4 L98.0 244.8 L89.7 238.2 L88.6 237.6 L84.2 236.0 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M141.2 236.0 L133.5 237.6 L130.7 238.2 L121.9 244.8 L121.3 245.4 L116.9 251.5 L116.3 252.0 L113.0 258.7 L113.0 259.2 L111.9 265.9 L111.9 266.4 L111.9 272.5 L111.9 273.1 L112.4 279.7 L112.4 280.3 L114.7 286.9 L125.2 293.6 L128.0 294.1 L131.8 295.2 L135.7 295.2 L137.4 294.1 L139.0 293.6 L147.3 286.9 L149.6 280.3 L149.6 279.7 L150.7 273.1 L150.7 272.5 L150.1 266.4 L150.1 265.9 L151.2 259.2 L151.8 258.7 L152.9 252.0 L152.9 251.5 L151.8 245.4 L151.8 244.8 L147.3 238.2 L146.2 237.6 L142.9 236.0 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M76.4 357.3 L73.7 363.9 L69.8 370.6 L69.2 371.1 L65.9 377.8 L65.4 378.3 L62.6 385.0 L60.9 391.6 L60.9 392.2 L59.8 398.8 L59.8 399.4 L58.7 405.5 L58.7 406.0 L59.3 412.7 L59.3 413.2 L60.4 419.9 L60.4 420.4 L62.0 426.5 L63.1 427.1 L65.9 433.7 L66.5 434.3 L68.7 440.9 L70.3 447.5 L70.3 448.1 L72.0 454.8 L72.0 455.3 L73.1 462.0 L73.1 468.6 L73.1 469.2 L73.7 475.8 L74.8 476.4 L77.5 480.8 L77.5 480.8 L78.7 476.4 L78.7 475.8 L79.2 469.2 L79.2 468.6 L79.2 462.0 L80.3 455.3 L80.3 454.8 L82.0 448.1 L82.5 447.5 L84.2 440.9 L86.4 434.3 L86.4 433.7 L89.2 427.1 L89.2 426.5 L90.8 420.4 L90.8 419.9 L92.0 413.2 L92.0 412.7 L92.0 406.0 L92.0 405.5 L91.4 399.4 L91.4 398.8 L89.7 392.2 L89.7 391.6 L87.5 385.0 L84.8 378.3 L84.8 377.8 L81.4 371.1 L80.9 370.6 L78.7 363.9 L77.0 357.3 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M142.9 357.3 L140.7 363.9 L137.9 370.6 L137.4 371.1 L135.2 377.8 L135.2 378.3 L131.8 385.0 L130.2 391.6 L130.2 392.2 L129.1 398.8 L129.1 399.4 L128.0 405.5 L128.0 406.0 L128.0 412.7 L128.0 413.2 L129.1 419.9 L129.1 420.4 L131.3 426.5 L131.3 427.1 L133.5 433.7 L133.5 434.3 L136.3 440.9 L137.9 447.5 L137.9 448.1 L139.6 454.8 L139.6 455.3 L140.7 462.0 L141.8 468.6 L141.8 469.2 L141.8 475.8 L141.8 476.4 L141.8 481.3 L144.0 481.3 L145.1 476.4 L145.1 475.8 L145.7 469.2 L145.7 468.6 L146.8 462.0 L147.9 455.3 L148.4 454.8 L149.6 448.1 L149.6 447.5 L151.2 440.9 L153.4 434.3 L155.1 433.7 L157.3 427.1 L157.9 426.5 L159.5 420.4 L159.5 419.9 L160.6 413.2 L161.2 412.7 L161.2 406.0 L161.2 405.5 L160.6 399.4 L160.6 398.8 L159.0 392.2 L159.0 391.6 L157.3 385.0 L154.5 378.3 L154.5 377.8 L150.7 371.1 L150.1 370.6 L146.2 363.9 L142.9 357.3 Z" fill="#2F9BD8" fill-opacity=".55"></path>
+        <path d="M103.6 81.4 L101.4 83.6 L101.4 84.2 L99.7 90.8 L99.7 91.4 L95.8 97.5 L95.3 98.0 L87.5 104.7 L86.4 105.2 L73.7 111.9 L72.6 112.4 L74.8 118.5 L74.8 119.1 L89.2 125.7 L90.8 126.3 L99.2 132.9 L105.2 139.0 L105.2 139.0 L105.2 132.9 L103.6 126.3 L103.6 125.7 L100.8 119.1 L100.3 118.5 L98.6 112.4 L98.6 111.9 L100.8 105.2 L101.4 104.7 L103.6 98.0 L104.1 97.5 L105.2 91.4 L105.2 90.8 L105.2 84.2 L105.2 83.6 L103.6 81.4 Z" fill="url(#hatchB)" stroke="#6B737D" stroke-width="1.6"></path>
+        <path d="M116.3 82.0 L115.2 83.6 L115.2 84.2 L115.2 90.8 L115.2 91.4 L116.3 97.5 L116.3 98.0 L119.1 104.7 L119.6 105.2 L121.3 111.9 L121.3 112.4 L120.2 118.5 L119.6 119.1 L116.3 125.7 L116.3 126.3 L115.2 132.9 L114.7 139.0 L115.2 139.0 L120.2 132.9 L129.1 126.3 L130.7 125.7 L143.5 119.1 L144.6 118.5 L147.3 112.4 L146.2 111.9 L134.6 105.2 L133.5 104.7 L124.6 98.0 L124.1 97.5 L120.8 91.4 L120.2 90.8 L118.5 84.2 L118.5 83.6 L117.4 82.0 Z" fill="url(#hatchB)" stroke="#6B737D" stroke-width="1.6"></path>
+      </svg>
+    </div>
+    <div style="flex:none;display:flex;flex-wrap:wrap;gap:7px 16px;justify-content:center;padding:0 14px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:transparent;border:1.8px dashed #6B737D;box-sizing:border-box"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">UNDER-TRAINED</span></div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:#2F9BD8"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">ON TARGET</span></div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;color:#8B939E">NEAR CAP</span></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px;margin-bottom:8px"><div style="height:64px;box-sizing:border-box;border-radius:18px;background:#1A1E24;display:flex;align-items:center;padding:0 20px;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B939E">⌕</span><span style="font-size:14.5px;color:#8B939E">Or search an exercise</span></div></div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#1A1E24;display:flex;align-items:center;justify-content:center"><span style="font-size:19px;font-weight:600;color:#8B939E">Nothing picked yet</span></div></div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Current: this is the live body map, traced from your calibration sheet. Weekly volume paints here as overlays; the numeric version is <a href="#10a">10a</a>.</p>
+</section>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Two ways in: follow a professionally-grounded plan, or pick muscles on the body map and let the app build the session. Coach direction throughout.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a><span><strong>The fork.</strong> Asked once at the end of intake, and always reachable from Plan. Neither path is the "advanced" one — the difference is who chooses the exercises.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:22px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">5 OF 5 · LAST ONE</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:33px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:6px">Who picks the exercises?</div>
+    <p style="margin:0 0 14px;font-size:14.5px;line-height:1.5;color:#8B939E;max-width:34ch;text-wrap:pretty">You can switch any time, and mixing is fine — follow the plan on Monday, freestyle on Saturday.</p>
+    <div style="background:#F5F5F0;border-radius:22px;padding:18px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:12px"><div style="flex:1"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;font-weight:600;color:#0C0E11;line-height:1.15">Give me a plan</div><div style="font-size:14px;line-height:1.5;color:#4A5158;margin-top:4px;text-wrap:pretty">A full week, built from your equipment and days. Weights go up on their own as you log sets.</div></div><div style="width:26px;height:26px;border-radius:13px;background:#0C0E11;display:flex;align-items:center;justify-content:center;color:#F5F5F0;font-size:14px;flex:none;margin-top:4px">✓</div></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap"><span style="background:rgba(12,14,17,.08);color:#0C0E11;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">EVERY MUSCLE 2× / WEEK</span><span style="background:rgba(12,14,17,.08);color:#0C0E11;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">AUTO PROGRESSION</span><span style="background:rgba(12,14,17,.08);color:#0C0E11;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">DELOADS PLANNED</span></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:22px;padding:18px;margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:12px"><div style="flex:1"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;font-weight:600;line-height:1.15">I'll choose each day</div><div style="font-size:14px;line-height:1.5;color:#8B939E;margin-top:4px;text-wrap:pretty">Tap the muscles you feel like training and get a session built around them, on the spot.</div></div><div style="width:26px;height:26px;border-radius:13px;border:1.5px solid #3E454E;box-sizing:border-box;flex:none;margin-top:4px"></div></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap"><span style="background:#242A32;color:#B9C0C9;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">BODY MAP</span><span style="background:#242A32;color:#B9C0C9;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">STILL TRACKS VOLUME</span><span style="background:#242A32;color:#B9C0C9;border-radius:9px;padding:5px 10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em">WARNS IF YOU SKEW</span></div>
+    </div>
+    <div style="display:flex;gap:9px;align-items:flex-start;padding:0 2px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FF5C1A">i</span><span style="font-size:12.5px;line-height:1.5;color:#8B939E;max-width:36ch;text-wrap:pretty">Either way the app tracks sets per muscle per week and tells you when something is being neglected.</span></div>
+  </div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Build my plan</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a><span><strong>The preset library.</strong> Templates that match what the evidence actually supports, each stating its dose and its source — and each marked with whether it fits the days and equipment you gave.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:18px 22px 12px;flex:none">
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:5px">Pick a plan</div>
+    <div style="font-size:14px;line-height:1.5;color:#8B939E;text-wrap:pretty">Four days, 60 minutes, commercial gym. Sorted by fit.</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 22px">
+    <div style="background:#1A1E24;border-radius:20px;padding:13px 18px;margin-bottom:8px;border:1px solid #FF5C1A">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:17px;font-weight:600">Upper / Lower</span><span style="background:#FF5C1A;color:#0C0E11;border-radius:7px;padding:2px 7px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;font-weight:500">BEST FIT</span></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-bottom:8px">4 DAYS · 55–65 MIN · 10–14 SETS PER MUSCLE / WEEK</div>
+      <div style="font-size:13.5px;line-height:1.5;color:#B9C0C9;text-wrap:pretty">Everything trained twice a week with two clear rest days. The most reliable structure at four days.</div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:13px 18px;margin-bottom:8px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:17px;font-weight:600">Strength — heavy triples</span></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-bottom:8px">3–4 DAYS · 60–75 MIN · 2–3 SETS PER LIFT @ ~80% 1RM</div>
+      <div style="font-size:13.5px;line-height:1.5;color:#B9C0C9;text-wrap:pretty">Squat, bench, deadlift, press first while you're fresh. Long rests, low reps, small weekly jumps.</div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:13px 18px;margin-bottom:8px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:17px;font-weight:600">Push / Pull / Legs</span><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#8B939E">NEEDS 6 DAYS</span></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-bottom:8px">6 DAYS · 50–60 MIN · 14–20 SETS PER MUSCLE / WEEK</div>
+      <div style="font-size:13.5px;line-height:1.5;color:#7B838E;text-wrap:pretty">More volume than you need right now, and only if six days is genuinely realistic.</div>
+    </div>
+    <div style="background:#171B21;border-radius:18px;padding:12px 14px;display:flex;gap:11px;align-items:center">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FF5C1A">i</span>
+      <div style="font-size:12px;line-height:1.5;color:#8B939E;text-wrap:pretty">Doses follow the ACSM 2026 position stand: ~10 hard sets per muscle weekly for growth, ~80% of 1RM for strength, every muscle twice a week, big lifts first. <span style="color:#B9C0C9">Read the reasoning.</span></div><div style="width:44px;height:44px;flex:none;border-radius:13px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div>
+    </div>
+  </div>
+  <div style="padding:12px 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Use Upper / Lower</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="3d"><div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a><span><strong>What the map produced.</strong> A real session, ordered compounds-first, fitted to your 60 minutes and your equipment — with a one-line reason beside every exercise and everything swappable before you start.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="padding:20px 22px 12px;flex:none">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:8px">CHEST + BICEPS · YOUR PICK</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:6px">11 sets, 47 minutes.</div>
+    <div style="font-size:14px;line-height:1.5;color:#B9C0C9;text-wrap:pretty">Presses first while you're fresh, curls after. Chest is kept short — it's near its weekly cap. Tap any row to swap it.</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 22px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="background:#1A1E24;border-radius:18px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:15px;color:#8B939E">01</div><div style="flex:1"><div style="font-size:15px">Incline Barbell Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">3 × 6–10 · 72.5 KG · 2 RIR</div></div><div style="width:44px;height:44px;border-radius:13px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+        <div style="font-size:12.5px;line-height:1.45;color:#7B838E;margin-top:9px;padding-left:48px">Upper chest is your weakest angle this block.</div>
+      </div>
+      <div style="background:#1A1E24;border-radius:18px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:15px;color:#8B939E">02</div><div style="flex:1"><div style="font-size:15px">Cable Fly</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">3 × 12–15 · 15 KG · 1 RIR</div></div><div style="width:44px;height:44px;border-radius:13px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+        <div style="font-size:12.5px;line-height:1.45;color:#7B838E;margin-top:9px;padding-left:48px">Cheap sets — low fatigue with chest already loaded.</div>
+      </div>
+      <div style="background:#1A1E24;border-radius:18px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:15px;color:#8B939E">03</div><div style="flex:1"><div style="font-size:15px">Incline Dumbbell Curl</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">3 × 10–15 · 17.5 KG · 1 RIR</div></div><div style="width:44px;height:44px;border-radius:13px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+        <div style="font-size:12.5px;line-height:1.45;color:#7B838E;margin-top:9px;padding-left:48px">Biceps are 6 sets under target for the week.</div>
+      </div>
+      <div style="background:#1A1E24;border-radius:18px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:15px;color:#8B939E">04</div><div style="flex:1"><div style="font-size:15px">Cable Hammer Curl</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">2 × 12–15 · 20 KG · 1 RIR</div></div><div style="width:44px;height:44px;border-radius:13px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#B9C0C9">›</div></div>
+      </div>
+      <div style="border:1px dashed #2A2F36;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:11px;background:#171B21;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:19px;color:#8B939E">+</div><div style="flex:1;font-size:14.5px;color:#8B939E">Add an exercise</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#8B939E">13 MIN LEFT</div></div>
+    </div>
+  </div>
+  <div style="padding:12px 16px 0;flex:none;display:flex;gap:10px">
+    <div style="flex:0 0 100px;height:88px;border-radius:22px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Save it</div>
+    <div style="flex:1;height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Start training</span></div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Current: <a href="#3a">3a</a>/<a href="#3b">3b</a>/<a href="#3d">3d</a> are the live plan fork, preset library and generated session.</p>
+</section>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Coach direction, locked in — <a class="dv-oid" href="#1b">1b</a>'s voice and set screen, with the sets-vs-target chart folded into Today. Plus the states and the first run.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a><span><strong>Today, merged.</strong> Coach headline and session card, then the volume chart as a quiet footer — status you glance at, never the headline.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:22px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:10px">FRIDAY MORNING · WEEK 3 OF 5</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.08;letter-spacing:-.015em;margin-bottom:5px">Push day. About an hour.</div>
+    <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#B9C0C9;max-width:34ch;text-wrap:pretty">Bench goes up to <span style="color:#F5F5F0">102.5&nbsp;kg</span> — you finished every set with two left on Tuesday.</p>
+    <div style="background:#1A1E24;border-radius:22px;padding:16px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><span style="font-size:17px;font-weight:600">Upper A</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E">20 SETS · 58 MIN</span></div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">01</div><div style="flex:1"><div style="font-size:14.5px">Barbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">4 × 6–10 · 102.5 kg</div></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#FF5C1A">+2.5</div></div>
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">02</div><div style="flex:1"><div style="font-size:14.5px">Barbell Row</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">4 × 6–10 · 80 kg</div></div></div>
+        <div style="display:flex;align-items:center;gap:13px"><div style="width:38px;height:38px;border-radius:11px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">03</div><div style="flex:1"><div style="font-size:14.5px">Overhead Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:1px">3 × 8–12 · 45 kg</div></div></div>
+      </div>
+      <div style="height:64px;box-sizing:border-box;margin-top:12px;border-radius:16px;background:#242A32;display:flex;align-items:center;gap:10px;padding:0 16px"><span style="flex:1;font-size:14.5px;color:#DDE2E8">3 more exercises · edit today</span><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:22px;color:#8B939E">›</span></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:12px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px"><span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E">THIS WEEK · SETS VS TARGET</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#B9C0C9">Chest</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:62%;height:100%;background:#2F9BD8"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">11/18</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#B9C0C9">Back</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:80%;height:100%;background:repeating-linear-gradient(135deg,#FFD100 0 3px,#8a7200 3px 6px)"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">16/20</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;width:62px;color:#B9C0C9">Shoulders</span><div style="flex:1;height:6px;border-radius:3px;background:#242A32;overflow:hidden"><div style="width:55%;height:100%;background:#2F9BD8"></div></div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;width:34px;text-align:right">13/24</span></div>
+      </div>
+      <div style="font-size:12.5px;line-height:1.5;color:#8B939E;margin-top:10px">Quads are light this week — Saturday covers it.</div>
+    </div>
+  </div>
+  <div style="padding:12px 22px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Let's go</span></div></div>
+  <div style="height:62px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">You</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a><span><strong>Rest, with the PR moment.</strong> The one earned celebration in the app. Timer at 112px so it reads with the phone on the floor; the coach tells you what's next while you wait.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;padding:8px 10px;flex:none">
+    <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;color:#8B939E">‹</div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:500">Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8B939E;margin-top:2px">SET 3 LOGGED · 1 TO GO</div></div>
+    <div style="width:56px;height:56px"></div>
+  </div>
+  <div style="flex:1;padding:0 22px;display:flex;flex-direction:column;justify-content:center;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="background:#FFD100;color:#0C0E11;border-radius:8px;padding:4px 9px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;font-weight:500">★ PR</div>
+      <div style="font-size:15px;color:#F5F5F0">Best set you've done at 102.5 kg.</div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:2px">REST</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:112px;font-weight:500;line-height:1;letter-spacing:-.02em;color:#FF5C1A;font-variant-numeric:tabular-nums">2:14</div>
+    <div style="height:5px;border-radius:3px;background:#242A32;overflow:hidden;margin:14px 0 20px"><div style="width:26%;height:100%;background:#FF5C1A"></div></div>
+    <p style="margin:0 0 16px;font-size:15.5px;line-height:1.55;color:#B9C0C9;max-width:32ch;text-wrap:pretty">Three minutes is the prescription for a heavy compound. Next set: <span style="color:#F5F5F0">same 102.5 kg</span>, and 8 reps is a good day.</p>
+    <div style="background:#1A1E24;border-radius:18px;padding:14px 18px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#8B939E;margin-bottom:7px">SO FAR</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.7;color:#B9C0C9">1&nbsp;&nbsp;102.5 × 10&nbsp;&nbsp;<span style="color:#8B939E">2 left</span><br>2&nbsp;&nbsp;102.5 × 9&nbsp;&nbsp;&nbsp;<span style="color:#8B939E">1 left</span><br>3&nbsp;&nbsp;102.5 × 9&nbsp;&nbsp;&nbsp;<span style="color:#8B939E">1 left</span>&nbsp;&nbsp;<span style="color:#FFD100">★</span></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px 10px;display:flex;gap:10px">
+    <div style="flex:0 0 92px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;color:#B9C0C9">−15s</div>
+    <div style="flex:1;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-size:14.5px;color:#B9C0C9">Add 30s</div>
+    <div style="flex:0 0 92px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;color:#B9C0C9">+15s</div>
+  </div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">I'm ready — set 4</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a><span><strong>Intake, question one.</strong> One question per screen, no keyboard, and every answer states its consequence so you know why it's being asked.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;gap:5px;padding:18px 22px 0;flex:none">
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:26px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:12px">1 OF 5 · ABOUT A MINUTE</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:8px">What are you training for?</div>
+    <p style="margin:0 0 20px;font-size:14.5px;line-height:1.5;color:#8B939E;max-width:34ch;text-wrap:pretty">This sets your rep ranges, rest times and how volume is spread across the week. You can change it later.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="background:#1A1E24;border-radius:20px;padding:16px 18px"><div style="font-size:17px;font-weight:600;margin-bottom:3px">Get stronger</div><div style="font-size:13.5px;line-height:1.45;color:#8B939E">Heavy compounds, 3–6 reps, long rests</div></div>
+      <div style="background:#F5F5F0;border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:14px"><div style="flex:1"><div style="font-size:17px;font-weight:600;margin-bottom:3px;color:#0C0E11">Build muscle</div><div style="font-size:13.5px;line-height:1.45;color:#4A5158">6–15 reps near failure, volume climbs weekly</div></div><div style="width:26px;height:26px;border-radius:13px;background:#0C0E11;display:flex;align-items:center;justify-content:center;color:#F5F5F0;font-size:14px">✓</div></div>
+      <div style="background:#1A1E24;border-radius:20px;padding:16px 18px"><div style="font-size:17px;font-weight:600;margin-bottom:3px">Lean out, keep muscle</div><div style="font-size:13.5px;line-height:1.45;color:#8B939E">Same lifting, shorter rests, optional finisher</div></div>
+      <div style="background:#1A1E24;border-radius:20px;padding:16px 18px"><div style="font-size:17px;font-weight:600;margin-bottom:3px">Just be fit and healthy</div><div style="font-size:13.5px;line-height:1.45;color:#8B939E">Full body, moderate reps, nothing brutal</div></div>
+    </div>
+    <div style="display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:0 2px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#FF5C1A">i</span><span style="font-size:12.5px;line-height:1.5;color:#8B939E;max-width:36ch;text-wrap:pretty">No weight targets, no calories, no BMI. This app measures load, reps and turning up.</span></div>
+  </div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Next</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a><span><strong>Intake, the schedule.</strong> Two answers on one screen because they only make sense together — and the split it produces is shown live rather than revealed later.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;gap:5px;padding:18px 22px 0;flex:none">
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:26px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:12px">2 OF 5</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:22px">How often, and for how long?</div>
+    <div style="font-size:14px;color:#8B939E;margin-bottom:10px">Days a week you can realistically train</div>
+    <div style="display:flex;gap:8px;margin-bottom:24px">
+      <div style="flex:1;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;color:#8B939E">2</div>
+      <div style="flex:1;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;color:#8B939E">3</div>
+      <div style="flex:1;height:64px;border-radius:16px;background:#F5F5F0;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;font-weight:600;color:#0C0E11">4</div>
+      <div style="flex:1;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;color:#8B939E">5</div>
+      <div style="flex:1;height:64px;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:24px;color:#8B939E">6</div>
+    </div>
+    <div style="font-size:14px;color:#8B939E;margin-bottom:10px">And how long is a session?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
+      <div style="flex:1 1 28%;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;color:#8B939E">30<span style="font-size:12px;color:#8B939E">&nbsp;min</span></div>
+      <div style="flex:1 1 28%;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;color:#8B939E">45<span style="font-size:12px;color:#8B939E">&nbsp;min</span></div>
+      <div style="flex:1 1 28%;height:64px;box-sizing:border-box;border-radius:16px;background:#F5F5F0;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;font-weight:600;color:#0C0E11">60<span style="font-size:12px;color:#4A5158">&nbsp;min</span></div>
+      <div style="flex:1 1 28%;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;color:#8B939E">75<span style="font-size:12px;color:#8B939E">&nbsp;min</span></div>
+      <div style="flex:1 1 28%;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:20px;color:#8B939E">90<span style="font-size:12px;color:#8B939E">&nbsp;min+</span></div>
+    </div>
+    <div style="background:#1A1E24;border-radius:20px;padding:16px 18px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:#FF5C1A;margin-bottom:8px">THAT MEANS</div>
+      <div style="font-size:15px;line-height:1.55;color:#DDE2E8;text-wrap:pretty">Upper / Lower, twice each. Around <span style="color:#F5F5F0">20 sets a session</span>, every muscle hit twice a week — which is the point where progress actually shows up.</div>
+    </div>
+  </div>
+  <div style="padding:12px 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Next</span></div></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="2e"><div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a><span><strong>Intake, equipment.</strong> The hardest form in the app. Searchable and categorised — and when a plate-loaded or fixed-increment item is ticked it asks the one follow-up that stops the engine prescribing 6 kg you don't own.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;gap:5px;padding:18px 22px 0;flex:none">
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#FF5C1A"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+    <div style="flex:1;height:4px;border-radius:2px;background:#242A32"></div>
+  </div>
+  <div style="padding:22px 22px 12px;flex:none">
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-bottom:6px">What can you actually get to?</div>
+    <div style="font-size:14px;line-height:1.5;color:#8B939E">Anything you don't tick is hidden.</div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:0 22px">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#F5F5F0;color:#0C0E11;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;font-weight:500">ALL 14</div>
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">BAR</div>
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">MACHINE</div>
+      <div style="flex:1;height:64px;box-sizing:border-box;background:#1A1E24;color:#8B939E;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;">CABLE</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <div style="background:#1A1E24;border-radius:16px;padding:11px 16px;min-height:64px;box-sizing:border-box;display:flex;align-items:center;gap:14px"><div style="flex:1"><div style="font-size:15px">Barbell + plates</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">20 KG BAR · 1.25 → 25 KG PLATES</div></div><div style="width:26px;height:26px;border-radius:13px;background:#FF5C1A;display:flex;align-items:center;justify-content:center;color:#0C0E11;font-size:14px">✓</div></div>
+      <div style="background:#242A32;border-radius:16px;padding:11px 16px">
+        <div style="display:flex;align-items:center;gap:14px;min-height:64px;margin-bottom:8px"><div style="flex:1"><div style="font-size:15px">Dumbbells</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#FF5C1A;margin-top:2px">ONE QUESTION — WHICH ONES?</div></div><div style="width:26px;height:26px;border-radius:13px;background:#FF5C1A;display:flex;align-items:center;justify-content:center;color:#0C0E11;font-size:14px">✓</div></div>
+        <div style="display:flex;gap:7px;margin-bottom:10px">
+          <div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#F5F5F0;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;font-weight:600;color:#0C0E11">2.5 kg</span><span style="font-size:9.5px;color:#4A5158">steps</span></div>
+          <div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">5 kg</span><span style="font-size:9.5px;color:#8B939E">steps</span></div>
+          <div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:16px;color:#8B939E">Pick</span><span style="font-size:9.5px;color:#8B939E">each</span></div>
+        </div>
+        <div style="font-size:12.5px;line-height:1.5;color:#8B939E;text-wrap:pretty">Up to 40 kg, in 2.5 kg steps. Progressions will only ever suggest weights on that list.</div>
+      </div>
+      <div style="background:#1A1E24;border-radius:16px;padding:11px 16px;min-height:64px;box-sizing:border-box;display:flex;align-items:center;gap:14px"><div style="flex:1"><div style="font-size:15px">Cable stack</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8B939E;margin-top:2px">5 KG PINS</div></div><div style="width:26px;height:26px;border-radius:13px;background:#FF5C1A;display:flex;align-items:center;justify-content:center;color:#0C0E11;font-size:14px">✓</div></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px 8px"><div style="height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;padding:0 20px;gap:12px"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#8B939E">⌕</span><span style="font-size:14.5px;color:#8B939E">Search equipment</span></div></div>
+  <div style="padding:0 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Next · 3 ticked</span></div></div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Current: the Today screen, rest/PR state and all three intake steps. Day one of Today is <a href="#9d">9d</a>; the full balance chart is <a href="#10a">10a</a>.</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">The direction, chosen — Coach: the app speaks in sentences, numbers stay. Today screen and live set screen as a matched pair.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a><span><strong>Coach.</strong> The app speaks in sentences. Numbers stay, but a plain-language line leads every screen and the difficulty question is the hero of the set screen. Warmest of the three.</span></div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;overflow:hidden;padding:26px 22px 0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8B939E;margin-bottom:14px">FRIDAY MORNING</div>
+    <div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:40px;font-weight:600;line-height:1.08;letter-spacing:-.015em;margin-bottom:10px;text-wrap:pretty">Push day.<br>About an hour.</div>
+    <p style="margin:0 0 16px;font-size:15.5px;line-height:1.6;color:#B9C0C9;max-width:32ch;text-wrap:pretty">Bench goes up to <span style="color:#F5F5F0">102.5&nbsp;kg</span> today — you finished every set with two reps left on Tuesday. Back is nearly at its weekly cap, so rows stay where they are.</p>
+    <div style="background:#1A1E24;border-radius:22px;padding:20px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px"><span style="font-size:17px;font-weight:600">Upper A</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E">20 SETS · 58 MIN</span></div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:42px;height:42px;border-radius:12px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:17px;color:#8B939E">01</div><div style="flex:1"><div style="font-size:15px">Barbell Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;margin-top:1px">4 × 6–10 · 102.5 kg</div></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:42px;height:42px;border-radius:12px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:17px;color:#8B939E">02</div><div style="flex:1"><div style="font-size:15px">Barbell Row</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;margin-top:1px">4 × 6–10 · 80 kg</div></div></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="width:42px;height:42px;border-radius:12px;background:#242A32;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:17px;color:#8B939E">03</div><div style="flex:1"><div style="font-size:15px">Overhead Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8B939E;margin-top:1px">3 × 8–12 · 45 kg</div></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #242A32"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#8B939E">+ 3 MORE</span><span style="flex:1"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#FF5C1A">EDIT TODAY</span></div>
+    </div>
+  </div>
+  <div style="padding:14px 22px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Let's go</span></div></div>
+  <div style="height:64px;display:flex;align-items:center;flex:none;padding:0 8px">
+    <div style="flex:1;text-align:center;font-size:12px;color:#FF5C1A;font-weight:600">Today</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">Plan</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">History</div>
+    <div style="flex:1;text-align:center;font-size:12px;color:#8B939E">You</div>
+  </div>
+</div>
+</x-import>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 400 }}" height="{{ 848 }}" hint-size="400px,848px">
+<div style="height:768px;box-sizing:border-box;padding-bottom:16px;background:#101317;color:#F5F5F0;display:flex;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;padding:8px 10px;flex:none">
+    <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:32px;color:#8B939E">‹</div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:500">Bench Press</div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8B939E;margin-top:2px">SET 3 OF 4</div></div>
+    <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:#1A1E24;font-size:13px;color:#8B939E">?</div>
+  </div>
+  <div style="flex:1;padding:0 22px;display:flex;flex-direction:column;justify-content:center;overflow:hidden">
+    <div style="font-size:15.5px;line-height:1.5;color:#B9C0C9;margin-bottom:4px">Same weight as your last set —</div>
+    <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:4px"><span style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:72px;font-weight:600;line-height:.95;letter-spacing:-.02em">102.5</span><span style="font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.1em;color:#8B939E;padding-bottom:12px">KG</span></div>
+    <div style="font-size:16px;line-height:1.55;color:#B9C0C9;margin-bottom:18px">aim for <span style="color:#F5F5F0">8 to 10 reps</span>, stop with 2 in the tank.</div>
+    <div style="position:relative;height:96px;display:flex;align-items:center;margin-bottom:18px">
+      <div style="position:absolute;left:0;right:0;height:8px;border-radius:4px;background:#2A2F36"></div>
+      <div style="position:relative;display:flex;align-items:center;gap:2px;margin:0 auto">
+        <div style="width:11px;height:88px;border-radius:3px;background:#00843D"></div>
+        <div style="width:15px;height:88px;border-radius:3px;background:#0057B8"></div>
+        <div style="width:18px;height:88px;border-radius:3px;background:#C8102E"></div>
+        <div style="width:12px;height:28px;border-radius:2px;background:#555;margin:0 3px"></div>
+        <div style="width:18px;height:88px;border-radius:3px;background:#C8102E"></div>
+        <div style="width:15px;height:88px;border-radius:3px;background:#0057B8"></div>
+        <div style="width:11px;height:88px;border-radius:3px;background:#00843D"></div>
+      </div>
+    </div>
+    <div style="background:#1A1E24;border-radius:18px;padding:14px 18px">
+      <div style="font-size:13.5px;line-height:1.55;color:#B9C0C9">Set 1 &nbsp;<span style="color:#F5F5F0">10 reps, 2 left</span><br>Set 2 &nbsp;<span style="color:#F5F5F0">9 reps, 1 left</span> &nbsp;·&nbsp; <span style="color:#FFD100">best ever at this weight</span></div>
+    </div>
+  </div>
+  <div style="flex:none;padding:0 16px 8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="width:64px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px">−</div>
+      <div style="text-align:center"><div style="font-family:'IBM Plex Sans Condensed',sans-serif;font-size:40px;font-weight:600;line-height:1">9</div><div style="font-size:12px;color:#8B939E;margin-top:-2px">reps done</div></div>
+      <div style="width:64px;height:64px;border-radius:18px;background:#1A1E24;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Condensed',sans-serif;font-size:26px">+</div>
+    </div>
+    <div style="font-size:13px;color:#8B939E;margin:0 2px 8px">How did that feel?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px"><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:400;color:#B9C0C9;text-align:center;line-height:1.15">Easy</span></div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:400;color:#B9C0C9;text-align:center;line-height:1.15">3 more<br>in me</span></div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:400;color:#B9C0C9;text-align:center;line-height:1.15">2 more<br>in me</span></div></div>
+      <div style="display:flex;gap:8px"><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#F5F5F0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:600;color:#0C0E11;text-align:center;line-height:1.15">1 more,<br>maybe</span></div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:400;color:#B9C0C9;text-align:center;line-height:1.15">All I<br>had</span></div><div style="flex:1;height:64px;box-sizing:border-box;border-radius:16px;background:#1A1E24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px"><span style="font-size:13px;font-weight:400;color:#B9C0C9;text-align:center;line-height:1.15">Failed<br>the rep</span></div></div>
+    </div>
+  </div>
+  <div style="padding:10px 16px 0;flex:none"><div style="height:88px;border-radius:22px;background:#FF5C1A;display:flex;align-items:center;justify-content:center"><span style="font-size:20px;font-weight:600;color:#0C0E11">Done — start rest</span></div></div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Direction settled here: <a href="#1b">1b</a> — Coach. Every screen after this one is built in it. The Instrument and Rack explorations are retired.</p>
+</section>
+</x-dc>
+</body>
+</html>
