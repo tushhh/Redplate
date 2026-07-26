@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @HiltViewModel
 class SetLoggingViewModel @Inject constructor(
@@ -157,8 +158,33 @@ class SetLoggingViewModel @Inject constructor(
                     name = candidate.name,
                     equipmentLabel = repo.getPrimaryEquipment(candidate)?.displayName
                         ?: "No equipment",
+                    overlapPercent = overlapPercent(current, candidate),
+                    startImageUri = mediaResolver.startImage(candidate.id),
+                    endImageUri = mediaResolver.endImage(candidate.id),
+                    primaryMuscle = candidate.primaryMuscle,
                 )
             }
+
+    /**
+     * Share of the original's muscles a candidate also trains, as a percentage.
+     *
+     * Primary counts double: an exercise that hits the same primary muscle is a far
+     * closer substitute than one that merely shares two secondaries.
+     */
+    private fun overlapPercent(current: ExerciseEntity, candidate: ExerciseEntity): Int {
+        val wanted = buildMap {
+            put(current.primaryMuscle, PRIMARY_WEIGHT)
+            current.secondaryMuscles.forEach { put(it, SECONDARY_WEIGHT) }
+        }
+        val covered = buildSet {
+            add(candidate.primaryMuscle)
+            addAll(candidate.secondaryMuscles)
+        }
+        val total = wanted.values.sum()
+        if (total == 0.0) return 0
+        val matched = wanted.filterKeys { it in covered }.values.sum()
+        return ((matched / total) * 100).roundToInt().coerceIn(0, 100)
+    }
 
     private fun nextSlot(): TemplateSlotEntity? =
         if (slotIndex >= 0) sessionSlots.getOrNull(slotIndex + 1) else null
@@ -493,5 +519,8 @@ class SetLoggingViewModel @Inject constructor(
 
         /** Enough to find a free station without turning the sheet into a catalogue. */
         private const val MAX_SUBSTITUTES = 5
+
+        private const val PRIMARY_WEIGHT = 2.0
+        private const val SECONDARY_WEIGHT = 1.0
     }
 }

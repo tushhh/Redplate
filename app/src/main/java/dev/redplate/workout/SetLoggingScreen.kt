@@ -87,6 +87,7 @@ fun SetLoggingRoute(
     }
 
     var showGuidance by rememberSaveable { mutableStateOf(false) }
+    var showSwap by rememberSaveable { mutableStateOf(false) }
 
     SetLoggingScreen(
         state = state,
@@ -122,20 +123,36 @@ fun SetLoggingRoute(
                 instructions = state.instructionSteps,
                 primaryMuscle = state.primaryMuscle,
                 imageUri = state.imageUri,
-                substitutes = state.substitutes,
+                endImageUri = state.endImageUri,
+                substituteCount = state.substitutes.size,
             ),
             onDismiss = {
                 showGuidance = false
                 viewModel.markGuidanceSeen()
             },
-            onSwap = { exerciseId ->
+            // Guidance hands off to the swap sheet rather than listing substitutes
+            // itself, so each sheet does one job (designs 8b and 8d).
+            onOpenSwap = {
                 showGuidance = false
                 viewModel.markGuidanceSeen()
-                onSwapExercise(viewModel.sessionId, exerciseId)
+                showSwap = true
             },
             onGotIt = {
                 showGuidance = false
                 viewModel.markGuidanceSeen()
+            },
+        )
+    }
+
+    if (showSwap) {
+        SwapSheet(
+            exerciseName = state.exerciseName,
+            loggedSetCount = state.loggedSets.count { !it.isWarmup },
+            substitutes = state.substitutes,
+            onDismiss = { showSwap = false },
+            onSwap = { exerciseId ->
+                showSwap = false
+                onSwapExercise(viewModel.sessionId, exerciseId)
             },
         )
     }
