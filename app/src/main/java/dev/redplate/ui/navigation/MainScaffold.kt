@@ -99,6 +99,17 @@ private fun MainContent() {
                         onPickExercise = {
                             navController.navigate("exercises")
                         },
+                        // "See the full week" lands on the Plan tab, where the balance
+                        // chart lives below the week list (design 10a).
+                        onSeeFullWeek = {
+                            navController.navigate("plan") {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         onEditSession = { templateId ->
                             navController.navigate("programBuilder/$templateId")
                         },

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,33 +29,44 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.redplate.ui.components.BorderedCard
+import dev.redplate.ui.components.Chevron
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
+import dev.redplate.ui.components.SectionLabel
+import dev.redplate.ui.components.SecondaryButton
 import dev.redplate.ui.components.VolumeBar
 import dev.redplate.ui.theme.PlexCondensed
-import dev.redplate.ui.theme.PlexMono
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
+import dev.redplate.ui.theme.StateColor
 
+/**
+ * Today — design 2a, with the day-one variant (9d) and the stall state (9c).
+ *
+ * The shape is always the same: one coach sentence answering "what do I do today?",
+ * the session card underneath it, and the week's volume as a quiet footer. Status is
+ * context, never the headline — nobody opens a gym app to read a dashboard.
+ */
 @Composable
 fun TodayRoute(
     onStartWorkout: (Long, String) -> Unit,
     onPickExercise: () -> Unit,
     onEditSession: (Long) -> Unit = {},
+    onSeeFullWeek: () -> Unit = {},
 ) {
     val viewModel: TodayViewModel = hiltViewModel()
     val state by viewModel.state.collectAsState()
 
-    // Today is a summary of state other screens change — a finished session, a new
-    // program. It used to load once in init and then never again, so it still showed
-    // "Let's go" for a workout already done. Refreshing on resume keeps it honest.
+    // Today summarises state other screens change — a finished session, a new program.
+    // Refreshing on resume keeps it from offering a workout that is already done.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -69,6 +81,9 @@ fun TodayRoute(
         onStartWorkout = { viewModel.startSession(onStartWorkout) },
         onPickExercise = onPickExercise,
         onEditSession = onEditSession,
+        onSeeFullWeek = onSeeFullWeek,
+        onTakeDeload = viewModel::takeDeload,
+        onDismissStall = viewModel::pushOnThroughStall,
     )
 }
 
@@ -78,42 +93,47 @@ fun TodayScreen(
     onStartWorkout: () -> Unit,
     onPickExercise: () -> Unit,
     onEditSession: (Long) -> Unit = {},
+    onSeeFullWeek: () -> Unit = {},
+    onTakeDeload: () -> Unit = {},
+    onDismissStall: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
     when (state) {
-        TodayState.Loading -> {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(colors.ground),
-                contentAlignment = Alignment.Center,
-            ) {}
-        }
+        TodayState.Loading -> Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.ground),
+        )
 
-        TodayState.NoProgramYet -> {
-            NoProgramScreen(onPickExercise = onPickExercise)
-        }
+        TodayState.NoProgramYet -> NoProgramScreen(onPickExercise = onPickExercise)
 
-        is TodayState.TrainingDay -> {
-            TrainingDayScreen(
-                state = state,
-                onStartWorkout = onStartWorkout,
-                onEditSession = onEditSession,
-            )
-        }
+        is TodayState.Stalled -> StallScreen(
+            state = state,
+            onTakeDeload = onTakeDeload,
+            onSwapLift = onEditSession,
+            onPushOn = onDismissStall,
+        )
 
-        is TodayState.RestDay -> {
-            RestDayScreen(state = state)
-        }
+        is TodayState.TrainingDay -> TrainingDayScreen(
+            state = state,
+            onStartWorkout = onStartWorkout,
+            onEditSession = { onEditSession(state.sessionCard.templateId) },
+            onSeeFullWeek = onSeeFullWeek,
+        )
+
+        is TodayState.RestDay -> RestDayScreen(state = state, onSeeFullWeek = onSeeFullWeek)
     }
 }
+
+// ── Training day — 2a, and 9d when there is no history yet ──────────
 
 @Composable
 private fun TrainingDayScreen(
     state: TodayState.TrainingDay,
     onStartWorkout: () -> Unit,
-    onEditSession: (Long) -> Unit,
+    onEditSession: () -> Unit,
+    onSeeFullWeek: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
 
@@ -130,43 +150,28 @@ private fun TrainingDayScreen(
                 .padding(horizontal = 22.dp),
         ) {
             Spacer(Modifier.height(22.dp))
-
-            // Eyebrow
             MonoLabel(text = state.eyebrow)
             Spacer(Modifier.height(10.dp))
-
-            // Coach headline
             CoachHeadline(text = state.headline)
             Spacer(Modifier.height(5.dp))
-
-            // Coach body
             Text(
                 text = state.coachBody,
-                style = RedplateType.body,
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = colors.inkSecondary,
-                lineHeight = 24.sp,
             )
             Spacer(Modifier.height(10.dp))
 
-            // Session card
-            SessionCardView(
-                card = state.sessionCard,
-                onEditSession = { onEditSession(state.sessionCard.templateId) },
-            )
+            SessionCardView(card = state.sessionCard, onEditSession = onEditSession)
             Spacer(Modifier.height(10.dp))
 
-            // Volume footer
             VolumeFooter(
                 rows = state.volumeRows,
                 coachLine = state.volumeCoachLine,
+                onSeeFullWeek = onSeeFullWeek,
             )
             Spacer(Modifier.height(16.dp))
         }
 
-        // Primary bar. This used to open a "How much time today?" dialog whose answer
-        // was then thrown away — a centred dialog, above the thumb arc, that added a tap
-        // and changed nothing. The session length already comes from the profile ceiling,
-        // so the primary action starts the workout.
         PrimaryBar(
             label = state.primaryLabel,
             onClick = onStartWorkout,
@@ -186,7 +191,6 @@ private fun SessionCardView(card: SessionCard, onEditSession: () -> Unit) {
             .background(colors.surface)
             .padding(16.dp),
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -198,68 +202,68 @@ private fun SessionCardView(card: SessionCard, onEditSession: () -> Unit) {
                 color = colors.ink,
             )
             Text(
-                text = "${card.totalSets} SETS · ${card.estimatedMinutes} MIN",
-                style = RedplateType.mono,
+                text = card.summaryLine,
+                style = RedplateType.mono.copy(fontSize = 11.sp),
                 color = colors.inkMuted,
             )
         }
 
         Spacer(Modifier.height(14.dp))
 
-        // Exercise rows
-        card.exercises.forEach { exercise ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 3.5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Order badge
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(colors.surfaceRaised),
-                    contentAlignment = Alignment.Center,
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            card.exercises.forEach { exercise ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "%02d".format(exercise.orderIndex),
-                        style = RedplateType.body.copy(
-                            fontFamily = PlexCondensed,
-                            fontSize = 16.sp,
-                        ),
-                        color = colors.inkMuted,
-                    )
-                }
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(colors.surfaceRaised),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "%02d".format(exercise.orderIndex),
+                            style = RedplateType.body.copy(
+                                fontFamily = PlexCondensed,
+                                fontSize = 16.sp,
+                            ),
+                            color = colors.inkMuted,
+                        )
+                    }
 
-                Spacer(Modifier.width(13.dp))
+                    Spacer(Modifier.width(13.dp))
 
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = exercise.name,
-                        style = RedplateType.body.copy(fontSize = 14.5.sp),
-                        color = colors.ink,
-                    )
-                    Text(
-                        text = exercise.prescription,
-                        style = RedplateType.mono.copy(fontSize = 10.5.sp),
-                        color = colors.inkMuted,
-                    )
-                }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = exercise.name,
+                            style = RedplateType.body.copy(fontSize = 14.5.sp),
+                            color = colors.ink,
+                        )
+                        Text(
+                            text = exercise.prescription,
+                            style = RedplateType.mono.copy(fontSize = 10.5.sp),
+                            color = colors.inkMuted,
+                        )
+                    }
 
-                // Weight change indicator
-                if (exercise.loadNote != null) {
-                    Text(
-                        text = exercise.loadNote,
-                        style = RedplateType.mono.copy(fontSize = 10.sp, letterSpacing = 0.08.em),
-                        color = colors.live,
-                    )
+                    // The load change, stated where the load is. This is the whole
+                    // reason the card lists the lifts rather than just naming the day.
+                    if (exercise.loadNote != null) {
+                        Text(
+                            text = exercise.loadNote,
+                            style = RedplateType.mono.copy(
+                                fontSize = 10.sp,
+                                letterSpacing = 0.08.em,
+                            ),
+                            color = colors.live,
+                        )
+                    }
                 }
             }
         }
 
-        // "N more · edit today" row. It had a chevron and no click handler, so it read
-        // as a link and behaved as decoration; it now opens the session in the builder.
         if (card.remainingCount > 0) {
             Spacer(Modifier.height(12.dp))
             Row(
@@ -278,20 +282,21 @@ private fun SessionCardView(card: SessionCard, onEditSession: () -> Unit) {
                     color = colors.inkBright,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "›",
-                    style = RedplateType.title,
-                    color = colors.inkMuted,
-                )
+                Chevron()
             }
         }
     }
 }
 
+/**
+ * The quiet footer. Three rows, then one sentence, then the way through to the full
+ * eleven-group chart on the Plan tab (design 10a's "see the full week").
+ */
 @Composable
 private fun VolumeFooter(
     rows: List<VolumeRow>,
     coachLine: String,
+    onSeeFullWeek: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
 
@@ -302,29 +307,186 @@ private fun VolumeFooter(
             .background(colors.surface)
             .padding(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        MonoLabel(text = "THIS WEEK · SETS VS TARGET")
+        SectionLabel(text = "This week · sets vs target")
         Spacer(Modifier.height(11.dp))
 
-        rows.forEach { row ->
-            VolumeBar(
-                label = row.label,
-                current = row.current,
-                target = row.target,
-            )
-            Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            rows.forEach { row ->
+                VolumeBar(label = row.label, current = row.current, target = row.target)
+            }
         }
 
+        Spacer(Modifier.height(10.dp))
         Text(
             text = coachLine,
-            style = RedplateType.body.copy(fontSize = 12.5.sp),
+            style = RedplateType.body.copy(fontSize = 12.5.sp, lineHeight = 19.sp),
             color = colors.inkMuted,
-            lineHeight = 19.sp,
         )
+
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onSeeFullWeek),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "See the full week",
+                style = RedplateType.body.copy(fontSize = 13.5.sp),
+                color = colors.inkSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            Chevron()
+        }
     }
 }
 
+// ── Stall / deload — 9c ─────────────────────────────────────────────
+
+/**
+ * Fires on Today rather than as a notification, and leads with the evidence rather
+ * than a verdict. The deload is spelled out in kilos so it reads as a plan, not as
+ * quitting — and "Push on" is always available.
+ */
 @Composable
-private fun RestDayScreen(state: TodayState.RestDay) {
+private fun StallScreen(
+    state: TodayState.Stalled,
+    onTakeDeload: () -> Unit,
+    onSwapLift: (Long) -> Unit,
+    onPushOn: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(horizontal = 22.dp),
+        ) {
+            Spacer(Modifier.height(22.dp))
+            MonoLabel(text = state.eyebrow)
+            Spacer(Modifier.height(10.dp))
+            CoachHeadline(text = state.headline)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = state.coachBody,
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                color = colors.inkSecondary,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(colors.surface)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            ) {
+                SectionLabel(text = "Estimated 1RM · last ${state.e1rmWeeks.size} weeks")
+                Spacer(Modifier.height(14.dp))
+                E1rmBars(weeks = state.e1rmWeeks)
+            }
+            Spacer(Modifier.height(12.dp))
+
+            BorderedCard {
+                Column {
+                    SectionLabel(text = "A deload week means")
+                    Spacer(Modifier.height(8.dp))
+                    state.deloadEffects.forEach { effect ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = effect.label,
+                                style = RedplateType.body.copy(fontSize = 13.5.sp),
+                                color = colors.inkBright,
+                            )
+                            Text(
+                                text = effect.value,
+                                style = RedplateType.mono.copy(fontSize = 12.5.sp),
+                                color = if (effect.isOutcome) colors.live else colors.inkBright,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PrimaryBar(label = "Take the deload week", onClick = onTakeDeload)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryButton(
+                    label = "Swap the lift instead",
+                    onClick = { onSwapLift(state.templateId) },
+                    modifier = Modifier.weight(1f),
+                )
+                SecondaryButton(
+                    label = "Push on",
+                    onClick = onPushOn,
+                    modifier = Modifier.width(112.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Six weeks of estimated 1RM. Flat weeks are the evidence, so they carry the colour. */
+@Composable
+private fun E1rmBars(weeks: List<E1rmWeek>) {
+    val colors = RedplateTheme.colors
+    val peak = weeks.maxOfOrNull { it.e1rm }?.takeIf { it > 0 } ?: 1.0
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(96.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        weeks.forEach { week ->
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        // Floor the bar so an early low week is still a visible column.
+                        .fillMaxHeight(((week.e1rm / peak).toFloat() * 0.82f).coerceIn(0.18f, 0.82f))
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(if (week.isFlat) StateColor.pr else colors.surfaceRaised),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = week.label,
+                    style = RedplateType.mono.copy(fontSize = 9.5.sp),
+                    color = if (week.isFlat) StateColor.pr else colors.inkMuted,
+                )
+            }
+        }
+    }
+}
+
+// ── Rest day and empty ──────────────────────────────────────────────
+
+@Composable
+private fun RestDayScreen(state: TodayState.RestDay, onSeeFullWeek: () -> Unit) {
     val colors = RedplateTheme.colors
 
     Column(
@@ -341,27 +503,27 @@ private fun RestDayScreen(state: TodayState.RestDay) {
         Spacer(Modifier.height(5.dp))
         Text(
             text = state.coachBody,
-            style = RedplateType.body,
+            style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
             color = colors.inkSecondary,
         )
-        if (state.nextSessionLabel != null) {
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(colors.surface)
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Next: ${state.nextSessionLabel}",
-                    style = RedplateType.body.copy(fontSize = 15.sp),
-                    color = colors.inkSubtle,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.surface)
+                .clickable(onClick = onSeeFullWeek)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = state.nextSessionLabel?.let { "Next: $it" } ?: "See the full week",
+                style = RedplateType.body.copy(fontSize = 15.sp),
+                color = colors.inkSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            Chevron()
         }
     }
 }
@@ -381,32 +543,19 @@ private fun NoProgramScreen(onPickExercise: () -> Unit) {
         CoachHeadline(text = "No program yet.")
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Set one up in the Plan tab, or just pick some exercises and train.",
-            style = RedplateType.body,
+            text = "Set one up in the Plan tab, or tap the muscles you feel like training " +
+                "and get a session built around them.",
+            style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
             color = colors.inkSecondary,
         )
         Spacer(Modifier.height(24.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(colors.surface)
-                .clickable(onClick = onPickExercise),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Pick exercises",
-                style = RedplateType.action,
-                color = colors.ink,
-            )
-        }
+        SecondaryButton(label = "Pick exercises", onClick = onPickExercise)
     }
 }
 
-// ── Previews ──
+// ── Previews ────────────────────────────────────────────────────────
 
-@Preview
+@Preview(name = "2a · training day", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayTrainingDayPreview() {
     RedplateTheme {
@@ -414,9 +563,11 @@ private fun TodayTrainingDayPreview() {
             state = TodayState.TrainingDay(
                 eyebrow = "FRIDAY MORNING · WEEK 3 OF 5",
                 headline = "Push day. About an hour.",
-                coachBody = "Bench goes up to 102.5 kg — you finished every set with two left on Tuesday.",
+                coachBody = "Bench goes up to 102.5 kg — you finished every set with two " +
+                    "left on Tuesday.",
                 sessionCard = SessionCard(
                     label = "Upper A",
+                    summaryLine = "20 SETS · 58 MIN",
                     totalSets = 20,
                     estimatedMinutes = 58,
                     exercises = listOf(
@@ -442,7 +593,7 @@ private fun TodayTrainingDayPreview() {
     }
 }
 
-@Preview
+@Preview(name = "9d · day one", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayFirstDayPreview() {
     RedplateTheme {
@@ -450,9 +601,11 @@ private fun TodayFirstDayPreview() {
             state = TodayState.TrainingDay(
                 eyebrow = "SATURDAY · WEEK 1, SESSION 1",
                 headline = "First one. Go light on purpose.",
-                coachBody = "Pick a weight you could manage two more reps with. Today sets the baseline — every number after this is built off it.",
+                coachBody = "Pick a weight you could manage two more reps with. Today sets " +
+                    "the baseline — every number after this is built off it.",
                 sessionCard = SessionCard(
                     label = "Upper A",
+                    summaryLine = "14 SETS · ~45 MIN",
                     totalSets = 14,
                     estimatedMinutes = 45,
                     exercises = listOf(
@@ -463,10 +616,7 @@ private fun TodayFirstDayPreview() {
                     remainingCount = 2,
                     templateId = 1L,
                 ),
-                volumeRows = listOf(
-                    VolumeRow("Chest", 0, 18),
-                    VolumeRow("Back", 0, 20),
-                ),
+                volumeRows = listOf(VolumeRow("Chest", 0, 18), VolumeRow("Back", 0, 20)),
                 volumeCoachLine = "Fills in as you log. Trends need three sessions.",
                 primaryLabel = "Start Upper A",
                 isFirstSession = true,
@@ -477,7 +627,55 @@ private fun TodayFirstDayPreview() {
     }
 }
 
-@Preview
+@Preview(name = "9c · stall detected", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun TodayStalledPreview() {
+    RedplateTheme {
+        TodayScreen(
+            state = TodayState.Stalled(
+                eyebrow = "BENCH PRESS · WEEK 6 OF 5",
+                headline = "Bench hasn't moved in three weeks.",
+                coachBody = "Same 102.5 kg, and the last rep got harder each time. " +
+                    "That's a stall, not a bad day.",
+                e1rmWeeks = listOf(
+                    E1rmWeek("W1", 112.0, isFlat = false),
+                    E1rmWeek("W2", 118.0, isFlat = false),
+                    E1rmWeek("W3", 126.0, isFlat = false),
+                    E1rmWeek("W4", 128.0, isFlat = true),
+                    E1rmWeek("W5", 127.5, isFlat = true),
+                    E1rmWeek("W6", 127.0, isFlat = true),
+                ),
+                deloadEffects = listOf(
+                    DeloadEffect("Bench", "102.5 → 82.5 kg"),
+                    DeloadEffect("Sets per lift", "4 → 2"),
+                    DeloadEffect("Then week 1 restarts at", "105 kg", isOutcome = true),
+                ),
+                templateId = 1L,
+            ),
+            onStartWorkout = {},
+            onPickExercise = {},
+        )
+    }
+}
+
+@Preview(name = "Today · rest day", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun TodayRestDayPreview() {
+    RedplateTheme {
+        TodayScreen(
+            state = TodayState.RestDay(
+                eyebrow = "THURSDAY · WEEK 3 OF 5",
+                headline = "Rest day. You've earned it.",
+                coachBody = "Next session is Upper A, tomorrow.",
+                nextSessionLabel = "Upper A",
+            ),
+            onStartWorkout = {},
+            onPickExercise = {},
+        )
+    }
+}
+
+@Preview(name = "Today · no program", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayNoProgramPreview() {
     RedplateTheme {
