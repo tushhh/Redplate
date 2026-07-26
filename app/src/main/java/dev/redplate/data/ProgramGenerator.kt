@@ -82,6 +82,90 @@ class ProgramGenerator @Inject constructor(
         }
     }
 
+    /**
+     * Builds a one-off session around the muscles the user tapped on the body map, and
+     * returns its template id (design 3d).
+     *
+     * Compounds first while they're fresh, isolation after, trimmed to the time they have.
+     * The template is stored so set logging can read a real prescription and walk the
+     * running order — the same machinery a programmed day uses. It is parked on an
+     * inactive "Freestyle" mesocycle and given a negative day index, so it never appears
+     * as a day on the Plan tab.
+     */
+    suspend fun generateAdHocTemplate(
+        muscles: Set<MuscleGroup>,
+        profile: ProfileEntity,
+        now: Long = System.currentTimeMillis(),
+    ): Long {
+        val available = equipmentDao.getAll().filter { it.isAvailable }.map { it.id }.toSet()
+        val pool = exerciseDao.getAll()
+            .filter { !it.isExcluded }
+            .filter { it.pattern !in profile.excludedPatterns }
+            .filter { ex -> ex.requiredEquipmentIds.all { it in available } }
+            .sortedBy { it.id }
+
+        // Compounds first, then isolation, cycling the picked muscles so no single one
+        // takes the whole session.
+        val chosen = mutableListOf<Pair<ExerciseEntity, Boolean>>()
+        val used = mutableSetOf<String>()
+        for (compound in listOf(true, false)) {
+            for (muscle in muscles) {
+                pool.firstOrNull {
+                    it.primaryMuscle == muscle && it.isCompound == compound && it.id !in used
+                }?.let {
+                    used += it.id
+                    chosen += it to compound
+                }
+            }
+        }
+        if (chosen.isEmpty()) error("No exercises available for the selected muscles")
+
+        return db.withTransaction {
+            val mesocycleId = programDao.getActiveMesocycle()?.id
+                ?: programDao.insertMesocycle(
+                    MesocycleEntity(
+                        name = FREESTYLE_BLOCK,
+                        goal = profile.goal,
+                        startedAt = now,
+                        lengthWeeks = 1,
+                        isActive = false,
+                    ),
+                )
+
+            val templateId = programDao.insertTemplate(
+                SessionTemplateEntity(
+                    mesocycleId = mesocycleId,
+                    label = muscles.joinToString(" + ") { it.name.lowercase().replaceFirstChar(Char::uppercase) },
+                    dayIndex = AD_HOC_DAY_INDEX,
+                ),
+            )
+
+            var budget = profile.sessionCeilingMinutes
+            val slots = mutableListOf<TemplateSlotEntity>()
+            for ((exercise, compound) in chosen) {
+                val rx = Prescription.of(profile.goal, compound)
+                val sets = if (compound) 3 else 2
+                val cost = sets * MINUTES_PER_SET
+                if (budget - cost < 0 && slots.isNotEmpty()) break
+                budget -= cost
+
+                slots += TemplateSlotEntity(
+                    templateId = templateId,
+                    exerciseId = exercise.id,
+                    orderIndex = slots.size,
+                    targetSets = sets,
+                    repRangeLow = rx.repLow,
+                    repRangeHigh = rx.repHigh,
+                    targetRir = rx.targetRir,
+                    restSeconds = rx.restSeconds,
+                    progression = ProgressionRule.DOUBLE_PROGRESSION,
+                )
+            }
+            programDao.insertSlots(slots)
+            templateId
+        }
+    }
+
     // ── Plan assembly ───────────────────────────────────────────────────
 
     private fun buildPlan(
@@ -236,6 +320,10 @@ class ProgramGenerator @Inject constructor(
         private const val MINUTES_PER_SET = 3
         private const val MIN_EXERCISES = 3
         private const val NOVICE_MONTHS = 12
+
+        /** Parks ad-hoc templates outside the Mon–Sun grid so the Plan tab ignores them. */
+        private const val AD_HOC_DAY_INDEX = -1
+        private const val FREESTYLE_BLOCK = "Freestyle"
 
         /**
          * One line explaining why a slot is prescribed the way it is. The engine must

@@ -60,6 +60,23 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun deleteSet(set: SetLogEntity) = sessionDao.deleteSetLog(set)
 
+    /**
+     * Opens a session against a template — either a programmed day or the one the body
+     * map just generated. Set logging reads its prescription and running order from here.
+     */
+    suspend fun startTemplatedSession(templateId: Long, now: Long): Long {
+        val template = programDao.getTemplateById(templateId)
+        val mesocycle = programDao.getActiveMesocycle()
+        return sessionDao.insertSession(
+            SessionEntity(
+                templateId = templateId,
+                mesocycleId = template?.mesocycleId,
+                weekNumber = mesocycle?.currentWeek?.takeIf { template?.mesocycleId == mesocycle.id },
+                startedAt = now,
+            )
+        )
+    }
+
     suspend fun startFreestyleSession(now: Long): Long =
         sessionDao.insertSession(
             SessionEntity(

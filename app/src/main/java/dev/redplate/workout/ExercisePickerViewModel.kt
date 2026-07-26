@@ -8,6 +8,8 @@ import dev.redplate.data.ExerciseDao
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.MuscleGroup
+import dev.redplate.data.ProfileDao
+import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.VolumeLandmarkEntity
 import dev.redplate.data.VolumeLandmarks
 import dev.redplate.data.WorkoutRepository
@@ -24,13 +26,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Whether the picker is in muscle-selection or exercise-selection phase. */
-enum class PickerPhase { MUSCLES, EXERCISES }
+/**
+ * Where the picker is. The design's flow is map → generated session → train, so the
+ * exercise list is now a detour reached by searching rather than the main path (3d).
+ */
+enum class PickerPhase { MUSCLES, GENERATED, EXERCISES }
 
 @HiltViewModel
 class ExercisePickerViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val repo: WorkoutRepository,
+    private val profileDao: ProfileDao,
+    private val programGenerator: ProgramGenerator,
     private val savedState: SavedStateHandle,
     val mediaResolver: MediaResolver,
 ) : ViewModel() {
@@ -136,12 +143,112 @@ class ExercisePickerViewModel @Inject constructor(
         get() = savedState.get<Long>("activeSessionId") ?: 0L
         set(value) { savedState["activeSessionId"] = value }
 
-    /** Transition from muscle selection to exercise selection. */
+    // ── Generated session (design 3d) ─────────────────────────────────────────
+
+    private val _generated = MutableStateFlow(GeneratedSessionState())
+    val generated: StateFlow<GeneratedSessionState> = _generated.asStateFlow()
+
+    private var generatedTemplateId: Long = 0L
+
+    /**
+     * Builds a session from the picked muscles and shows it for inspection before the
+     * first set. The plan is stored as a real template, so set logging reads the same
+     * prescription and walks the same running order as a programmed day.
+     */
     fun buildSession() {
+        val muscles = _pickedMuscles.value
+        if (muscles.isEmpty()) return
+
         viewModelScope.launch {
-            getOrCreateSession()
-            _phase.value = PickerPhase.EXERCISES
+            val profile = profileDao.get() ?: return@launch
+            _phase.value = PickerPhase.GENERATED
+            _generated.value = GeneratedSessionState(isLoading = true)
+
+            val templateId = runCatching {
+                programGenerator.generateAdHocTemplate(muscles, profile)
+            }.getOrNull()
+
+            if (templateId == null) {
+                _phase.value = PickerPhase.MUSCLES
+                return@launch
+            }
+            generatedTemplateId = templateId
+            _generated.value = describeGenerated(templateId, muscles, profile.sessionCeilingMinutes)
         }
+    }
+
+    private suspend fun describeGenerated(
+        templateId: Long,
+        muscles: Set<MuscleGroup>,
+        ceilingMinutes: Int,
+    ): GeneratedSessionState {
+        val slots = repo.getSlotsForTemplate(templateId)
+        val weekly = repo.weeklyHardSetsPerMuscle()
+        val totalSets = slots.sumOf { it.targetSets }
+        val minutes = totalSets * MINUTES_PER_SET
+
+        val rows = slots.map { slot ->
+            val exercise = repo.getExercise(slot.exerciseId)
+            val equipment = exercise?.let { repo.getPrimaryEquipment(it) }
+            val load = slot.workingLoadKg ?: equipment?.barWeightKg
+            GeneratedSlotRow(
+                orderIndex = slot.orderIndex + 1,
+                exerciseId = slot.exerciseId,
+                name = exercise?.name ?: slot.exerciseId,
+                prescription = buildString {
+                    append("${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh}")
+                    if (load != null) append(" · ${formatKg(load)} KG")
+                    slot.targetRir?.let { append(" · $it RIR") }
+                },
+                reason = exercise?.let { reasonFor(it, weekly) },
+            )
+        }
+
+        return GeneratedSessionState(
+            eyebrow = muscles.joinToString(" + ") { it.displayName.uppercase() } + " · YOUR PICK",
+            headline = "$totalSets sets, $minutes minutes.",
+            coachBody = "Compounds first while you're fresh, isolation after. " +
+                "Tap any row to swap it.",
+            rows = rows,
+            minutesLeft = (ceilingMinutes - minutes).coerceAtLeast(0),
+            isLoading = false,
+        )
+    }
+
+    /** Why this lift is in the session, in one line, from the week's actual volume. */
+    private fun reasonFor(
+        exercise: ExerciseEntity,
+        weekly: Map<MuscleGroup, Double>,
+    ): String {
+        val muscle = exercise.primaryMuscle
+        val done = (weekly[muscle] ?: 0.0).toInt()
+        val target = VolumeLandmarks.forMuscle(muscle).mavHigh
+        val gap = target - done
+        return when {
+            gap > 0 && exercise.isCompound ->
+                "${muscle.displayName} is $gap set${if (gap == 1) "" else "s"} under target this week."
+
+            gap > 0 -> "Cheap sets — low fatigue with ${muscle.displayName.lowercase()} already loaded."
+            else -> "${muscle.displayName} is at its cap — this one is kept short."
+        }
+    }
+
+    /** Opens a session against the generated template and hands back its id. */
+    suspend fun startGeneratedSession(): Pair<Long, String>? {
+        val slots = repo.getSlotsForTemplate(generatedTemplateId)
+        val first = slots.firstOrNull() ?: return null
+        val sessionId = repo.startTemplatedSession(generatedTemplateId, System.currentTimeMillis())
+        activeSessionId = sessionId
+        return sessionId to first.exerciseId
+    }
+
+    fun backToMuscles() {
+        _phase.value = PickerPhase.MUSCLES
+    }
+
+    /** Jumps to the searchable exercise list, the archive behind the map. */
+    fun browseExercises() {
+        _phase.value = PickerPhase.EXERCISES
     }
 
     fun goBackToMuscles() {
@@ -150,11 +257,18 @@ class ExercisePickerViewModel @Inject constructor(
         _searchQuery.value = ""
     }
 
+    private fun formatKg(kg: Double): String =
+        if (kg % 1.0 == 0.0) kg.toInt().toString() else "%.1f".format(kg)
+
     suspend fun getOrCreateSession(): Long {
         val existing = activeSessionId
         if (existing > 0L) return existing
         val id = repo.startFreestyleSession(System.currentTimeMillis())
         activeSessionId = id
         return id
+    }
+
+    private companion object {
+        const val MINUTES_PER_SET = 3
     }
 }
