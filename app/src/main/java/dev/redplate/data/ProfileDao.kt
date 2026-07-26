@@ -14,4 +14,8 @@ interface ProfileDao {
 
     @Query("SELECT * FROM profile WHERE id = 1")
     suspend fun get(): ProfileEntity?
+
+    /** Wipe (import only — must run inside the import transaction). */
+    @Query("DELETE FROM profile")
+    suspend fun deleteAll()
 }

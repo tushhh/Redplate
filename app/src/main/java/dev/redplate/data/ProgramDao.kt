@@ -77,4 +77,15 @@ interface ProgramDao {
 
     @Query("SELECT * FROM template_slots ORDER BY id ASC")
     suspend fun getAllSlots(): List<TemplateSlotEntity>
+
+    // ── Wipe (import only — must run inside the import transaction) ──
+
+    @Query("DELETE FROM template_slots")
+    suspend fun deleteAllSlots()
+
+    @Query("DELETE FROM session_templates")
+    suspend fun deleteAllTemplates()
+
+    @Query("DELETE FROM mesocycles")
+    suspend fun deleteAllMesocycles()
 }

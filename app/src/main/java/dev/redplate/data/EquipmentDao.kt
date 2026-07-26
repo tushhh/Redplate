@@ -26,4 +26,8 @@ interface EquipmentDao {
 
     @Query("SELECT * FROM equipment WHERE isAvailable = 1 ORDER BY displayName ASC")
     fun observeAvailable(): Flow<List<EquipmentEntity>>
+
+    /** Wipe (import only — must run inside the import transaction). */
+    @Query("DELETE FROM equipment")
+    suspend fun deleteAll()
 }

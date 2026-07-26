@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.IOException
@@ -55,15 +56,42 @@ class BackupRepository @Inject constructor(
 
     // ── Import ──────────────────────────────────────────────────────
 
+    /**
+     * Replaces the database with the contents of [jsonString].
+     *
+     * Atomic by construction: the file is fully parsed *before* anything is touched,
+     * and the wipe plus every insert run inside one transaction, so a malformed or
+     * truncated backup leaves the existing data exactly as it was. The previous
+     * version wiped first and inserted afterwards — a failure halfway through took
+     * the training history with it.
+     */
     suspend fun import(jsonString: String) {
-        val data = json.decodeFromString<BackupData>(jsonString)
-        require(data.schemaVersion == 1) {
-            "Unsupported backup version ${data.schemaVersion}"
+        val data = try {
+            json.decodeFromString<BackupData>(jsonString)
+        } catch (e: SerializationException) {
+            throw IllegalArgumentException(
+                "That file isn't a Redplate backup. Pick the .json file written by Export.",
+                e,
+            )
+        }
+        require(data.schemaVersion == BackupData.SCHEMA_VERSION) {
+            "This backup is version ${data.schemaVersion}; this build reads version " +
+                "${BackupData.SCHEMA_VERSION}. Install the matching build to restore it."
         }
 
-        db.clearAllTables()
-
         db.withTransaction {
+            // Children before parents, so nothing is orphaned mid-wipe.
+            db.sessionDao().deleteAllSetLogs()
+            db.sessionDao().deleteAllSessions()
+            db.programDao().deleteAllSlots()
+            db.programDao().deleteAllTemplates()
+            db.programDao().deleteAllMesocycles()
+            db.volumeDao().deleteAllSnapshots()
+            db.volumeDao().deleteAllLandmarks()
+            db.exerciseDao().deleteAll()
+            db.equipmentDao().deleteAll()
+            db.profileDao().deleteAll()
+
             db.equipmentDao().insertAll(data.equipment)
             db.exerciseDao().insertAll(data.exercises)
             data.profile?.let { db.profileDao().upsert(it) }
