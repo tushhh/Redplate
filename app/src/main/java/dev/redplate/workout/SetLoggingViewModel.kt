@@ -208,7 +208,7 @@ class SetLoggingViewModel @Inject constructor(
         _state.update {
             it.copy(
                 difficulty = difficulty,
-                rir = difficulty?.rir?.coerceAtLeast(0),
+                rir = difficulty?.rir,
             )
         }
     }
@@ -313,7 +313,12 @@ class SetLoggingViewModel @Inject constructor(
     private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
         val lastWorking = logged.lastOrNull { !it.isWarmup }
         return when {
-            lastWorking != null -> "Same weight as your last set —"
+            lastWorking != null -> {
+                if (lastWorking.loadKg == _state.value.loadKg)
+                    "Same weight as your last set —"
+                else
+                    "Bumped from your last set —"
+            }
             previous.isNotEmpty() -> "Based on your last session —"
             else -> ""
         }
