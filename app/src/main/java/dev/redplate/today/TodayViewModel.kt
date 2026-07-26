@@ -78,6 +78,14 @@ class TodayViewModel @Inject constructor(
     private var pendingMesoWeek: Int? = null
 
     init {
+        refresh()
+    }
+
+    /**
+     * Recomputes the day. Called on every resume, because finishing a session or editing
+     * a program happens on another screen and Today is a summary of both.
+     */
+    fun refresh() {
         viewModelScope.launch { load() }
     }
 

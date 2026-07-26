@@ -27,7 +27,22 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun getSlot(id: Long): TemplateSlotEntity? = programDao.getSlotById(id)
 
+    /** The ordered slots of a session template — the running order for the whole workout. */
+    suspend fun getSlotsForTemplate(templateId: Long): List<TemplateSlotEntity> =
+        programDao.getSlots(templateId)
+
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
+
+    /** Stamps the finish time. A session without one is still in progress. */
+    suspend fun endSession(sessionId: Long, endedAt: Long) {
+        val session = sessionDao.getSessionById(sessionId) ?: return
+        if (session.endedAt == null) {
+            sessionDao.updateSession(session.copy(endedAt = endedAt))
+        }
+    }
+
+    suspend fun markExerciseIntroduced(exerciseId: String) =
+        exerciseDao.markIntroduced(exerciseId)
 
     /** First required equipment that is on hand; falls back to any declared equipment. */
     suspend fun getPrimaryEquipment(exercise: ExerciseEntity): EquipmentEntity? {
@@ -54,6 +69,12 @@ class WorkoutRepository @Inject constructor(
                 startedAt = now,
             )
         )
+
+    /** One-shot list of exercises for a muscle that the available equipment can support. */
+    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =
+        exerciseDao.getAll()
+            .filter { it.primaryMuscle == muscle && !it.isExcluded }
+            .filter { isExerciseAvailable(it) }
 
     /** Stream of all exercises that can be performed with available equipment, for a given muscle. */
     fun observeExercisesByMuscleWithAvailableEquipment(muscle: MuscleGroup): Flow<List<ExerciseEntity>> =

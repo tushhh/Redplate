@@ -19,11 +19,16 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,7 +64,9 @@ import dev.redplate.ui.theme.StateColor
 @Composable
 fun SetLoggingRoute(
     onBack: () -> Unit,
-    onOpenGuidance: () -> Unit,
+    onNextExercise: (sessionId: Long, exerciseId: String) -> Unit,
+    onSwapExercise: (sessionId: Long, exerciseId: String) -> Unit,
+    onSessionFinished: (sessionId: Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SetLoggingViewModel = hiltViewModel(),
 ) {
@@ -69,7 +76,7 @@ fun SetLoggingRoute(
 
     val context = LocalContext.current
     val haptics = remember(context) { WorkoutHaptics(context) }
-    androidx.compose.runtime.LaunchedEffect(viewModel) {
+    LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 WorkoutEvent.SetLogged -> haptics.setLogged()
@@ -79,10 +86,12 @@ fun SetLoggingRoute(
         }
     }
 
+    var showGuidance by rememberSaveable { mutableStateOf(false) }
+
     SetLoggingScreen(
         state = state,
         onBack = onBack,
-        onOpenGuidance = onOpenGuidance,
+        onOpenGuidance = { showGuidance = true },
         onLoadDown = viewModel::loadDown,
         onLoadUp = viewModel::loadUp,
         onRepsDown = viewModel::repsDown,
@@ -90,11 +99,45 @@ fun SetLoggingRoute(
         onSetDifficulty = viewModel::setDifficulty,
         onToggleWarmup = viewModel::toggleWarmup,
         onCompleteSet = viewModel::completeSet,
-        onSkipRest = viewModel::skipRest,
+        // One button, three jobs, chosen by the ViewModel so the label and the
+        // behaviour cannot disagree: another set, the next lift, or close the session.
+        onRestPrimary = {
+            when (state.restPrimaryAction) {
+                RestAction.NEXT_SET -> viewModel.skipRest()
+                RestAction.NEXT_EXERCISE -> viewModel.goToNextExercise(onNextExercise)
+                RestAction.FINISH_SESSION -> viewModel.finishSession(onSessionFinished)
+            }
+        },
         onAddRest = { viewModel.adjustRest(30) },
         onSubRest = { viewModel.adjustRest(-15) },
         modifier = modifier,
     )
+
+    if (showGuidance) {
+        GuidanceSheet(
+            state = GuidanceState(
+                exerciseName = state.exerciseName,
+                muscleTags = state.guidanceMuscleTags,
+                instructions = state.instructionSteps,
+                primaryMuscle = state.primaryMuscle,
+                imageUri = state.imageUri,
+                substitutes = state.substitutes,
+            ),
+            onDismiss = {
+                showGuidance = false
+                viewModel.markGuidanceSeen()
+            },
+            onSwap = { exerciseId ->
+                showGuidance = false
+                viewModel.markGuidanceSeen()
+                onSwapExercise(viewModel.sessionId, exerciseId)
+            },
+            onGotIt = {
+                showGuidance = false
+                viewModel.markGuidanceSeen()
+            },
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -113,7 +156,7 @@ fun SetLoggingScreen(
     onSetDifficulty: (Difficulty?) -> Unit,
     onToggleWarmup: () -> Unit,
     onCompleteSet: () -> Unit,
-    onSkipRest: () -> Unit,
+    onRestPrimary: () -> Unit,
     onAddRest: () -> Unit,
     onSubRest: () -> Unit,
     modifier: Modifier = Modifier,
@@ -131,8 +174,7 @@ fun SetLoggingScreen(
                 onBack = onBack,
                 onSub = onSubRest,
                 onAdd = onAddRest,
-                onSkip = onSkipRest,
-                onReady = onSkipRest,
+                onPrimary = onRestPrimary,
                 modifier = modifier,
             )
         } else {
@@ -181,7 +223,9 @@ private fun InputScreen(
         // ── Header ──
         Header(
             exerciseName = state.exerciseName,
-            subtitle = state.headerSubtitle,
+            subtitle = listOf(state.exercisePositionLabel, state.headerSubtitle)
+                .filter { it.isNotEmpty() }
+                .joinToString("  ·  "),
             hasGuidance = state.hasGuidance,
             onBack = onBack,
             onOpenGuidance = onOpenGuidance,
@@ -194,7 +238,7 @@ private fun InputScreen(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         ) {
-            // Movement window — wger exercise stills
+            // Movement window — start-position still, or a muscle-group placeholder
             ExerciseImage(
                 imageUri = state.imageUri,
                 muscle = state.primaryMuscle,
@@ -222,20 +266,46 @@ private fun InputScreen(
                     Spacer(Modifier.height(2.dp))
                 }
 
-                // Weight display
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = formatKg(state.loadKg),
-                        style = RedplateType.load.copy(fontSize = 64.sp),
-                        color = colors.ink,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "KG",
-                        style = RedplateType.mono.copy(fontSize = 14.sp),
-                        color = colors.inkMuted,
-                        modifier = Modifier.padding(bottom = 9.dp),
-                    )
+                // Weight readout and its stepper. The steppers flank the number so the
+                // thumb lands either side of what it is changing, and each step is a
+                // load the equipment can actually make — never a 6 kg dumbbell.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    StepButton("−", "Decrease weight", onClick = onLoadDown)
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = formatKg(state.loadKg),
+                                style = RedplateType.load.copy(fontSize = 64.sp),
+                                color = colors.ink,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Weight ${formatKg(state.loadKg)} kilograms"
+                                },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "KG",
+                                style = RedplateType.mono.copy(fontSize = 14.sp),
+                                color = colors.inkMuted,
+                                modifier = Modifier.padding(bottom = 9.dp),
+                            )
+                        }
+                        // Plate maths could not hit the number asked for. Say so, rather
+                        // than silently showing a weight that cannot be loaded.
+                        if (!state.isExactLoad) {
+                            Text(
+                                text = "closest the plates allow",
+                                style = RedplateType.mono.copy(fontSize = 10.sp),
+                                color = colors.inkMuted,
+                            )
+                        }
+                    }
+
+                    StepButton("+", "Increase weight", onClick = onLoadUp)
                 }
             }
 
@@ -270,12 +340,12 @@ private fun InputScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Warmup toggle (compact)
-            if (!state.isWarmup) {
-                // Small link to toggle warmup on
-            } else {
-                WarmupBadge(onToggle = onToggleWarmup)
-            }
+            // Warm-up toggle. This used to render only when already on, so there was no
+            // way to turn it back on once cleared — the control disappeared with the state
+            // it controlled. It is now always present and always says which way it is set.
+            WarmupToggle(isWarmup = state.isWarmup, onToggle = onToggleWarmup)
+
+            Spacer(Modifier.height(12.dp))
         }
 
         // ── Primary bar ──
@@ -295,8 +365,7 @@ private fun RestScreen(
     onBack: () -> Unit,
     onSub: () -> Unit,
     onAdd: () -> Unit,
-    onSkip: () -> Unit,
-    onReady: () -> Unit,
+    onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = RedplateTheme.colors
@@ -416,12 +485,13 @@ private fun RestScreen(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            RestPill("−15s", "Subtract 15 seconds", onClick = onSub,
-                modifier = Modifier.width(92.dp))
-            RestPill("Add 30s", "Add 30 seconds", onClick = onAdd,
+            // Two controls, both real. There used to be a third "+15s" pill with an
+            // empty handler sitting next to a "+30s" one, so the row had a button that
+            // did nothing and two that looked like they did the same thing.
+            RestPill("−15s", "Take 15 seconds off the rest", onClick = onSub,
                 modifier = Modifier.weight(1f))
-            RestPill("+15s", "Add 15 seconds", onClick = { /* uses onAdd internally */ },
-                modifier = Modifier.width(92.dp))
+            RestPill("+30s", "Add 30 seconds to the rest", onClick = onAdd,
+                modifier = Modifier.weight(1f))
         }
 
         // Primary bar
@@ -432,7 +502,7 @@ private fun RestScreen(
                 .heightIn(min = 88.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .background(colors.live)
-                .clickable(onClick = onReady)
+                .clickable(onClick = onPrimary)
                 .semantics {
                     contentDescription = state.restPrimaryLabel
                     role = Role.Button
@@ -544,19 +614,37 @@ private fun RepCounter(
 }
 
 @Composable
-private fun WarmupBadge(onToggle: () -> Unit) {
+private fun WarmupToggle(isWarmup: Boolean, onToggle: () -> Unit) {
     val colors = RedplateTheme.colors
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Box(
             Modifier
+                .heightIn(min = 64.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(colors.surface)
-                .border(1.dp, colors.ink, RoundedCornerShape(10.dp))
-                .clickable { onToggle() }
-                .semantics { role = Role.Switch }
+                .background(if (isWarmup) colors.surfaceRaised else colors.ground)
+                .border(
+                    1.dp,
+                    if (isWarmup) colors.ink else colors.line,
+                    RoundedCornerShape(10.dp),
+                )
+                .toggleable(
+                    value = isWarmup,
+                    role = Role.Switch,
+                    onValueChange = { onToggle() },
+                )
+                .semantics {
+                    contentDescription =
+                        "Warm-up set. ${if (isWarmup) "On" else "Off"}. " +
+                            "Warm-up sets are logged but do not count toward weekly volume."
+                }
                 .padding(horizontal = 18.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Text("WARM-UP  ●", style = RedplateType.label, color = colors.ink)
+            Text(
+                text = if (isWarmup) "WARM-UP  ●" else "WARM-UP  ○",
+                style = RedplateType.label,
+                color = if (isWarmup) colors.ink else colors.inkMuted,
+            )
         }
     }
 }
@@ -701,7 +789,7 @@ private fun PreviewScreen(state: SetLoggingUiState) {
             onRepsDown = {}, onRepsUp = {},
             onSetDifficulty = {},
             onToggleWarmup = {}, onCompleteSet = {},
-            onSkipRest = {}, onAddRest = {}, onSubRest = {},
+            onRestPrimary = {}, onAddRest = {}, onSubRest = {},
         )
     }
 }
@@ -714,6 +802,7 @@ private fun FirstSetPreview() {
             isLoading = false,
             exerciseName = "Bench Press",
             hasGuidance = true,
+            exercisePositionLabel = "EXERCISE 1 OF 5",
             setNumber = 3, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
             headerSubtitle = "SET 3 OF 4 · 6–10 REPS · 2 LEFT",
             coachReasoningLine = "Same weight as your last set —",
@@ -749,4 +838,79 @@ private fun RestingPreview() {
             restPrimaryLabel = "I'm ready — set 4",
         )
     )
+}
+
+@Preview(name = "Input · unloadable weight", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Composable
+private fun InexactLoadPreview() {
+    PreviewScreen(
+        SetLoggingUiState(
+            isLoading = false,
+            exerciseName = "Barbell Back Squat",
+            hasGuidance = true,
+            exercisePositionLabel = "EXERCISE 1 OF 5",
+            setNumber = 1, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
+            headerSubtitle = "SET 1 OF 4 · 6–10 REPS · 4 LEFT",
+            coachReasoningLine = "Based on your last session —",
+            loadKg = 97.5, reps = 8,
+            isPlateLoaded = true,
+            isExactLoad = false,
+            plateLoad = PlateMath.PlateLoad(97.5, listOf(25.0, 10.0, 3.75), false),
+            isWarmup = true,
+        )
+    )
+}
+
+@Preview(name = "Resting · last set of lift", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Composable
+private fun RestingNextExercisePreview() {
+    PreviewScreen(
+        SetLoggingUiState(
+            isLoading = false,
+            exerciseName = "Bench Press",
+            exercisePositionLabel = "EXERCISE 1 OF 5",
+            setNumber = 5, targetSets = 4, repRangeLow = 6, repRangeHigh = 10, targetRir = 2,
+            loadKg = 102.5, reps = 8,
+            loggedSets = listOf(
+                LoggedSetLine(0, 102.5, 10, 2, isWarmup = false, isPr = false),
+                LoggedSetLine(1, 102.5, 9, 1, isWarmup = false, isPr = false),
+                LoggedSetLine(2, 102.5, 9, 1, isWarmup = false, isPr = false),
+                LoggedSetLine(3, 102.5, 8, 0, isWarmup = false, isPr = false),
+            ),
+            rest = RestState.Running(remainingSeconds = 96, totalSeconds = 150),
+            nextExerciseName = "Wide-Grip Lat Pulldown",
+            restCoachText = "That's this lift done. Wide-Grip Lat Pulldown is up next.",
+            restPrimaryLabel = "Next — Wide-Grip Lat Pulldown",
+            restPrimaryAction = RestAction.NEXT_EXERCISE,
+        )
+    )
+}
+
+@Preview(name = "Resting · session end", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Composable
+private fun RestingFinishPreview() {
+    PreviewScreen(
+        SetLoggingUiState(
+            isLoading = false,
+            exerciseName = "Hanging Leg Raise",
+            exercisePositionLabel = "EXERCISE 5 OF 5",
+            setNumber = 4, targetSets = 3, repRangeLow = 10, repRangeHigh = 15,
+            loadKg = 0.0, reps = 12,
+            loggedSets = listOf(
+                LoggedSetLine(0, 0.0, 14, 2, isWarmup = false, isPr = false),
+                LoggedSetLine(1, 0.0, 12, 1, isWarmup = false, isPr = false),
+                LoggedSetLine(2, 0.0, 11, 0, isWarmup = false, isPr = false),
+            ),
+            rest = RestState.Running(remainingSeconds = 42, totalSeconds = 90),
+            restCoachText = "Last set of the session. Nice work.",
+            restPrimaryLabel = "Finish session",
+            restPrimaryAction = RestAction.FINISH_SESSION,
+        )
+    )
+}
+
+@Preview(name = "Input · loading", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Composable
+private fun LoadingPreview() {
+    PreviewScreen(SetLoggingUiState())
 }

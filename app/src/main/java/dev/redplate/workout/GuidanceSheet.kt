@@ -45,6 +45,15 @@ data class GuidanceState(
     val instructions: List<String>,
     val primaryMuscle: MuscleGroup,
     val imageUri: String? = null,
+    /** Equipment-valid alternatives, best overlap first. One tap swaps (COACHING.md §4). */
+    val substitutes: List<SubstituteOption> = emptyList(),
+)
+
+/** An exercise the user could do instead, with the kit it needs. */
+data class SubstituteOption(
+    val exerciseId: String,
+    val name: String,
+    val equipmentLabel: String,
 )
 
 /**
@@ -57,7 +66,7 @@ data class GuidanceState(
 fun GuidanceSheet(
     state: GuidanceState,
     onDismiss: () -> Unit,
-    onSwap: () -> Unit,
+    onSwap: (exerciseId: String) -> Unit,
     onGotIt: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
@@ -127,9 +136,11 @@ fun GuidanceSheet(
                         .height(186.dp),
                     contentDescription = state.exerciseName,
                 )
-                // Attribution badge
+                // Attribution badge. The bundled stills come from free-exercise-db,
+                // not wger \u2014 crediting the wrong project is a licensing problem, not a
+                // cosmetic one.
                 Text(
-                    text = "wger \u00B7 Everkinetic \u00B7 CC BY-SA",
+                    text = "free-exercise-db \u00B7 public domain",
                     style = RedplateType.mono.copy(fontSize = 9.5.sp, letterSpacing = 0.06.sp),
                     color = colors.inkOnLight,
                     modifier = Modifier
@@ -162,28 +173,48 @@ fun GuidanceSheet(
             }
             Spacer(Modifier.height(12.dp))
 
-            // Swap row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(colors.surfaceRaised)
-                    .clickable(onClick = onSwap)
-                    .padding(horizontal = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Substitutes. This was a single "Swap for something else" row wired to an
+            // empty handler; a rack being occupied is the most common reason to open
+            // this sheet, so the alternatives are listed here and swap in one tap.
+            if (state.substitutes.isNotEmpty()) {
                 Text(
-                    text = "Swap for something else",
-                    style = RedplateType.body.copy(fontSize = 14.5.sp),
-                    color = colors.inkBright,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "\u203A",
-                    style = RedplateType.title.copy(fontSize = 22.sp),
+                    text = "RACK BUSY? TRY",
+                    style = RedplateType.mono.copy(fontSize = 10.sp, letterSpacing = 0.1.sp),
                     color = colors.inkMuted,
                 )
+                Spacer(Modifier.height(8.dp))
+
+                state.substitutes.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .height(64.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(colors.surfaceRaised)
+                            .clickable { onSwap(option.exerciseId) }
+                            .padding(horizontal = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = option.name,
+                                style = RedplateType.body.copy(fontSize = 14.5.sp),
+                                color = colors.inkBright,
+                            )
+                            Text(
+                                text = option.equipmentLabel,
+                                style = RedplateType.mono.copy(fontSize = 10.sp),
+                                color = colors.inkMuted,
+                            )
+                        }
+                        Text(
+                            text = "\u203A",
+                            style = RedplateType.title.copy(fontSize = 22.sp),
+                            color = colors.inkMuted,
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(10.dp))
 
