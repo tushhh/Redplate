@@ -216,7 +216,7 @@ private fun InputScreen(
                 if (state.coachReasoningLine.isNotEmpty()) {
                     Text(
                         text = state.coachReasoningLine,
-                        style = RedplateType.body,
+                        style = RedplateType.body.copy(fontSize = 15.5.sp),
                         color = colors.inkSecondary,
                     )
                     Spacer(Modifier.height(2.dp))
@@ -417,11 +417,11 @@ private fun RestScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             RestPill("−15s", "Subtract 15 seconds", onClick = onSub,
-                modifier = Modifier.weight(0.8f))
+                modifier = Modifier.width(92.dp))
             RestPill("Add 30s", "Add 30 seconds", onClick = onAdd,
                 modifier = Modifier.weight(1f))
             RestPill("+15s", "Add 15 seconds", onClick = { /* uses onAdd internally */ },
-                modifier = Modifier.weight(0.8f))
+                modifier = Modifier.width(92.dp))
         }
 
         // Primary bar
@@ -529,7 +529,7 @@ private fun RepCounter(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = reps.toString(),
-                    style = RedplateType.figure,
+                    style = RedplateType.figure.copy(fontSize = 38.sp, fontWeight = FontWeight.SemiBold),
                     color = colors.ink,
                 )
                 Text(

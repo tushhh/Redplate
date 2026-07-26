@@ -42,6 +42,13 @@ android {
     }
 }
 
+// Force Gradle to use the system JAVA_HOME
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }

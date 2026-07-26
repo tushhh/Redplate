@@ -1,6 +1,7 @@
 package dev.redplate.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,4 +54,27 @@ class WorkoutRepository @Inject constructor(
                 startedAt = now,
             )
         )
+
+    /** Stream of all exercises that can be performed with available equipment, for a given muscle. */
+    fun observeExercisesByMuscleWithAvailableEquipment(muscle: MuscleGroup): Flow<List<ExerciseEntity>> =
+        exerciseDao.observeByMuscle(muscle).map { exercises ->
+            exercises.filter { isExerciseAvailable(it) }
+        }
+
+    /** Stream of all exercises that can be performed with available equipment. */
+    fun observeExercisesWithAvailableEquipment(): Flow<List<ExerciseEntity>> =
+        exerciseDao.observeAll().map { exercises ->
+            exercises.filter { isExerciseAvailable(it) }
+        }
+
+    /** Check if an exercise can be performed with the available equipment in the gym. */
+    private suspend fun isExerciseAvailable(exercise: ExerciseEntity): Boolean {
+        // If exercise requires no equipment, it's always available
+        if (exercise.requiredEquipmentIds.isEmpty()) return true
+        // Check if any required equipment is available
+        return exercise.requiredEquipmentIds.any { eqId ->
+            val eq = equipmentDao.getById(eqId)
+            eq != null && eq.isAvailable
+        }
+    }
 }
