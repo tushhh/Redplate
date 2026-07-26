@@ -20,7 +20,7 @@ import dev.redplate.history.HistoryRoute
 import dev.redplate.onboarding.IntakeFlow
 import dev.redplate.plan.ProgramBuilderRoute
 import dev.redplate.plan.WeekPlanRoute
-import dev.redplate.settings.BackupScreen
+import dev.redplate.settings.BackupRoute
 import dev.redplate.settings.EquipmentRoute
 import dev.redplate.settings.SettingsRoute
 import dev.redplate.today.TodayRoute
@@ -209,7 +209,7 @@ private fun MainContent() {
 
                 // ── Backup screen ──
                 composable("backup") {
-                    BackupScreen(
+                    BackupRoute(
                         onBack = { navController.popBackStack() },
                     )
                 }

@@ -70,6 +70,28 @@ class WorkoutRepository @Inject constructor(
             )
         )
 
+    /**
+     * Hard sets per muscle over the last seven days, secondaries at half credit and only
+     * counting sets logged at 0–3 RIR, per COACHING.md §3. This is what turns the body map
+     * from navigation into a status display: you see what is undertrained while choosing
+     * what to train.
+     */
+    suspend fun weeklyHardSetsPerMuscle(now: Long = System.currentTimeMillis()): Map<MuscleGroup, Double> {
+        val since = now - SEVEN_DAYS_MILLIS
+        val recent = sessionDao.getAllSetLogs()
+            .filter { it.completedAt >= since && it.countsTowardVolume }
+        if (recent.isEmpty()) return emptyMap()
+
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val perMuscle = mutableMapOf<MuscleGroup, Double>()
+        for (set in recent) {
+            val exercise = exercises[set.exerciseId] ?: continue
+            perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
+            exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
+        }
+        return perMuscle
+    }
+
     /** One-shot list of exercises for a muscle that the available equipment can support. */
     suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =
         exerciseDao.getAll()
@@ -87,6 +109,10 @@ class WorkoutRepository @Inject constructor(
         exerciseDao.observeAll().map { exercises ->
             exercises.filter { isExerciseAvailable(it) }
         }
+
+    private companion object {
+        const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1000
+    }
 
     /** Check if an exercise can be performed with the available equipment in the gym. */
     private suspend fun isExerciseAvailable(exercise: ExerciseEntity): Boolean {

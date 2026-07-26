@@ -8,6 +8,8 @@ import dev.redplate.data.ExerciseDao
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.MuscleGroup
+import dev.redplate.data.VolumeLandmarkEntity
+import dev.redplate.data.VolumeLandmarks
 import dev.redplate.data.WorkoutRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,13 +73,35 @@ class ExercisePickerViewModel @Inject constructor(
     }
 
     /**
-     * Weekly trained volume per muscle.
-     * TODO: wire to VolumeDao once the mesocycle system is built (step 5).
-     * Emits an empty map for now — body map renders all muscles in NONE state.
+     * Weekly trained volume per muscle, shading the body map against each muscle's own
+     * landmarks. This was stubbed to an empty map, so every region rendered untrained and
+     * the map's whole reason for existing — seeing what is undertrained *while* choosing
+     * what to train — did nothing.
      */
-    val muscleVolume: StateFlow<Map<MuscleGroup, VolumeLevel>> =
-        flowOf(emptyMap<MuscleGroup, VolumeLevel>())
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    private val _muscleVolume = MutableStateFlow<Map<MuscleGroup, VolumeLevel>>(emptyMap())
+    val muscleVolume: StateFlow<Map<MuscleGroup, VolumeLevel>> = _muscleVolume.asStateFlow()
+
+    init {
+        refreshVolume()
+    }
+
+    /** Recomputes shading. Called on load and again whenever the picker is resumed. */
+    fun refreshVolume() {
+        viewModelScope.launch {
+            val hardSets = repo.weeklyHardSetsPerMuscle()
+            _muscleVolume.value = MuscleGroup.entries.associateWith { muscle ->
+                classify(hardSets[muscle] ?: 0.0, VolumeLandmarks.forMuscle(muscle))
+            }
+        }
+    }
+
+    private fun classify(hardSets: Double, landmark: VolumeLandmarkEntity): VolumeLevel = when {
+        hardSets <= 0.0 -> VolumeLevel.NONE
+        hardSets < landmark.mev -> VolumeLevel.BELOW_MEV
+        hardSets < landmark.mavHigh -> VolumeLevel.MEV_TO_MAV
+        hardSets < landmark.mrv -> VolumeLevel.APPROACHING_MRV
+        else -> VolumeLevel.AT_MRV
+    }
 
     // ── Exercise list (used by search and exercise-selection phase) ───────────
 

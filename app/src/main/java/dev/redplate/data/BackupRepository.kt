@@ -10,6 +10,9 @@ import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,6 +56,59 @@ class BackupRepository @Inject constructor(
             ?: throw IOException("Cannot open output stream")
         exportToStream(stream)
     }
+
+    // ── CSV (lossy, for spreadsheets) ────────────────────────────────
+
+    /**
+     * One row per logged set, joined to exercise and session. Lossy on purpose: it drops
+     * the program, equipment and volume tables, so it can never be a restore path. Use
+     * JSON for that.
+     */
+    suspend fun exportCsv(): String {
+        val sets = db.sessionDao().getAllSetLogs()
+        val exerciseNames = db.exerciseDao().getAll().associate { it.id to it.name }
+        val sessionStarts = db.sessionDao().getAllSessions().associate { it.id to it.startedAt }
+
+        return buildString {
+            appendLine(CSV_HEADER)
+            for (set in sets.sortedBy { it.completedAt }) {
+                appendLine(
+                    listOf(
+                        isoDate(set.completedAt),
+                        set.sessionId.toString(),
+                        sessionStarts[set.sessionId]?.let(::isoDate).orEmpty(),
+                        csvEscape(exerciseNames[set.exerciseId] ?: set.exerciseId),
+                        (set.setIndex + 1).toString(),
+                        set.loadKg.toString(),
+                        set.reps.toString(),
+                        set.rir?.toString().orEmpty(),
+                        if (set.isWarmup) "1" else "0",
+                        if (set.countsTowardVolume) "1" else "0",
+                        "%.2f".format(set.estimated1Rm()),
+                    ).joinToString(",")
+                )
+            }
+        }
+    }
+
+    suspend fun exportCsvToUri(uri: Uri) {
+        val stream = context.contentResolver.openOutputStream(uri)
+            ?: throw IOException("Cannot open output stream")
+        stream.bufferedWriter().use { it.write(exportCsv()) }
+    }
+
+    private fun isoDate(epochMillis: Long): String =
+        Instant.ofEpochMilli(epochMillis)
+            .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+    /** Exercise names can contain commas; quote and double any embedded quotes. */
+    private fun csvEscape(value: String): String =
+        if (value.contains(',') || value.contains('"')) {
+            "\"" + value.replace("\"", "\"\"") + "\""
+        } else {
+            value
+        }
 
     // ── Import ──────────────────────────────────────────────────────
 
@@ -114,4 +170,28 @@ class BackupRepository @Inject constructor(
             ?: throw IOException("Cannot open input stream")
         importFromStream(stream)
     }
+
+    // ── Status, for the backup screen ───────────────────────────────
+
+    suspend fun status(): BackupStatus {
+        val sessions = db.sessionDao().getAllSessions()
+        return BackupStatus(
+            sessionCount = sessions.size,
+            setCount = db.sessionDao().getAllSetLogs().count { !it.isWarmup },
+            lastSessionAt = sessions.maxOfOrNull { it.startedAt },
+        )
+    }
+
+    private companion object {
+        const val CSV_HEADER =
+            "completed_at,session_id,session_started_at,exercise,set_number," +
+                "load_kg,reps,rir,is_warmup,counts_toward_volume,estimated_1rm"
+    }
 }
+
+/** What is actually in the database right now — never a placeholder. */
+data class BackupStatus(
+    val sessionCount: Int,
+    val setCount: Int,
+    val lastSessionAt: Long?,
+)

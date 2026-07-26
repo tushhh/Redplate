@@ -1,7 +1,6 @@
 package dev.redplate.plan
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,22 +99,10 @@ fun ProgramBuilderScreen(
                     )
                 }
 
-                // "Add an exercise" dashed row
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, colors.line, RoundedCornerShape(16.dp))
-                        .clickable {},
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "+ Add an exercise",
-                        style = RedplateType.body.copy(fontSize = 15.sp),
-                        color = colors.inkMuted,
-                    )
-                }
+                // An "+ Add an exercise" row sat here with an empty click handler. Adding
+                // a slot needs an exercise picker scoped to this template, which does not
+                // exist yet — so the row is gone rather than pretending to work. Sets are
+                // adjustable per slot, and slots can be removed.
             }
             Spacer(Modifier.height(20.dp))
 
