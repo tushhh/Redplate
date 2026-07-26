@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.ui.theme.RedplateTheme
@@ -30,6 +31,12 @@ fun SegmentedToggle(
     selectedIndex: Int,
     onOptionSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * 64dp where the toggle is a primary control (the body map's FRONT/BACK, history's
+     * ranges); smaller where it sits inside a row that is already 64dp tall, as the
+     * units toggle does on the You tab.
+     */
+    segmentSize: Dp = 64.dp,
 ) {
     val colors = RedplateTheme.colors
     Row(
@@ -42,8 +49,8 @@ fun SegmentedToggle(
             val selected = index == selectedIndex
             Box(
                 modifier = Modifier
-                    .width(64.dp)
-                    .height(64.dp)
+                    .width(segmentSize)
+                    .height(segmentSize)
                     .clip(RoundedCornerShape(15.dp))
                     .background(if (selected) colors.ink else colors.surface)
                     .clickable { onOptionSelected(index) },

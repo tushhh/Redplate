@@ -173,6 +173,24 @@ class BackupRepository @Inject constructor(
 
     // ── Status, for the backup screen ───────────────────────────────
 
+    /**
+     * Roughly how large a JSON export would be, without building one.
+     *
+     * Serialising the whole database just to show a size on a settings screen would be
+     * wasteful, so this estimates from row counts against measured per-row sizes. It is
+     * only ever rendered as "about 1.4 MB".
+     */
+    suspend fun approximateJsonBytes(): Long {
+        val sets = db.sessionDao().getAllSetLogs().size.toLong()
+        val sessions = db.sessionDao().getAllSessions().size.toLong()
+        val exercises = db.exerciseDao().count().toLong()
+        val equipment = db.equipmentDao().getAll().size.toLong()
+        return sets * BYTES_PER_SET +
+            sessions * BYTES_PER_SESSION +
+            exercises * BYTES_PER_EXERCISE +
+            equipment * BYTES_PER_EQUIPMENT
+    }
+
     suspend fun status(): BackupStatus {
         val sessions = db.sessionDao().getAllSessions()
         return BackupStatus(
@@ -183,6 +201,12 @@ class BackupRepository @Inject constructor(
     }
 
     private companion object {
+        // Measured against pretty-printed output; only used for a rounded display size.
+        const val BYTES_PER_SET = 260L
+        const val BYTES_PER_SESSION = 220L
+        const val BYTES_PER_EXERCISE = 420L
+        const val BYTES_PER_EQUIPMENT = 300L
+
         const val CSV_HEADER =
             "completed_at,session_id,session_started_at,exercise,set_number," +
                 "load_kg,reps,rir,is_warmup,counts_toward_volume,estimated_1rm"

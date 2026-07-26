@@ -215,6 +215,10 @@ private fun MainContent() {
                     SettingsRoute(
                         onNavigateToBackup = { navController.navigate("backup") },
                         onNavigateToEquipment = { navController.navigate("equipment") },
+                        // Plate pairs are part of the equipment inventory, so the
+                        // "plates in your gym" row opens the screen that owns them
+                        // rather than a plates screen that does not exist.
+                        onNavigateToPlates = { navController.navigate("equipment") },
                     )
                 }
 
