@@ -528,6 +528,12 @@ private fun RestDayScreen(state: TodayState.RestDay, onSeeFullWeek: () -> Unit) 
     }
 }
 
+/**
+ * No weekly plan — either because the user chose to pick each day (3a) or because they
+ * have not built one yet. It reads as an invitation rather than a report of absence, and
+ * its action is the same 88 dp bar every other Today state ends with: this is a state you
+ * can be in on purpose, so it should not feel like a screen you have to get out of.
+ */
 @Composable
 private fun NoProgramScreen(onPickExercise: () -> Unit) {
     val colors = RedplateTheme.colors
@@ -536,20 +542,36 @@ private fun NoProgramScreen(onPickExercise: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(colors.ground)
-            .statusBarsPadding()
-            .padding(horizontal = 22.dp),
-        verticalArrangement = Arrangement.Center,
+            .statusBarsPadding(),
     ) {
-        CoachHeadline(text = "No program yet.")
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Set one up in the Plan tab, or tap the muscles you feel like training " +
-                "and get a session built around them.",
-            style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
-            color = colors.inkSecondary,
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 22.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            CoachHeadline(text = "Nothing scheduled.\nPick what you feel like.")
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Tap the muscles you want to train and you get a real session built " +
+                    "around them — ordered compounds first, fitted to your time, and " +
+                    "counted towards the week like anything else.",
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                color = colors.inkSecondary,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Want a full week instead? Build one from the Plan tab.",
+                style = RedplateType.body.copy(fontSize = 13.5.sp, lineHeight = 20.sp),
+                color = colors.inkMuted,
+            )
+        }
+
+        PrimaryBar(
+            label = "Pick what to train",
+            onClick = onPickExercise,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
-        Spacer(Modifier.height(24.dp))
-        SecondaryButton(label = "Pick exercises", onClick = onPickExercise)
     }
 }
 

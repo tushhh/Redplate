@@ -297,28 +297,18 @@ class SetLoggingViewModel @Inject constructor(
         }
     }
 
-    // ── Rep / RIR steppers ──
+    // ── Rep stepper ──
 
     fun repsUp() = _state.update { it.copy(reps = it.reps + 1) }
     fun repsDown() = _state.update { it.copy(reps = (it.reps - 1).coerceAtLeast(0)) }
 
-    /** null (unreported) → 0 → … → MAX_RIR, then clamps; stepping down off 0 returns to unreported. */
-    fun rirUp() = _state.update {
-        it.copy(rir = when (val r = it.rir) {
-            null -> 0
-            else -> (r + 1).coerceAtMost(MAX_RIR)
-        })
-    }
-
-    fun rirDown() = _state.update {
-        it.copy(rir = when (val r = it.rir) {
-            null -> null
-            0 -> null
-            else -> r - 1
-        })
-    }
-
-    /** Set difficulty via chips (replaces RIR stepper in revamped UI). */
+    /**
+     * How hard that was, in the words the design asks the question in (8a).
+     *
+     * This is the only way RIR is entered. A numeric stepper existed alongside it and had
+     * no control on any screen — two ways to write one field, one of them unreachable, is
+     * how the two drift apart.
+     */
     fun setDifficulty(difficulty: Difficulty?) {
         _state.update {
             it.copy(
@@ -327,8 +317,6 @@ class SetLoggingViewModel @Inject constructor(
             )
         }
     }
-
-    fun toggleWarmup() = _state.update { it.copy(isWarmup = !it.isWarmup) }
 
     // ── Completing a set ──
 
@@ -512,7 +500,6 @@ class SetLoggingViewModel @Inject constructor(
         private const val DEFAULT_REP_HIGH = 12
         private const val DEFAULT_REST_SECONDS = 120
         private const val MAX_REST_SECONDS = 60 * 60
-        private const val MAX_RIR = 5
 
         /** Sub-second so the readout never sits a whole second behind the deadline. */
         private const val TICK_MILLIS = 250L

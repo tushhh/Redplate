@@ -6,7 +6,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.SessionDao
-import dev.redplate.data.SetLogEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
