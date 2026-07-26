@@ -49,6 +49,7 @@ fun PresetLibraryScreen(
     sessionMinutes: Int,
     presets: List<PresetPlan>,
     onSelectPreset: (String) -> Unit,
+    onConfirm: () -> Unit,
     selectedPresetId: String?,
 ) {
     val colors = RedplateTheme.colors
@@ -158,7 +159,7 @@ fun PresetLibraryScreen(
             ) {
                 Text("i", style = RedplateType.mono, color = colors.live)
                 Text(
-                    text = "Doses follow the ACSM 2026 position stand: ~10 hard sets per muscle weekly for growth, ~80% of 1RM for strength, every muscle twice a week, big lifts first.",
+                    text = "Whichever you pick: around 10 hard sets per muscle per week to grow, heavier work at low reps to get strong, every muscle trained twice a week, big lifts first while you're fresh.",
                     style = RedplateType.body.copy(fontSize = 12.sp, lineHeight = 18.sp),
                     color = colors.inkMuted,
                     modifier = Modifier.weight(1f),
@@ -171,7 +172,7 @@ fun PresetLibraryScreen(
             label = if (selectedPresetId != null) {
                 "Use ${presets.find { it.id == selectedPresetId }?.name ?: "plan"}"
             } else "Select a plan",
-            onClick = { /* handled by navigation in IntakeNavigation */ },
+            onClick = onConfirm,
             enabled = selectedPresetId != null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
@@ -215,6 +216,7 @@ private fun PresetLibraryScreenPreview() {
             ),
             selectedPresetId = "upper_lower",
             onSelectPreset = {},
+            onConfirm = {},
         )
     }
 }

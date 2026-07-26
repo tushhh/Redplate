@@ -118,9 +118,10 @@ private fun MainContent() {
 
                 // ── Plan tab ──
                 composable("plan") {
-                    selectedTab = RedplateTab.Plan
                     WeekPlanRoute(
-                        onEditProgram = { navController.navigate("programBuilder/0") },
+                        onEditTemplate = { templateId ->
+                            navController.navigate("programBuilder/$templateId")
+                        },
                     )
                 }
 
