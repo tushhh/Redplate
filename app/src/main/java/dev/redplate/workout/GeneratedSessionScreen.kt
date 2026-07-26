@@ -36,6 +36,8 @@ import dev.redplate.ui.theme.RedplateType
 
 /** One row of the generated session, with the one-line reason it is there. */
 data class GeneratedSlotRow(
+    /** The stored slot this row renders. Swapping edits it in place. */
+    val slotId: Long,
     val orderIndex: Int,
     val exerciseId: String,
     val name: String,
@@ -63,7 +65,8 @@ data class GeneratedSessionState(
 @Composable
 fun GeneratedSessionScreen(
     state: GeneratedSessionState,
-    onSwapRow: (exerciseId: String) -> Unit,
+    onSwapRow: (slotId: Long, exerciseId: String) -> Unit,
+    onAddExercise: () -> Unit,
     onSave: () -> Unit,
     onStart: () -> Unit,
 ) {
@@ -102,7 +105,7 @@ fun GeneratedSessionScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .background(colors.surface)
-                        .clickable { onSwapRow(row.exerciseId) }
+                        .clickable { onSwapRow(row.slotId, row.exerciseId) }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -157,26 +160,45 @@ fun GeneratedSessionScreen(
                 }
             }
 
-            // Drawn as the design has it, and honest about not being built: adding needs
-            // a picker scoped to this session, which does not exist yet.
+            // The dashed row is an invitation, so it has to actually add something: it
+            // opens the browser scoped to this session, and the minutes left tell you
+            // whether there is room before you go looking.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .border(1.dp, colors.line, RoundedCornerShape(18.dp))
+                    .clickable(onClick = onAddExercise)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(colors.surfaceSunken),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "+",
+                        style = RedplateType.body.copy(
+                            fontFamily = PlexCondensed,
+                            fontSize = 19.sp,
+                        ),
+                        color = colors.inkMuted,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Fitted to your time",
+                    text = "Add an exercise",
                     style = RedplateType.body.copy(fontSize = 14.5.sp),
-                    color = colors.inkSubtle,
+                    color = colors.inkMuted,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = "${state.minutesLeft} MIN LEFT",
-                    style = RedplateType.mono.copy(fontSize = 10.sp),
+                    style = RedplateType.mono.copy(fontSize = 10.sp, letterSpacing = 0.08.sp),
                     color = colors.inkMuted,
                 )
             }
@@ -226,17 +248,17 @@ private fun GeneratedSessionPreview() {
                     "Tap any row to swap it.",
                 rows = listOf(
                     GeneratedSlotRow(
-                        1, "incline_barbell_bench", "Incline Barbell Press",
+                        1L, 1, "incline_barbell_bench", "Incline Barbell Press",
                         "3 × 6–10 · 72.5 KG · 2 RIR",
                         "Chest is 7 sets under target for the week.",
                     ),
                     GeneratedSlotRow(
-                        2, "machine_pec_fly", "Machine Chest Fly",
+                        2L, 2, "machine_pec_fly", "Machine Chest Fly",
                         "2 × 10–15 · 15 KG · 1 RIR",
                         "Cheap sets — low fatigue with chest already loaded.",
                     ),
                     GeneratedSlotRow(
-                        3, "db_bicep_curl", "Dumbbell Bicep Curl",
+                        3L, 3, "db_bicep_curl", "Dumbbell Bicep Curl",
                         "2 × 10–15 · 17.5 KG · 1 RIR",
                         "Biceps are 6 sets under target for the week.",
                     ),
@@ -244,7 +266,8 @@ private fun GeneratedSessionPreview() {
                 minutesLeft = 13,
                 isLoading = false,
             ),
-            onSwapRow = {},
+            onSwapRow = { _, _ -> },
+            onAddExercise = {},
             onSave = {},
             onStart = {},
         )

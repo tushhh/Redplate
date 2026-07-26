@@ -31,6 +31,24 @@ class WorkoutRepository @Inject constructor(
     suspend fun getSlotsForTemplate(templateId: Long): List<TemplateSlotEntity> =
         programDao.getSlots(templateId)
 
+    /** What the session is called, for screens that add to it by name ("Add to Upper A"). */
+    suspend fun getTemplateLabel(templateId: Long): String? =
+        programDao.getTemplateById(templateId)?.label
+
+    /**
+     * Throws away a generated template nothing was ever logged against. Slots cascade.
+     *
+     * Only ever called for an ad-hoc plan the user replaced before starting it — going
+     * back to the map and building again should not leave a trail of dead templates.
+     * A template with a session against it is never touched: `sessions.templateId` has no
+     * foreign key, so deleting one would leave the history pointing at nothing.
+     */
+    suspend fun discardUnusedTemplate(templateId: Long) {
+        if (templateId <= 0L) return
+        if (sessionDao.getAllSessions().any { it.templateId == templateId }) return
+        programDao.getTemplateById(templateId)?.let { programDao.deleteTemplate(it) }
+    }
+
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
 
     /** Stamps the finish time. A session without one is still in progress. */
@@ -108,6 +126,23 @@ class WorkoutRepository @Inject constructor(
         }
         return perMuscle
     }
+
+    /** The whole archive, one query — the exercise browser tiers and filters it in memory. */
+    suspend fun allExercises(): List<ExerciseEntity> = exerciseDao.getAll()
+
+    /** Equipment keyed by id, so a list of 800 exercises can be labelled without 800 queries. */
+    suspend fun equipmentById(): Map<String, EquipmentEntity> =
+        equipmentDao.getAll().associateBy { it.id }
+
+    /**
+     * Working sets ever logged per exercise. This is what "you train these most" means —
+     * the user's own history, not a popularity list shipped with the app.
+     */
+    suspend fun workingSetCountsByExercise(): Map<String, Int> =
+        sessionDao.getAllSetLogs()
+            .filter { !it.isWarmup }
+            .groupingBy { it.exerciseId }
+            .eachCount()
 
     /** One-shot list of exercises for a muscle that the available equipment can support. */
     suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =

@@ -166,6 +166,76 @@ class ProgramGenerator @Inject constructor(
         }
     }
 
+    // ── Editing a template in place (8c: swap a row, add a row) ─────────
+
+    /**
+     * Appends an exercise to the end of a template and returns the new slot.
+     *
+     * The prescription comes from the same [Prescription] table the generator uses, so a
+     * lift the user added by hand is programmed exactly as one the engine chose — there
+     * is no second, weaker code path for "manual" slots.
+     */
+    suspend fun appendSlot(
+        templateId: Long,
+        exerciseId: String,
+        profile: ProfileEntity,
+    ): TemplateSlotEntity? {
+        val exercise = exerciseDao.getById(exerciseId) ?: return null
+        val existing = programDao.getSlots(templateId)
+        val slot = prescribe(
+            templateId = templateId,
+            exercise = exercise,
+            orderIndex = existing.size,
+            goal = profile.goal,
+        )
+        return slot.copy(id = programDao.insertSlot(slot))
+    }
+
+    /**
+     * Swaps the exercise in an existing slot, re-prescribing for the new movement.
+     *
+     * A compound cannot inherit an isolation's rep range and still make sense, so the
+     * whole prescription is rebuilt. The working load is dropped deliberately: it belongs
+     * to the lift that was there, and carrying it over would put someone under a bar at a
+     * weight they have never lifted on that movement.
+     */
+    suspend fun replaceSlotExercise(
+        slotId: Long,
+        exerciseId: String,
+        profile: ProfileEntity,
+    ): TemplateSlotEntity? {
+        val slot = programDao.getSlotById(slotId) ?: return null
+        val exercise = exerciseDao.getById(exerciseId) ?: return null
+        val replacement = prescribe(
+            templateId = slot.templateId,
+            exercise = exercise,
+            orderIndex = slot.orderIndex,
+            goal = profile.goal,
+        ).copy(id = slot.id, supersetGroup = slot.supersetGroup)
+        programDao.updateSlot(replacement)
+        return replacement
+    }
+
+    private fun prescribe(
+        templateId: Long,
+        exercise: ExerciseEntity,
+        orderIndex: Int,
+        goal: Goal,
+    ): TemplateSlotEntity {
+        val rx = Prescription.of(goal, exercise.isCompound)
+        return TemplateSlotEntity(
+            templateId = templateId,
+            exerciseId = exercise.id,
+            orderIndex = orderIndex,
+            targetSets = if (exercise.isCompound) 3 else 2,
+            repRangeLow = rx.repLow,
+            repRangeHigh = rx.repHigh,
+            targetRir = rx.targetRir,
+            restSeconds = rx.restSeconds,
+            progression = exercise.defaultProgression,
+        )
+    }
+
     // ── Plan assembly ───────────────────────────────────────────────────
 
     private fun buildPlan(
@@ -296,6 +366,14 @@ class ProgramGenerator @Inject constructor(
                     Prescription(10, 15, 1, 90)
                 }
 
+                // Same stimulus as hypertrophy, shorter rests. Nothing here is a calorie
+                // target: the only lever the engine has is how the training is arranged.
+                Goal.LEAN -> if (compound) {
+                    Prescription(6, 12, 2, 105)
+                } else {
+                    Prescription(12, 18, 1, 60)
+                }
+
                 Goal.GENERAL -> if (compound) {
                     Prescription(5, 10, 2, 150)
                 } else {
@@ -338,6 +416,7 @@ class ProgramGenerator @Inject constructor(
             val why = when (goal) {
                 Goal.STRENGTH -> "heavy, low reps and long rests are what move a max"
                 Goal.HYPERTROPHY -> "moderate reps close to failure is what drives growth"
+                Goal.LEAN -> "the same reps with shorter rests keeps the work density up"
                 Goal.GENERAL -> "a middle rep range keeps strength and size both moving"
             }
             return "$exerciseName: ${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} " +

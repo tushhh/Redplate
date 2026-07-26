@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.redplate.data.ExerciseDao
+import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.MuscleGroup
@@ -13,14 +13,10 @@ import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.VolumeLandmarkEntity
 import dev.redplate.data.VolumeLandmarks
 import dev.redplate.data.WorkoutRepository
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,18 +24,33 @@ import javax.inject.Inject
 
 /**
  * Where the picker is. The design's flow is map → generated session → train, so the
- * exercise list is now a detour reached by searching rather than the main path (3d).
+ * exercise browser is a detour off the session rather than the main path (3d, 8c).
  */
-enum class PickerPhase { MUSCLES, GENERATED, EXERCISES }
+enum class PickerPhase { MUSCLES, GENERATED, BROWSING }
+
+/**
+ * Why the browser is open. This is what makes 8c a real screen rather than a list: the
+ * same grid either replaces a row, appends one, or opens a freestyle session, and the
+ * primary bar says which.
+ */
+sealed interface BrowseIntent {
+    /** Replace one slot of the generated session. */
+    data class Swap(val slotId: Long, val currentExerciseId: String) : BrowseIntent
+
+    /** Append a slot to the generated session. */
+    data object Add : BrowseIntent
+
+    /** No session built yet — reached by searching from the map. */
+    data object Freestyle : BrowseIntent
+}
 
 @HiltViewModel
 class ExercisePickerViewModel @Inject constructor(
-    private val exerciseDao: ExerciseDao,
     private val repo: WorkoutRepository,
     private val profileDao: ProfileDao,
     private val programGenerator: ProgramGenerator,
     private val savedState: SavedStateHandle,
-    val mediaResolver: MediaResolver,
+    private val mediaResolver: MediaResolver,
 ) : ViewModel() {
 
     // ── Phase ─────────────────────────────────────────────────────────────────
@@ -63,7 +74,6 @@ class ExercisePickerViewModel @Inject constructor(
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    /** Toggle a muscle in/out of the picked set. */
     fun toggleMuscle(muscle: MuscleGroup) {
         _pickedMuscles.value = _pickedMuscles.value.toMutableSet().apply {
             if (contains(muscle)) remove(muscle) else add(muscle)
@@ -77,13 +87,13 @@ class ExercisePickerViewModel @Inject constructor(
 
     fun search(query: String) {
         _searchQuery.value = query
+        if (_phase.value == PickerPhase.BROWSING) refreshBrowser()
     }
 
     /**
      * Weekly trained volume per muscle, shading the body map against each muscle's own
-     * landmarks. This was stubbed to an empty map, so every region rendered untrained and
-     * the map's whole reason for existing — seeing what is undertrained *while* choosing
-     * what to train — did nothing.
+     * landmarks — seeing what is undertrained *while* choosing what to train is the whole
+     * reason the map exists.
      */
     private val _muscleVolume = MutableStateFlow<Map<MuscleGroup, VolumeLevel>>(emptyMap())
     val muscleVolume: StateFlow<Map<MuscleGroup, VolumeLevel>> = _muscleVolume.asStateFlow()
@@ -110,45 +120,20 @@ class ExercisePickerViewModel @Inject constructor(
         else -> VolumeLevel.AT_MRV
     }
 
-    // ── Exercise list (used by search and exercise-selection phase) ───────────
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val exercises: StateFlow<List<ExerciseEntity>> =
-        combine(_searchQuery, _pickedMuscles, _phase) { q, muscles, phase ->
-            Triple(q, muscles, phase)
-        }.flatMapLatest { (q, muscles, phase) ->
-            when {
-                q.isNotBlank() -> exerciseDao.search(q)
-                phase == PickerPhase.EXERCISES && muscles.isNotEmpty() -> {
-                    // Combine exercises for all picked muscles
-                    val flows = muscles.map { repo.observeExercisesByMuscleWithAvailableEquipment(it) }
-                    combine(flows) { arrays -> arrays.flatMap { it }.distinctBy { it.id } }
-                }
-                else -> flowOf(emptyList())
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    // ── Selected exercise (exercise-selection phase) ──────────────────────────
-
-    private val _selectedExerciseId = MutableStateFlow<String?>(null)
-    val selectedExerciseId: StateFlow<String?> = _selectedExerciseId.asStateFlow()
-
-    fun selectExercise(id: String) {
-        _selectedExerciseId.value = if (_selectedExerciseId.value == id) null else id
-    }
-
     // ── Session management ────────────────────────────────────────────────────
 
     private var activeSessionId: Long
-        get() = savedState.get<Long>("activeSessionId") ?: 0L
-        set(value) { savedState["activeSessionId"] = value }
+        get() = savedState.get<Long>(KEY_SESSION_ID) ?: 0L
+        set(value) { savedState[KEY_SESSION_ID] = value }
 
     // ── Generated session (design 3d) ─────────────────────────────────────────
 
     private val _generated = MutableStateFlow(GeneratedSessionState())
     val generated: StateFlow<GeneratedSessionState> = _generated.asStateFlow()
 
-    private var generatedTemplateId: Long = 0L
+    private var generatedTemplateId: Long
+        get() = savedState.get<Long>(KEY_TEMPLATE_ID) ?: 0L
+        set(value) { savedState[KEY_TEMPLATE_ID] = value }
 
     /**
      * Builds a session from the picked muscles and shows it for inspection before the
@@ -164,11 +149,16 @@ class ExercisePickerViewModel @Inject constructor(
             _phase.value = PickerPhase.GENERATED
             _generated.value = GeneratedSessionState(isLoading = true)
 
+            // Rebuilding replaces the last plan rather than stacking beside it. Anything
+            // already trained against is left alone by the repository.
+            if (activeSessionId == 0L) repo.discardUnusedTemplate(generatedTemplateId)
+
             val templateId = runCatching {
                 programGenerator.generateAdHocTemplate(muscles, profile)
             }.getOrNull()
 
             if (templateId == null) {
+                generatedTemplateId = 0L
                 _phase.value = PickerPhase.MUSCLES
                 return@launch
             }
@@ -192,13 +182,14 @@ class ExercisePickerViewModel @Inject constructor(
             val equipment = exercise?.let { repo.getPrimaryEquipment(it) }
             val load = slot.workingLoadKg ?: equipment?.barWeightKg
             GeneratedSlotRow(
+                slotId = slot.id,
                 orderIndex = slot.orderIndex + 1,
                 exerciseId = slot.exerciseId,
                 name = exercise?.name ?: slot.exerciseId,
                 prescription = buildString {
                     append("${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh}")
                     if (load != null) append(" · ${formatKg(load)} KG")
-                    slot.targetRir?.let { append(" · $it RIR") }
+                    append(" · ${slot.targetRir} RIR")
                 },
                 reason = exercise?.let { reasonFor(it, weekly) },
             )
@@ -213,6 +204,18 @@ class ExercisePickerViewModel @Inject constructor(
             minutesLeft = (ceilingMinutes - minutes).coerceAtLeast(0),
             isLoading = false,
         )
+    }
+
+    /** Recomputes 3d after the browser changed a row. */
+    private fun refreshGenerated() {
+        viewModelScope.launch {
+            val profile = profileDao.get() ?: return@launch
+            _generated.value = describeGenerated(
+                generatedTemplateId,
+                _pickedMuscles.value,
+                profile.sessionCeilingMinutes,
+            )
+        }
     }
 
     /** Why this lift is in the session, in one line, from the week's actual volume. */
@@ -246,16 +249,247 @@ class ExercisePickerViewModel @Inject constructor(
         _phase.value = PickerPhase.MUSCLES
     }
 
-    /** Jumps to the searchable exercise list, the archive behind the map. */
-    fun browseExercises() {
-        _phase.value = PickerPhase.EXERCISES
+    // ── Exercise browser (design 8c) ──────────────────────────────────────────
+
+    private val _browser = MutableStateFlow(BrowserState())
+    val browser: StateFlow<BrowserState> = _browser.asStateFlow()
+
+    private var browseIntent: BrowseIntent = BrowseIntent.Freestyle
+
+    /**
+     * Where leaving the browser goes. Tracked rather than inferred: a user who built a
+     * session, went back to the map and then searched must land back on the map, not on
+     * a session they had already stepped away from.
+     */
+    private var browseReturnPhase: PickerPhase = PickerPhase.MUSCLES
+
+    /** Tapping a row on 3d: the browser opens scoped to that slot's muscle. */
+    fun browseToSwap(slotId: Long, exerciseId: String) {
+        browseIntent = BrowseIntent.Swap(slotId, exerciseId)
+        openBrowser(defaultFilters = setOf(BrowseFilter.MY_KIT, BrowseFilter.MUSCLE))
     }
 
-    fun goBackToMuscles() {
-        _phase.value = PickerPhase.MUSCLES
-        _selectedExerciseId.value = null
-        _searchQuery.value = ""
+    /** "Add an exercise" on 3d. */
+    fun browseToAdd() {
+        browseIntent = BrowseIntent.Add
+        openBrowser(defaultFilters = setOf(BrowseFilter.MY_KIT))
     }
+
+    /** Typing in the map's search field — there is no session yet to add to. */
+    fun browseFreestyle() {
+        if (_phase.value == PickerPhase.BROWSING) return
+        browseIntent = BrowseIntent.Freestyle
+        openBrowser(defaultFilters = setOf(BrowseFilter.MY_KIT))
+    }
+
+    private fun openBrowser(defaultFilters: Set<BrowseFilter>) {
+        browseReturnPhase = _phase.value
+        _phase.value = PickerPhase.BROWSING
+        _browser.value = BrowserState(activeFilters = defaultFilters, isLoading = true)
+        refreshBrowser()
+    }
+
+    fun toggleBrowseFilter(filter: BrowseFilter) {
+        val current = _browser.value.activeFilters
+        _browser.value = _browser.value.copy(
+            activeFilters = if (filter in current) current - filter else current + filter,
+        )
+        refreshBrowser()
+    }
+
+    fun selectBrowsedExercise(id: String) {
+        val state = _browser.value
+        val next = if (state.selectedId == id) null else id
+        _browser.value = state.copy(
+            selectedId = next,
+            selectedName = next?.let { picked ->
+                state.sections.firstNotNullOfOrNull { section ->
+                    section.items.firstOrNull { it.id == picked }?.name
+                }
+            },
+        )
+    }
+
+    fun leaveBrowser() {
+        _searchQuery.value = ""
+        _phase.value = browseReturnPhase
+    }
+
+    /**
+     * Commits the browser's pick.
+     *
+     * Swapping and adding edit the stored template and drop the user back on 3d, so the
+     * session they inspected is the session they start. Only the freestyle path — reached
+     * by searching before anything is built — opens a session directly, and it returns the
+     * ids for navigation.
+     */
+    suspend fun commitBrowse(): Pair<Long, String>? {
+        val exerciseId = _browser.value.selectedId ?: return null
+        val profile = profileDao.get()
+
+        when (val intent = browseIntent) {
+            is BrowseIntent.Swap -> {
+                if (profile != null) {
+                    programGenerator.replaceSlotExercise(intent.slotId, exerciseId, profile)
+                }
+                _searchQuery.value = ""
+                _phase.value = PickerPhase.GENERATED
+                refreshGenerated()
+                return null
+            }
+
+            BrowseIntent.Add -> {
+                if (profile != null && generatedTemplateId > 0L) {
+                    programGenerator.appendSlot(generatedTemplateId, exerciseId, profile)
+                }
+                _searchQuery.value = ""
+                _phase.value = PickerPhase.GENERATED
+                refreshGenerated()
+                return null
+            }
+
+            BrowseIntent.Freestyle -> {
+                val sessionId = getOrCreateSession()
+                return sessionId to exerciseId
+            }
+        }
+    }
+
+    /**
+     * Rebuilds the browser's tiers. Everything is derived here rather than stored, so a
+     * filter tap and a keystroke go through exactly the same path.
+     */
+    private fun refreshBrowser() {
+        viewModelScope.launch {
+            val all = repo.allExercises().filter { !it.isExcluded }
+            val equipment = repo.equipmentById()
+            val setCounts = repo.workingSetCountsByExercise()
+            val slots = if (generatedTemplateId > 0L) {
+                repo.getSlotsForTemplate(generatedTemplateId)
+            } else {
+                emptyList()
+            }
+            val inSession = slots.map { it.exerciseId }.toSet()
+
+            val intent = browseIntent
+            val scopeMuscle = when (intent) {
+                is BrowseIntent.Swap -> all.firstOrNull { it.id == intent.currentExerciseId }
+                    ?.primaryMuscle
+
+                else -> _pickedMuscles.value.firstOrNull()
+            }
+
+            val filters = _browser.value.activeFilters
+            val query = _searchQuery.value.trim()
+            val visible = all.filter { exercise ->
+                val matchesQuery = query.isEmpty() ||
+                    exercise.name.contains(query, ignoreCase = true)
+                val matchesKit = BrowseFilter.MY_KIT !in filters || isAvailable(exercise, equipment)
+                val matchesMuscle = BrowseFilter.MUSCLE !in filters || scopeMuscle == null ||
+                    exercise.primaryMuscle == scopeMuscle
+                val matchesCompound = BrowseFilter.COMPOUND !in filters || exercise.isCompound
+                matchesQuery && matchesKit && matchesMuscle && matchesCompound
+            }
+
+            val sections = buildSections(visible, inSession, setCounts, equipment)
+            val selectedId = _browser.value.selectedId?.takeIf { picked ->
+                sections.any { section -> section.items.any { it.id == picked } }
+            }
+
+            _browser.value = BrowserState(
+                title = browserTitle(intent, all),
+                subtitle = browserSubtitle(setCounts.size, all.size),
+                sections = sections,
+                muscleFilterLabel = scopeMuscle?.displayName?.uppercase() ?: "ONE MUSCLE",
+                activeFilters = filters,
+                archiveSize = all.size,
+                selectedId = selectedId,
+                selectedName = selectedId?.let { picked -> all.firstOrNull { it.id == picked }?.name },
+                confirmVerb = when (intent) {
+                    is BrowseIntent.Swap -> "Swap in"
+                    BrowseIntent.Add -> "Add"
+                    BrowseIntent.Freestyle -> "Start with"
+                },
+                isLoading = false,
+            )
+        }
+    }
+
+    private fun buildSections(
+        visible: List<ExerciseEntity>,
+        inSession: Set<String>,
+        setCounts: Map<String, Int>,
+        equipment: Map<String, EquipmentEntity>,
+    ): List<BrowserSection> {
+        fun card(exercise: ExerciseEntity) = BrowserExercise(
+            id = exercise.id,
+            name = exercise.name,
+            tag = tagFor(exercise, equipment, setCounts[exercise.id] ?: 0),
+            primaryMuscle = exercise.primaryMuscle,
+            startImageUri = mediaResolver.startImage(exercise.id),
+            endImageUri = mediaResolver.endImage(exercise.id),
+            isAvailable = isAvailable(exercise, equipment),
+        )
+
+        val session = visible.filter { it.id in inSession }
+        val rest = visible.filterNot { it.id in inSession }
+        val trained = rest
+            .filter { (setCounts[it.id] ?: 0) > 0 }
+            .sortedByDescending { setCounts[it.id] ?: 0 }
+        val trainedIds = trained.map { it.id }.toSet()
+        val everythingElse = rest
+            .filterNot { it.id in trainedIds }
+            .sortedBy { it.name }
+
+        return listOfNotNull(
+            BrowserSection("IN THIS SESSION", session.map(::card)).takeIf { session.isNotEmpty() },
+            BrowserSection("YOU TRAIN THESE MOST", trained.map(::card))
+                .takeIf { trained.isNotEmpty() },
+            BrowserSection("EVERYTHING ELSE", everythingElse.map(::card))
+                .takeIf { everythingElse.isNotEmpty() },
+        )
+    }
+
+    /** "DUMBBELL · 34 SETS" — the kit first, then how much of it you have actually done. */
+    private fun tagFor(
+        exercise: ExerciseEntity,
+        equipment: Map<String, EquipmentEntity>,
+        sets: Int,
+    ): String {
+        val kit = exercise.requiredEquipmentIds
+            .firstNotNullOfOrNull { equipment[it]?.displayName }
+            ?.uppercase()
+            ?: "BODYWEIGHT"
+        return if (sets > 0) "$kit · $sets SETS" else kit
+    }
+
+    private fun isAvailable(
+        exercise: ExerciseEntity,
+        equipment: Map<String, EquipmentEntity>,
+    ): Boolean = exercise.requiredEquipmentIds.isEmpty() ||
+        exercise.requiredEquipmentIds.any { equipment[it]?.isAvailable == true }
+
+    private suspend fun browserTitle(intent: BrowseIntent, all: List<ExerciseEntity>): String =
+        when (intent) {
+            is BrowseIntent.Swap -> {
+                val name = all.firstOrNull { it.id == intent.currentExerciseId }?.name
+                if (name != null) "Instead of $name" else "Swap this exercise"
+            }
+
+            BrowseIntent.Add -> {
+                val label = repo.getTemplateLabel(generatedTemplateId)
+                if (label != null) "Add to $label" else "Add an exercise"
+            }
+
+            BrowseIntent.Freestyle -> "Pick an exercise"
+        }
+
+    private fun browserSubtitle(trainedCount: Int, archiveSize: Int): String =
+        if (trainedCount > 0) {
+            "Yours first · $archiveSize in the archive"
+        } else {
+            "$archiveSize in the archive · your own move to the top once you log them"
+        }
 
     private fun formatKg(kg: Double): String =
         if (kg % 1.0 == 0.0) kg.toInt().toString() else "%.1f".format(kg)
@@ -270,5 +504,7 @@ class ExercisePickerViewModel @Inject constructor(
 
     private companion object {
         const val MINUTES_PER_SET = 3
+        const val KEY_SESSION_ID = "activeSessionId"
+        const val KEY_TEMPLATE_ID = "generatedTemplateId"
     }
 }
