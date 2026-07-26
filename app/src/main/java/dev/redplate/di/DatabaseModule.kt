@@ -18,7 +18,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): RedplateDatabase =
         Room.databaseBuilder(context, RedplateDatabase::class.java, "redplate.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(*Migrations.ALL)
             .build()
 
     @Provides fun provideExerciseDao(db: RedplateDatabase): ExerciseDao = db.exerciseDao()

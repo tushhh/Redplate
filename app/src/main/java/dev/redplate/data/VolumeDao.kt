@@ -46,4 +46,12 @@ interface VolumeDao {
 
     @Query("SELECT * FROM volume_landmarks ORDER BY muscle ASC")
     suspend fun getAllLandmarks(): List<VolumeLandmarkEntity>
+
+    // ── Wipe (import only — must run inside the import transaction) ──
+
+    @Query("DELETE FROM volume_snapshots")
+    suspend fun deleteAllSnapshots()
+
+    @Query("DELETE FROM volume_landmarks")
+    suspend fun deleteAllLandmarks()
 }

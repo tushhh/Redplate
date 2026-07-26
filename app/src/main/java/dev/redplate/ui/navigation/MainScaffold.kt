@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -23,12 +20,13 @@ import dev.redplate.history.HistoryRoute
 import dev.redplate.onboarding.IntakeFlow
 import dev.redplate.plan.ProgramBuilderRoute
 import dev.redplate.plan.WeekPlanRoute
-import dev.redplate.settings.BackupScreen
+import dev.redplate.settings.BackupRoute
 import dev.redplate.settings.EquipmentRoute
 import dev.redplate.settings.SettingsRoute
 import dev.redplate.today.TodayRoute
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.workout.ExercisePickerRoute
+import dev.redplate.workout.SessionSummaryRoute
 import dev.redplate.workout.SetLoggingRoute
 
 /**
@@ -61,12 +59,26 @@ private fun MainContent() {
 
     // Tab bar hides during full-bleed screens
     val showTabs = currentRoute?.startsWith("setLogging") != true
+        && currentRoute?.startsWith("sessionSummary") != true
         && currentRoute?.startsWith("programBuilder") != true
         && currentRoute != "backup"
         && currentRoute != "equipment"
 
-    // Track selected tab for visual highlight
-    var selectedTab by rememberSaveable { mutableStateOf(RedplateTab.Today) }
+    // Derived from the back stack rather than assigned inside each composable{} block.
+    // Writing state during composition is what that did before, and it left the
+    // highlight stale whenever navigation happened any other way (back gesture included).
+    val selectedTab = when {
+        currentRoute == null -> RedplateTab.Today
+        currentRoute.startsWith("plan") || currentRoute.startsWith("programBuilder") ->
+            RedplateTab.Plan
+
+        currentRoute.startsWith("history") -> RedplateTab.History
+        currentRoute.startsWith("you") ||
+            currentRoute == "backup" ||
+            currentRoute == "equipment" -> RedplateTab.You
+
+        else -> RedplateTab.Today
+    }
 
     Column(
         modifier = Modifier
@@ -80,13 +92,15 @@ private fun MainContent() {
             ) {
                 // ── Today tab ──
                 composable("today") {
-                    selectedTab = RedplateTab.Today
                     TodayRoute(
                         onStartWorkout = { sessionId, exerciseId ->
                             navController.navigate("setLogging/$sessionId/$exerciseId")
                         },
                         onPickExercise = {
                             navController.navigate("exercises")
+                        },
+                        onEditSession = { templateId ->
+                            navController.navigate("programBuilder/$templateId")
                         },
                     )
                 }
@@ -112,15 +126,59 @@ private fun MainContent() {
                 ) {
                     SetLoggingRoute(
                         onBack = { navController.popBackStack() },
-                        onOpenGuidance = {},
+                        // Moving through the session replaces the current exercise rather
+                        // than stacking on it, so Back leaves the workout instead of
+                        // walking backwards through every lift already finished.
+                        onNextExercise = { sessionId, exerciseId ->
+                            navController.navigate("setLogging/$sessionId/$exerciseId") {
+                                popUpTo("setLogging/{sessionId}/{exerciseId}") {
+                                    inclusive = true
+                                }
+                            }
+                        },
+                        onSwapExercise = { sessionId, exerciseId ->
+                            navController.navigate("setLogging/$sessionId/$exerciseId") {
+                                popUpTo("setLogging/{sessionId}/{exerciseId}") {
+                                    inclusive = true
+                                }
+                            }
+                        },
+                        onSessionFinished = { sessionId ->
+                            navController.navigate("sessionSummary/$sessionId") {
+                                popUpTo("today")
+                            }
+                        },
+                    )
+                }
+
+                // ── Session summary (full-bleed) ──
+                composable(
+                    "sessionSummary/{sessionId}",
+                    arguments = listOf(
+                        navArgument("sessionId") { type = NavType.LongType },
+                    ),
+                ) {
+                    SessionSummaryRoute(
+                        onSeeLog = {
+                            navController.navigate("history") {
+                                popUpTo("today")
+                                launchSingleTop = true
+                            }
+                        },
+                        onDone = {
+                            navController.navigate("today") {
+                                popUpTo("today") { inclusive = true }
+                            }
+                        },
                     )
                 }
 
                 // ── Plan tab ──
                 composable("plan") {
-                    selectedTab = RedplateTab.Plan
                     WeekPlanRoute(
-                        onEditProgram = { navController.navigate("programBuilder/0") },
+                        onEditTemplate = { templateId ->
+                            navController.navigate("programBuilder/$templateId")
+                        },
                     )
                 }
 
@@ -138,13 +196,11 @@ private fun MainContent() {
 
                 // ── History tab ──
                 composable("history") {
-                    selectedTab = RedplateTab.History
                     HistoryRoute()
                 }
 
                 // ── You tab ──
                 composable("you") {
-                    selectedTab = RedplateTab.You
                     SettingsRoute(
                         onNavigateToBackup = { navController.navigate("backup") },
                         onNavigateToEquipment = { navController.navigate("equipment") },
@@ -153,7 +209,7 @@ private fun MainContent() {
 
                 // ── Backup screen ──
                 composable("backup") {
-                    BackupScreen(
+                    BackupRoute(
                         onBack = { navController.popBackStack() },
                     )
                 }

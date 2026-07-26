@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
@@ -58,11 +61,26 @@ data class VolumeRow(
     val target: Int,
 )
 
+/**
+ * Route wrapper. Shows nothing until the summary is computed — a blank frame is better
+ * than a screen of zeroes that fills in a moment later.
+ */
+@Composable
+fun SessionSummaryRoute(
+    onSeeLog: () -> Unit,
+    onDone: () -> Unit,
+    viewModel: SessionSummaryViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    state?.let {
+        SessionSummaryScreen(state = it, onSeeLog = onSeeLog, onDone = onDone)
+    }
+}
+
 @Composable
 fun SessionSummaryScreen(
     state: SessionSummaryState,
     onSeeLog: () -> Unit,
-    onAddNote: () -> Unit,
     onDone: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
@@ -199,14 +217,11 @@ fun SessionSummaryScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // "Add a note" sat here with an empty handler and no note editor behind it.
+            // Removed until it does something; see the log is the one real action.
             SecondaryButton(
                 label = "See the log",
                 onClick = onSeeLog,
-                modifier = Modifier.weight(1f),
-            )
-            SecondaryButton(
-                label = "Add a note",
-                onClick = onAddNote,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -272,7 +287,6 @@ private fun SessionSummaryPreview() {
                 volumeCoachLine = "Back is at its cap — Saturday drops a row.",
             ),
             onSeeLog = {},
-            onAddNote = {},
             onDone = {},
         )
     }

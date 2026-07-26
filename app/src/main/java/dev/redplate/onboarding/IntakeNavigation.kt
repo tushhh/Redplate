@@ -69,10 +69,11 @@ fun IntakeFlow(
                 daysPerWeek = state.daysPerWeek,
                 sessionMinutes = state.sessionMinutes,
                 presets = buildPresetList(state.daysPerWeek),
-                selectedPresetId = "upper_lower",
-                onSelectPreset = { presetId ->
-                    viewModel.finishIntake(onIntakeComplete)
-                },
+                selectedPresetId = state.selectedPresetId,
+                // Tapping a card selects it; the primary bar commits. Previously a card
+                // tap finished intake outright and the bar below it did nothing.
+                onSelectPreset = viewModel::selectPreset,
+                onConfirm = { viewModel.finishIntake(onIntakeComplete) },
             )
         }
     }
@@ -80,7 +81,7 @@ fun IntakeFlow(
 
 private fun buildPresetList(daysPerWeek: Int): List<PresetPlan> = listOf(
     PresetPlan(
-        id = "upper_lower",
+        id = PRESET_UPPER_LOWER,
         name = "Upper / Lower",
         daysRequired = 4,
         durationRange = "55\u201365 MIN",
@@ -89,7 +90,7 @@ private fun buildPresetList(daysPerWeek: Int): List<PresetPlan> = listOf(
         isBestFit = daysPerWeek == 4,
     ),
     PresetPlan(
-        id = "strength",
+        id = PRESET_STRENGTH,
         name = "Strength \u2014 heavy triples",
         daysRequired = 4,
         durationRange = "60\u201375 MIN",
@@ -97,7 +98,7 @@ private fun buildPresetList(daysPerWeek: Int): List<PresetPlan> = listOf(
         description = "Squat, bench, deadlift, press first while you\u2019re fresh. Long rests, low reps, small weekly jumps.",
     ),
     PresetPlan(
-        id = "ppl",
+        id = PRESET_PPL,
         name = "Push / Pull / Legs",
         daysRequired = 6,
         durationRange = "50\u201360 MIN",

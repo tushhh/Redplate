@@ -131,27 +131,4 @@ object GymEquipmentSeed {
         category = category, loadingScheme = LoadingScheme.BODYWEIGHT
     )
 
-    /**
-     * Coarse fallback for free-exercise-db's broad `equipment` string, used only for
-     * exercises that haven't been hand-tagged with a specific local machine id.
-     * See GYM.md "The free-exercise-db mapping is coarse" before relying on this for
-     * anything in active rotation — hand-tag those ~30 exercises instead.
-     *
-     * A key present but mapped to emptyList() (e.g. "body only") means the exercise
-     * genuinely needs no equipment. A key ABSENT from this map (e.g. "machine") means
-     * the equipment is too coarse or not present at this gym — DatabaseSeeder excludes
-     * those exercises rather than guessing which local machine satisfies them.
-     */
-    val looseEquipmentMapping: Map<String, List<String>> = mapOf(
-        "barbell" to listOf("barbell"),
-        "dumbbell" to listOf("dumbbells"),
-        "cable" to listOf("dual_adjustable_pulley", "four_station_multigym"),
-        "body only" to emptyList(),
-        "kettlebells" to listOf("rox_kettlebells"),
-        "bands" to listOf("rox_bands"),
-        "medicine ball" to listOf("wall_ball"),
-        // "machine", "exercise ball", "e-z curl bar", "other" deliberately unmapped —
-        // too coarse or not present at this gym. Exercises tagged with these are
-        // excluded from selection until hand-tagged to a specific local equipment id.
-    )
 }

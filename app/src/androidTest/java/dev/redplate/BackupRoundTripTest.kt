@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -360,4 +361,44 @@ class BackupRoundTripTest {
         assertEquals(3, db.equipmentDao().getAll().size)
         assertEquals(1, db.programDao().getAllMesocycles().size)
     }
-}
+
+    /**
+     * Data loss is the only unrecoverable failure in this project, and a bad restore is
+     * the likeliest way to cause one. Import used to wipe the database before parsing
+     * the file, so pointing it at the wrong document destroyed the training log and put
+     * nothing back. Nothing may be touched unless the whole file is known good.
+     */
+    @Test
+    fun failedImportLeavesExistingDataIntact() = runBlocking {
+        seedAll()
+        val before = db.sessionDao().getAllSetLogs()
+
+        val garbage = "{ this is not a backup"
+        try {
+            repo.import(garbage)
+            fail("Import of a non-backup file should not succeed")
+        } catch (expected: IllegalArgumentException) {
+            // Expected — the file never parses, so the database is never touched.
+        }
+
+        assertEquals(before, db.sessionDao().getAllSetLogs())
+        assertEquals(profile, db.profileDao().get())
+        assertEquals(3, db.exerciseDao().count())
+    }
+
+    @Test
+    fun importOfAnUnsupportedSchemaVersionIsRejectedBeforeAnyWrite() = runBlocking {
+        seedAll()
+        // Well-formed JSON, readable shape, version this build does not know.
+        val fromTheFuture = """{"schemaVersion":99,"exportedAt":1700000000000}"""
+
+        try {
+            repo.import(fromTheFuture)
+            fail("Import of an unsupported schema version should not succeed")
+        } catch (expected: IllegalArgumentException) {
+            // Expected — the version check runs before the transaction opens.
+        }
+
+        assertEquals(3, db.exerciseDao().count())
+        assertEquals(profile, db.profileDao().get())
+    }

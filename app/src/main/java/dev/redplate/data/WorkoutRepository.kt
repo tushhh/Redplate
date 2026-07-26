@@ -27,7 +27,22 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun getSlot(id: Long): TemplateSlotEntity? = programDao.getSlotById(id)
 
+    /** The ordered slots of a session template — the running order for the whole workout. */
+    suspend fun getSlotsForTemplate(templateId: Long): List<TemplateSlotEntity> =
+        programDao.getSlots(templateId)
+
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
+
+    /** Stamps the finish time. A session without one is still in progress. */
+    suspend fun endSession(sessionId: Long, endedAt: Long) {
+        val session = sessionDao.getSessionById(sessionId) ?: return
+        if (session.endedAt == null) {
+            sessionDao.updateSession(session.copy(endedAt = endedAt))
+        }
+    }
+
+    suspend fun markExerciseIntroduced(exerciseId: String) =
+        exerciseDao.markIntroduced(exerciseId)
 
     /** First required equipment that is on hand; falls back to any declared equipment. */
     suspend fun getPrimaryEquipment(exercise: ExerciseEntity): EquipmentEntity? {
@@ -55,6 +70,34 @@ class WorkoutRepository @Inject constructor(
             )
         )
 
+    /**
+     * Hard sets per muscle over the last seven days, secondaries at half credit and only
+     * counting sets logged at 0–3 RIR, per COACHING.md §3. This is what turns the body map
+     * from navigation into a status display: you see what is undertrained while choosing
+     * what to train.
+     */
+    suspend fun weeklyHardSetsPerMuscle(now: Long = System.currentTimeMillis()): Map<MuscleGroup, Double> {
+        val since = now - SEVEN_DAYS_MILLIS
+        val recent = sessionDao.getAllSetLogs()
+            .filter { it.completedAt >= since && it.countsTowardVolume }
+        if (recent.isEmpty()) return emptyMap()
+
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val perMuscle = mutableMapOf<MuscleGroup, Double>()
+        for (set in recent) {
+            val exercise = exercises[set.exerciseId] ?: continue
+            perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
+            exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
+        }
+        return perMuscle
+    }
+
+    /** One-shot list of exercises for a muscle that the available equipment can support. */
+    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =
+        exerciseDao.getAll()
+            .filter { it.primaryMuscle == muscle && !it.isExcluded }
+            .filter { isExerciseAvailable(it) }
+
     /** Stream of all exercises that can be performed with available equipment, for a given muscle. */
     fun observeExercisesByMuscleWithAvailableEquipment(muscle: MuscleGroup): Flow<List<ExerciseEntity>> =
         exerciseDao.observeByMuscle(muscle).map { exercises ->
@@ -66,6 +109,10 @@ class WorkoutRepository @Inject constructor(
         exerciseDao.observeAll().map { exercises ->
             exercises.filter { isExerciseAvailable(it) }
         }
+
+    private companion object {
+        const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1000
+    }
 
     /** Check if an exercise can be performed with the available equipment in the gym. */
     private suspend fun isExerciseAvailable(exercise: ExerciseEntity): Boolean {

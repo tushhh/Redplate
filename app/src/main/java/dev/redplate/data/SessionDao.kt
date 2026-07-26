@@ -75,4 +75,12 @@ interface SessionDao {
         LIMIT 1
     """)
     suspend fun getPrSet(exerciseId: String): SetLogEntity?
+
+    // ── Wipe (import only — must run inside the import transaction) ──
+
+    @Query("DELETE FROM set_logs")
+    suspend fun deleteAllSetLogs()
+
+    @Query("DELETE FROM sessions")
+    suspend fun deleteAllSessions()
 }

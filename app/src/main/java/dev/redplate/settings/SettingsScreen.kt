@@ -115,10 +115,6 @@ fun SettingsScreen(
         SectionHeader("GETS THE NUMBERS WRONG IF WRONG")
         Spacer(Modifier.height(10.dp))
 
-        // Plates row
-        SettingsRow(label = "Plates", detail = "Calibrated", onClick = {})
-        Spacer(Modifier.height(6.dp))
-
         // Units toggle
         Row(
             modifier = Modifier
@@ -150,38 +146,18 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(24.dp))
 
-        // Section: HOW LOUD THE COACH IS
-        SectionHeader("HOW LOUD THE COACH IS")
+        // Section: YOUR DATA
+        SectionHeader("YOUR DATA")
         Spacer(Modifier.height(10.dp))
 
-        SettingsRow(label = "Rest timer", detail = "3:00 default", onClick = {})
-        Spacer(Modifier.height(6.dp))
-
-        // Deload prompts toggle row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(colors.surface)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Deload prompts",
-                style = RedplateType.body.copy(fontSize = 15.sp),
-                color = colors.ink,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "ON",
-                style = RedplateType.mono.copy(fontSize = 10.sp),
-                color = colors.safe,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-
-        // Backup row
-        SettingsRow(label = "Backup", detail = "Last: today", onClick = onNavigateToBackup)
+        // A "Deload prompts: ON" row used to sit here — a read-only badge with no setting
+        // behind it. The backup row's detail was the literal text "Last: today"; the real
+        // status lives on the backup screen, where it is read from the database.
+        SettingsRow(
+            label = "Backup",
+            detail = "Export & restore",
+            onClick = onNavigateToBackup,
+        )
 
         Spacer(Modifier.height(24.dp))
     }

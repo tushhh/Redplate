@@ -1,18 +1,20 @@
 package dev.redplate.ui.navigation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
@@ -27,8 +29,12 @@ enum class RedplateTab(val label: String) {
 }
 
 /**
- * 62dp bottom tab bar. Active tab = live orange, inactive = inkMuted.
- * Hides during active workout (set logging is full-bleed).
+ * Bottom tab bar, 64 dp tall to meet the minimum touch target in CLAUDE.md §4.
+ * Active tab = live orange, inactive = inkMuted. Hidden during full-bleed screens.
+ *
+ * Each tab fills the bar's full height. It previously wrapped its label, so the
+ * tappable area was the ~16 dp of text rather than the bar — a miss with chalky
+ * hands landed on nothing at all.
  */
 @Composable
 fun RedplateTabBar(
@@ -42,7 +48,7 @@ fun RedplateTabBar(
             .fillMaxWidth()
             .background(colors.ground)
             .navigationBarsPadding()
-            .height(62.dp),
+            .height(TAB_BAR_HEIGHT),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -50,12 +56,17 @@ fun RedplateTabBar(
             val selected = tab == selectedTab
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(
+                    .fillMaxHeight()
+                    .selectable(
+                        selected = selected,
+                        role = Role.Tab,
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
-                    ) { onTabSelected(tab) },
+                        onClick = { onTabSelected(tab) },
+                    ),
             ) {
                 Text(
                     text = tab.label,
@@ -68,3 +79,5 @@ fun RedplateTabBar(
         }
     }
 }
+
+private val TAB_BAR_HEIGHT = 64.dp

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -36,17 +37,17 @@ import dev.redplate.ui.theme.RedplateType
 
 @Composable
 fun WeekPlanRoute(
-    onEditProgram: () -> Unit = {},
+    onEditTemplate: (Long) -> Unit = {},
 ) {
     val viewModel: WeekPlanViewModel = hiltViewModel()
     val state by viewModel.state.collectAsState()
-    WeekPlanScreen(state = state, onEditProgram = onEditProgram)
+    WeekPlanScreen(state = state, onEditTemplate = onEditTemplate)
 }
 
 @Composable
 fun WeekPlanScreen(
     state: WeekPlanState,
-    onEditProgram: () -> Unit = {},
+    onEditTemplate: (Long) -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -94,10 +95,10 @@ fun WeekPlanScreen(
         )
         Spacer(Modifier.height(20.dp))
 
-        // Day cards
+        // Day cards — tapping a training day opens it in the builder
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             state.days.forEach { day ->
-                DayCardRow(day = day)
+                DayCardRow(day = day, onClick = { day.templateId?.let(onEditTemplate) })
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -128,20 +129,19 @@ fun WeekPlanScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Edit / Move buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Edit today's session, or the first training day if today is a rest day.
+        // "Move a day" used to sit beside this with an empty handler; a button that
+        // does nothing is worse than no button, so it is gone until it does something.
+        val editableTemplateId = state.days.firstOrNull { it.status == DayStatus.TODAY }?.templateId
+            ?: state.days.firstNotNullOfOrNull { it.templateId }
+        if (editableTemplateId != null) {
             SecondaryButton(
-                label = "Edit program",
-                onClick = onEditProgram,
-                modifier = Modifier.weight(1f),
+                label = "Edit a session",
+                onClick = { onEditTemplate(editableTemplateId) },
+                modifier = Modifier.fillMaxWidth(),
             )
-            SecondaryButton(
-                label = "Move a day",
-                onClick = {},
-                modifier = Modifier.weight(1f),
-            )
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
 
         // Volume section
         if (state.volumeTargets.isNotEmpty()) {
@@ -190,7 +190,7 @@ fun WeekPlanScreen(
 }
 
 @Composable
-private fun DayCardRow(day: DayCard) {
+private fun DayCardRow(day: DayCard, onClick: () -> Unit) {
     val colors = RedplateTheme.colors
     val isToday = day.status == DayStatus.TODAY
     val isRest = day.status == DayStatus.REST
@@ -204,7 +204,8 @@ private fun DayCardRow(day: DayCard) {
                 else Modifier
             )
             .background(if (isRest) colors.ground else colors.surface)
-            .clickable(enabled = !isRest) {}
+            .clickable(enabled = !isRest, onClick = onClick)
+            .heightIn(min = 64.dp)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

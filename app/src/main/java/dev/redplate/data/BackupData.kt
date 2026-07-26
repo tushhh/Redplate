@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class BackupData(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = SCHEMA_VERSION,
     val exportedAt: Long,
     val profile: ProfileEntity? = null,
     val equipment: List<EquipmentEntity> = emptyList(),
@@ -16,4 +16,12 @@ data class BackupData(
     val setLogs: List<SetLogEntity> = emptyList(),
     val volumeSnapshots: List<VolumeSnapshotEntity> = emptyList(),
     val volumeLandmarks: List<VolumeLandmarkEntity> = emptyList(),
-)
+) {
+    companion object {
+        /**
+         * Bump only when the JSON shape changes in a way older builds cannot read.
+         * Adding a field with a default is backwards compatible and does not need a bump.
+         */
+        const val SCHEMA_VERSION = 1
+    }
+}

@@ -19,11 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,8 +30,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.em
-import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
@@ -47,14 +47,28 @@ import dev.redplate.ui.theme.RedplateType
 fun TodayRoute(
     onStartWorkout: (Long, String) -> Unit,
     onPickExercise: () -> Unit,
+    onEditSession: (Long) -> Unit = {},
 ) {
     val viewModel: TodayViewModel = hiltViewModel()
     val state by viewModel.state.collectAsState()
+
+    // Today is a summary of state other screens change — a finished session, a new
+    // program. It used to load once in init and then never again, so it still showed
+    // "Let's go" for a workout already done. Refreshing on resume keeps it honest.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     TodayScreen(
         state = state,
         onStartWorkout = { viewModel.startSession(onStartWorkout) },
         onPickExercise = onPickExercise,
+        onEditSession = onEditSession,
     )
 }
 
@@ -63,6 +77,7 @@ fun TodayScreen(
     state: TodayState,
     onStartWorkout: () -> Unit,
     onPickExercise: () -> Unit,
+    onEditSession: (Long) -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -81,7 +96,11 @@ fun TodayScreen(
         }
 
         is TodayState.TrainingDay -> {
-            TrainingDayScreen(state = state, onStartWorkout = onStartWorkout)
+            TrainingDayScreen(
+                state = state,
+                onStartWorkout = onStartWorkout,
+                onEditSession = onEditSession,
+            )
         }
 
         is TodayState.RestDay -> {
@@ -94,9 +113,9 @@ fun TodayScreen(
 private fun TrainingDayScreen(
     state: TodayState.TrainingDay,
     onStartWorkout: () -> Unit,
+    onEditSession: (Long) -> Unit,
 ) {
     val colors = RedplateTheme.colors
-    var showTimeDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -130,7 +149,10 @@ private fun TrainingDayScreen(
             Spacer(Modifier.height(10.dp))
 
             // Session card
-            SessionCardView(card = state.sessionCard)
+            SessionCardView(
+                card = state.sessionCard,
+                onEditSession = { onEditSession(state.sessionCard.templateId) },
+            )
             Spacer(Modifier.height(10.dp))
 
             // Volume footer
@@ -141,97 +163,20 @@ private fun TrainingDayScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Primary bar
+        // Primary bar. This used to open a "How much time today?" dialog whose answer
+        // was then thrown away — a centred dialog, above the thumb arc, that added a tap
+        // and changed nothing. The session length already comes from the profile ceiling,
+        // so the primary action starts the workout.
         PrimaryBar(
             label = state.primaryLabel,
-            onClick = { showTimeDialog = true },
+            onClick = onStartWorkout,
             modifier = Modifier.padding(horizontal = 22.dp),
         )
     }
-
-    if (showTimeDialog) {
-        SessionTimeDialog(
-            estimatedMinutes = state.sessionCard.estimatedMinutes,
-            onDismiss = { showTimeDialog = false },
-            onConfirm = {
-                showTimeDialog = false
-                onStartWorkout()
-            },
-        )
-    }
 }
 
 @Composable
-private fun SessionTimeDialog(
-    estimatedMinutes: Int,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val colors = RedplateTheme.colors
-    val timeOptions = listOf(30, 45, 60, 75, 90)
-    var selectedMinutes by remember { mutableStateOf(
-        timeOptions.minByOrNull { kotlin.math.abs(it - estimatedMinutes) } ?: 60
-    ) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(colors.surface)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "How much time today?",
-                style = RedplateType.title.copy(fontSize = 22.sp),
-                color = colors.ink,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Session will be planned to fit.",
-                style = RedplateType.body.copy(fontSize = 13.sp),
-                color = colors.inkMuted,
-            )
-            Spacer(Modifier.height(20.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                timeOptions.forEach { minutes ->
-                    val isSelected = minutes == selectedMinutes
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(64.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isSelected) colors.live else colors.ground)
-                            .clickable { selectedMinutes = minutes },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "${minutes}m",
-                            style = RedplateType.body.copy(
-                                fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            ),
-                            color = if (isSelected) colors.ground else colors.ink,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-
-            PrimaryBar(
-                label = "Start · ${selectedMinutes} min",
-                onClick = onConfirm,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SessionCardView(card: SessionCard) {
+private fun SessionCardView(card: SessionCard, onEditSession: () -> Unit) {
     val colors = RedplateTheme.colors
 
     Column(
@@ -313,7 +258,8 @@ private fun SessionCardView(card: SessionCard) {
             }
         }
 
-        // "N more · edit today" row
+        // "N more · edit today" row. It had a chevron and no click handler, so it read
+        // as a link and behaved as decoration; it now opens the session in the builder.
         if (card.remainingCount > 0) {
             Spacer(Modifier.height(12.dp))
             Row(
@@ -322,6 +268,7 @@ private fun SessionCardView(card: SessionCard) {
                     .height(64.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(colors.surfaceRaised)
+                    .clickable(onClick = onEditSession)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -38,4 +38,11 @@ interface ExerciseDao {
 
     @Query("UPDATE exercises SET isExcluded = :excluded WHERE id = :id")
     suspend fun setExcluded(id: String, excluded: Boolean)
+
+    @Query("UPDATE exercises SET hasBeenIntroduced = 1 WHERE id = :id")
+    suspend fun markIntroduced(id: String)
+
+    /** Wipe (import only — must run inside the import transaction). */
+    @Query("DELETE FROM exercises")
+    suspend fun deleteAll()
 }

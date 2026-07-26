@@ -33,7 +33,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import dev.redplate.ui.components.SecondaryButton
 import dev.redplate.ui.components.SegmentedToggle
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
@@ -225,19 +224,8 @@ fun HistoryScreen(
             }
             Spacer(Modifier.height(20.dp))
 
-            // Bottom buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton(
-                    label = "All lifts",
-                    onClick = {},
-                    modifier = Modifier.weight(1f),
-                )
-                SecondaryButton(
-                    label = "Every PR",
-                    onClick = {},
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            // "All lifts" and "Every PR" sat here with empty handlers and no screens
+            // behind them. The exercise selector above already switches lifts.
 
             Spacer(Modifier.height(24.dp))
         }

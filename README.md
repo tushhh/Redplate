@@ -1,114 +1,265 @@
 # Redplate
 
-Single-user, offline-first strength training app for **Samsung Galaxy S24 Ultra**.
+A strength training app that reads like a piece of gym equipment, not a consumer app.
 
-> **Status:** Active development (foundation in place)
+Single user, single device, **no backend, no accounts, no analytics, no ads, no subscription**.
+It works identically in airplane mode, and it will keep working when every fitness startup
+in your app drawer has been acquired and shut down.
+
+Built for one phone: the **Samsung Galaxy S24 Ultra** (6.8", ~384 × 824 dp, portrait only).
 
 ---
 
-## Overview
+## Why this exists
 
-Redplate is a local-only strength training app designed to feel like gym instrumentation rather than a generic consumer fitness product.
+Every training app converges on the same shape: a flat exercise list, a rep counter, and a
+paywall in front of the part that would actually coach you. The programming is either a static
+PDF or a black box that can't explain itself.
 
-The app is optimized for one person on one phone, with **no backend and no recurring cost**. It must remain fully functional in airplane mode.
+Redplate is the opposite bet. The programming engine is the product, it runs entirely on the
+device, and **every prescription can show its reasoning in plain language**. There is no model
+to call, no server to be down, and nothing to renew.
 
-## Current Repository Snapshot
+---
 
-This section reflects the current state of `tushhh/Redplate` on `master`.
+## The plate stack
 
-- **Language:** Kotlin (100%)
-- **Build system:** Gradle Kotlin DSL + Version Catalog
-- **Project modules:** `:app`
-- **Architecture direction:** Compose UI → ViewModel/StateFlow → Repository → Room/SQLite
-- **Networking stack:** None added in the current Gradle setup
+The one loud element in an otherwise quiet interface.
 
-## Tech Stack (as configured)
+As you step the weight, the barbell on screen loads itself in **IPF/IWF calibrated plate
+colours** — the same colours as the discs in your hands. It is simultaneously the plate
+calculator and the weight readout, and it is legible from the rack at two metres.
 
-- **Android Gradle Plugin:** `9.3.1`
-- **Kotlin:** `2.2.10`
-- **KSP:** `2.2.10-2.0.2`
-- **Compose BOM:** `2026.02.01`
-- **Room:** `2.7.1`
-- **Hilt:** `2.60.1`
-- **kotlinx.serialization:** `1.8.1`
+| Plate  | Colour    | Hex       |
+|--------|-----------|-----------|
+| 25 kg  | Red       | `#C8102E` |
+| 20 kg  | Blue      | `#0057B8` |
+| 15 kg  | Yellow    | `#FFD100` |
+| 10 kg  | Green     | `#00843D` |
+| 5 kg   | White     | `#F2F2F2` |
+| 2.5 kg | Black     | `#1A1A1A` |
 
-Primary source: `gradle/libs.versions.toml`.
+The colours are functional, not decorative. Plates are only ever drawn from the pairs you
+actually own, heaviest first, in rack order. If a target weight can't be assembled from your
+plates, the app says so rather than showing a number you can't load.
 
-## Android Configuration (app module)
+---
 
-- `namespace`: `dev.redplate`
-- `applicationId`: `dev.redplate`
-- `compileSdk`: `36` (minor API level `1`)
-- `minSdk`: `36`
-- `targetSdk`: `36`
-- Java compatibility: `11`
-- Compose enabled
-- Activity orientation locked to portrait in `AndroidManifest.xml`
-- Backup is enabled (`allowBackup=true`) with backup/data extraction rules configured
+## What it does
 
-## Current Dependency Set
+### Coaches, rather than records
 
-Configured libraries currently include:
+Most trackers are a spreadsheet with rounded corners. Redplate prescribes the session, then
+adapts it from your own history.
 
-- Jetpack Compose + Material 3
-- Lifecycle runtime + compose + ViewModel compose
-- Hilt + hilt-navigation-compose
-- Room runtime + ktx + compiler (via KSP)
-- kotlinx.serialization JSON
-- AndroidX test + Espresso + Compose UI test
+- **Program generation** — answer four questions and get a full mesocycle: a split matched to
+  your days, exercises filtered by the equipment you actually have, rep ranges and rest
+  intervals set by your goal, and a deload planned at the end of the block.
+- **Volume landmarks** — weekly hard sets per muscle tracked against MV / MEV / MAV / MRV.
+  Secondary muscles get half credit; a set only counts if it was logged at 0–3 reps in reserve.
+- **Progression rules** — double progression for hypertrophy, load progression for strength
+  compounds, RIR autoregulation, all stepping by increments your equipment can physically make.
+- **Explains itself** — every slot can render its own prescription in a sentence. No black boxes.
 
-## Project Structure (current)
+### Knows what's in your gym
+
+The differentiator most apps get wrong. Equipment isn't a checkbox list — it's a loading model.
+
+```kotlin
+EquipmentEntity(
+    loadingScheme = FIXED_INCREMENT,          // dumbbells, kettlebells
+    availableLoads = listOf(10.0, 12.0, 14.0) // the ones you actually own
+)
+```
+
+If your dumbbells jump 10 → 12 → 14 kg, the engine never prescribes 13. If your cable stack
+moves in 2.5 kg pins, progression accounts for a jump that might be 15% of the working load.
+Equipment whose contents aren't confirmed is marked unavailable and excluded — **fail closed,
+never guess open**.
+
+### Built for a gym floor, not a desk
+
+The ergonomics are hard rules, not preferences ([`CLAUDE.md`](CLAUDE.md) §4):
+
+- **Top 370 dp is read-only.** Nothing tappable where your thumb can't reach anyway.
+- **All controls in the bottom half.** Primary action is a full-width 88 dp bar — never a
+  corner FAB, so it's identical for left- and right-handed use.
+- **64 dp minimum touch targets**, not Material's 48. You're out of breath with chalk on
+  your hands.
+- **No gesture-only actions.** Sweat causes both false and rejected touches.
+- **Rest timer at 112 sp** — readable with the phone on the floor.
+- **Screen stays on** during a session; **haptics** on set logged, PR hit, and rest complete,
+  with distinct patterns, because you often aren't looking at the screen.
+- Near-black ground for AMOLED battery and glare, tabular figures so digits don't jitter as
+  weight increments.
+
+---
+
+## A session, end to end
+
+```
+Today  →  set logging  ⇄  rest  →  next lift  →  …  →  summary
+```
+
+1. **Today** opens on the session the program says is due, the first three lifts, and where
+   your weekly volume stands. One tap starts it.
+2. **Set logging** is a single set, full screen: the load with its stepper and plate stack,
+   the rep counter, and plain-language difficulty chips ("2 more in me", "All I had") that map
+   to RIR. Guidance sits top-right, deliberately out of thumb reach — it's a pre-set decision,
+   never an in-set one.
+3. **Complete the set** → haptic → the rest timer starts at the prescribed interval and counts
+   down against a wall-clock deadline, so it stays honest whatever the process does.
+4. **The rest screen's one button knows what comes next** — another set, the next lift, or
+   finish. Label and behaviour come from the same value, so they can't disagree.
+5. **Summary** derives tonnage, PRs and per-muscle volume from what you logged.
+
+**Rack occupied?** Open guidance and swap in one tap — substitutes are ranked by
+secondary-muscle overlap and filtered to equipment you own, without leaving the session.
+
+**No program?** The body-map picker lets you tap the muscles you feel like training and builds
+a session around them, still tracking volume.
+
+---
+
+## Your data stays yours
+
+Data loss is the only unrecoverable failure in this project, so it gets three independent paths:
+
+1. **Android Auto Backup** — automatic, free, includes the Room database and excludes caches.
+2. **JSON export / import** via the Storage Access Framework — full fidelity, rebuilds the
+   entire database. Import is **atomic**: the file is fully parsed before anything is touched,
+   and the wipe plus every insert run in one transaction, so a bad file leaves your log intact.
+3. **CSV export** — one row per logged set, joined to exercise and session, for spreadsheet
+   analysis. Lossy by design: it drops the program and equipment tables, so it is never a
+   restore path.
+
+The backup screen reports what is actually in the database and tells you the outcome of every
+export and restore, success or failure. A silent failure there is the worst case — it would
+leave you believing a backup exists.
+
+Room migrations are always real. There is no destructive fallback anywhere in the build.
+
+---
+
+## Architecture
+
+```
+Compose UI  →  ViewModel (StateFlow)  →  Repository  →  Room DAO  →  SQLite
+```
+
+Kotlin · Jetpack Compose · Material 3 · Room · Hilt · kotlinx.serialization · Coil.
+Single activity, no fragments. Room is the single source of truth; screens observe Flows and
+nothing holds duplicate state.
+
+**There is no networking dependency.** No Retrofit, no OkHttp, no Ktor, and the only permission
+in the manifest is `VIBRATE`. The app opens no sockets at all. (`COACHING.md` permits one future
+exception — an `ACTION_VIEW` hand-off to search for form videos in another app — which is not
+built yet.)
 
 ```text
-Redplate/
-├─ app/
-│  ├─ build.gradle.kts
-│  └─ src/main/
-│     └─ AndroidManifest.xml
-├─ gradle/
-│  └─ libs.versions.toml
-├─ build.gradle.kts
-├─ settings.gradle.kts
-└─ README.md
+app/src/main/java/dev/redplate/
+├─ data/          Room entities, DAOs, seeds, PlateMath, ProgramGenerator, backup
+├─ onboarding/    Goal → schedule → equipment → plan fork → preset library
+├─ today/         The session that's due, volume standing
+├─ workout/       Set logging, rest, guidance, body map, session summary
+├─ plan/          Week view and program builder
+├─ history/       e1RM curves, PRs, per-exercise logs
+├─ settings/      Profile, equipment inventory, backup
+└─ ui/            Theme, type scale, PlateStack and shared components
 ```
 
-> Note: This is a concise snapshot based on currently inspected root/app build files and manifest.
+Roughly 12,000 lines of Kotlin across 74 files, with 34 `@Preview` states.
 
-## Build & Run
+### Seed data
 
-### Requirements
+85 exercises hand-tagged to the equipment in one real gym — movement pattern, primary and
+secondary muscles, complexity tier and fatigue cost each. Start/end position stills come from
+[`yuhonas/free-exercise-db`](https://github.com/yuhonas/free-exercise-db) (public domain),
+trimmed to only the images the app can reference (160 files, 12 MB). `MediaResolver` prefers a
+sideloaded set in the app's external files directory, so the media can be swapped with
+`adb push` and no rebuild.
 
-- Android Studio (current stable)
-- Android SDK platform/API 36 installed
-- JDK compatible with project (Java 11 target)
+---
 
-### Quick Start
+## Build
 
-1. Clone the repository
-2. Open in Android Studio
-3. Sync Gradle
-4. Run the `app` configuration on a device/emulator with API 36
-
-### Command Line
-
-From repo root:
+**Requirements:** Android Studio (current stable), Android SDK 36, JDK 21.
 
 ```bash
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug        # build
+./gradlew :app:test                 # JVM unit tests — plate maths, program structure
+./gradlew :app:connectedAndroidTest # instrumented — seeding, backup round-trip
 ```
 
-## Principles (project intent)
+Optional, to sideload your own exercise media:
 
-- Offline-first, local-only behavior
-- No backend/accounts/analytics/ads
-- Portrait-first UX
-- Durable local data model with backup/export pathways
+```bash
+adb push media/ /sdcard/Android/data/dev.redplate/files/exercises/
+# filenames: <exerciseId>_start.jpg / <exerciseId>_end.jpg
+```
+
+---
+
+## Design
+
+| Token           | Hex       | Use                                       |
+|-----------------|-----------|-------------------------------------------|
+| `ground`        | `#101317` | Base — near-black, lifted just off pure    |
+| `surface`       | `#1A1E24` | Cards, sheets, raised rows                 |
+| `surfaceRaised` | `#242A32` | Steppers, chips, controls on a surface     |
+| `line`          | `#2A2F36` | Hairline dividers, borders                 |
+| `ink`           | `#F5F5F0` | Primary type                               |
+| `inkMuted`      | `#8B939E` | Labels, units, secondary data              |
+| `live`          | `#FF5C1A` | Active set, running timer, primary action  |
+
+`live` is the only warm accent and appears in exactly one place per screen. Plate colours are
+used solely inside the plate stack. Progression state is never encoded in colour alone — always
+paired with an icon or label.
+
+**Type:** IBM Plex Sans Condensed for numerals (tabular figures mandatory), IBM Plex Sans for
+UI, IBM Plex Mono for logs. All bundled — loading a font over the network would break the
+offline guarantee.
+
+**Motion:** restrained. One orchestrated moment — the plate stack animating as weight changes.
+Everything else is a 120 ms fade or nothing.
+
+---
+
+## Scope
+
+**In:** set logging, program generation and progression, equipment-aware exercise selection,
+history and PR detection, per-muscle volume tracking, exercise guidance, backup and export.
+
+**Out, deliberately:** social feed, program sharing, hosted video, cloud sync, LLM coaching,
+Wear OS. Also out: BMI, body-fat targets, calorie counting, goal weight. This is a training
+app. Progress is measured in load, reps and consistency.
+
+Redplate coaches training. It does not diagnose, prescribe rehab, or evaluate anyone's body.
+Where an injury is flagged the correct behaviour is to exclude the movement and suggest seeing
+a professional.
+
+---
+
+## Project documents
+
+| File | What it governs |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | The contract — non-negotiables, architecture, design system, ergonomics |
+| [`COACHING.md`](COACHING.md) | The engine — intake, equipment model, program generation, progression |
+| [`SCREENS.md`](SCREENS.md) | What each screen is, so screens don't default to flat lists |
+
+If a change conflicts with `CLAUDE.md`, the contract wins — say so before writing the code.
 
 ## Contributing
 
-Before proposing changes:
+1. Keep it offline-only. Adding a networking dependency means something has gone wrong — stop
+   and ask.
+2. Never destructive-migrate Room. Write a real migration.
+3. Export must keep working. It is the only thing standing between a bug and a lost training log.
+4. No dead controls. A button that does nothing is worse than no button.
+5. Commit after every green build.
 
-1. Keep the app offline-compatible and local-only.
-2. Avoid adding networking dependencies.
-3. Preserve data durability assumptions.
-4. Keep UX readable and fast for workout logging.
+## Licence
+
+Personal project, not distributed. Bundled third-party assets: IBM Plex (OFL 1.1),
+`free-exercise-db` imagery (public domain).
