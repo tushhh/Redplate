@@ -20,7 +20,10 @@ import javax.inject.Inject
 data class BackupUiState(
     val sessionCount: Int = 0,
     val setCount: Int = 0,
-    val lastSessionLabel: String = "No sessions logged yet",
+    /** "Last session yesterday" — design 9b states this as a date, never as "enabled". */
+    val headline: String = "Nothing logged yet",
+    /** "146 sessions, 3,912 sets and your equipment setup — about 1.4 MB." */
+    val detail: String = "Log a session and your history starts here.",
     val hasData: Boolean = false,
     val isBusy: Boolean = false,
     /** Result of the last export or restore. Cleared once shown. */
@@ -53,7 +56,8 @@ class BackupViewModel @Inject constructor(
                 it.copy(
                     sessionCount = status.sessionCount,
                     setCount = status.setCount,
-                    lastSessionLabel = describeLastSession(status.lastSessionAt),
+                    headline = describeLastSession(status.lastSessionAt),
+                    detail = describeContents(status.sessionCount, status.setCount, repo.approximateJsonBytes()),
                     hasData = status.sessionCount > 0,
                 )
             }
@@ -101,16 +105,32 @@ class BackupViewModel @Inject constructor(
     }
 
     private fun describeLastSession(epochMillis: Long?): String {
-        if (epochMillis == null) return "No sessions logged yet"
+        if (epochMillis == null) return "Nothing logged yet"
 
         val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
         return when (val days = ChronoUnit.DAYS.between(date, LocalDate.now())) {
-            0L -> "Last session: today"
-            1L -> "Last session: yesterday"
-            in 2L..6L -> "Last session: $days days ago"
-            else -> "Last session: ${date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}"
+            0L -> "Last session today"
+            1L -> "Last session yesterday"
+            in 2L..6L -> "Last session $days days ago"
+            else -> "Last session ${date.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}"
         }
     }
+
+    /**
+     * How many, and how big. Both matter: the count is what you would lose, and the
+     * size is what tells you the export is not going to be a problem to keep.
+     */
+    private fun describeContents(sessions: Int, sets: Int, bytes: Long): String {
+        if (sessions == 0) return "Log a session and your history starts here."
+        val size = when {
+            bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+            else -> "${(bytes / 1024).coerceAtLeast(1)} KB"
+        }
+        return "$sessions session${plural(sessions)}, $sets working set${plural(sets)} and " +
+            "your equipment setup — about $size. Nothing leaves this phone unless you export it."
+    }
+
+    private fun plural(n: Int) = if (n == 1) "" else "s"
 
     companion object {
         fun suggestedJsonName(): String = "redplate-${today()}.json"

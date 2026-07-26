@@ -4,8 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.EquipmentDao
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.MuscleGroup
+import dev.redplate.data.PlateMath
+import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.VolumeDao
@@ -29,6 +32,8 @@ class SessionSummaryViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val sessionDao: SessionDao,
     private val exerciseDao: ExerciseDao,
+    private val equipmentDao: EquipmentDao,
+    private val programDao: ProgramDao,
     private val volumeDao: VolumeDao,
 ) : ViewModel() {
 
@@ -55,14 +60,18 @@ class SessionSummaryViewModel @Inject constructor(
         val prs = countPrs(working)
         val volumeRows = buildVolumeRows(working)
 
+        val templateLabel = session.templateId
+            ?.let { programDao.getTemplateById(it)?.label }
+            ?: "Freestyle"
+
         _state.value = SessionSummaryState(
-            eyebrow = buildEyebrow(durationMinutes, working.size),
+            eyebrow = buildEyebrow(templateLabel, durationMinutes, working.size),
             headline = buildHeadline(prs, working.size),
             coachBody = buildCoachBody(working, prs),
             totalSets = working.size,
             totalTonnage = formatTonnage(tonnage),
             prCount = prs,
-            progressionChanges = emptyList(),
+            progressionChanges = buildProgressionChanges(working),
             volumeRows = volumeRows,
             volumeCoachLine = buildVolumeCoachLine(volumeRows),
         )
@@ -120,9 +129,75 @@ class SessionSummaryViewModel @Inject constructor(
             }
     }
 
-    private fun buildEyebrow(minutes: Int, sets: Int): String = when {
-        minutes > 0 -> "SESSION COMPLETE · $minutes MIN · $sets SETS"
-        else -> "SESSION COMPLETE · $sets SETS"
+    /**
+     * What this session changes about the next one, per lift.
+     *
+     * Double progression, stated plainly: clear the top of the range at 2 RIR or better
+     * on every set and the load steps up by whatever the equipment can actually make;
+     * fall short of the bottom and it comes down; anything between holds. The reason is
+     * carried with the decision, because a prescription you cannot interrogate is the
+     * black box the user is trying to get away from.
+     */
+    private suspend fun buildProgressionChanges(working: List<SetLogEntity>): List<ProgressionChange> =
+        working.groupBy { it.exerciseId }.mapNotNull { (exerciseId, sets) ->
+            val exercise = exerciseDao.getById(exerciseId) ?: return@mapNotNull null
+            val slot = slotFor(exerciseId)
+            val load = sets.maxOf { it.loadKg }
+            val equipment = exercise.requiredEquipmentIds
+                .firstNotNullOfOrNull { equipmentDao.getById(it) }
+
+            val repHigh = slot?.repRangeHigh ?: DEFAULT_REP_HIGH
+            val repLow = slot?.repRangeLow ?: DEFAULT_REP_LOW
+            val clearedTop = sets.all { it.reps >= repHigh && (it.rir ?: 0) <= 2 }
+            val fellShort = sets.any { it.reps < repLow }
+
+            when {
+                clearedTop -> {
+                    val next = equipment?.let { PlateMath.nextLoadUp(load, it) } ?: (load + 2.5)
+                    val delta = next - load
+                    ProgressionChange(
+                        deltaLabel = "+${formatKg(delta)}",
+                        description = "${exercise.name} — you finished at " +
+                            "${sets.minOf { it.rir ?: 0 }} rep left, so it goes to " +
+                            "${formatKg(next)} kg",
+                        isUp = true,
+                    )
+                }
+
+                fellShort -> {
+                    val next = equipment?.let { PlateMath.nextLoadDown(load, it) }
+                        ?: (load - 2.5).coerceAtLeast(0.0)
+                    val short = repLow - sets.minOf { it.reps }
+                    ProgressionChange(
+                        deltaLabel = "−${formatKg(load - next)}",
+                        description = "${exercise.name} — fell $short rep${plural(short)} short, " +
+                            "dropping to ${formatKg(next)} kg",
+                        isUp = false,
+                    )
+                }
+
+                else -> ProgressionChange(
+                    deltaLabel = "HOLD",
+                    description = "${exercise.name} — ${sets.maxOf { it.reps }} reps at " +
+                        "${formatKg(load)} kg, stay there until the range is clean",
+                    isUp = false,
+                )
+            }
+        }
+
+    private suspend fun slotFor(exerciseId: String) =
+        sessionDao.getSessionById(sessionId)?.templateId
+            ?.let { programDao.getSlots(it) }
+            ?.firstOrNull { it.exerciseId == exerciseId }
+
+    private fun plural(n: Int) = if (n == 1) "" else "s"
+
+    private fun formatKg(kg: Double): String =
+        if (kg % 1.0 == 0.0) kg.toInt().toString() else "%.1f".format(kg)
+
+    private fun buildEyebrow(label: String, minutes: Int, sets: Int): String = when {
+        minutes > 0 -> "${label.uppercase()} · $minutes MINUTES"
+        else -> "${label.uppercase()} · $sets SETS"
     }
 
     private fun buildHeadline(prs: Int, sets: Int): String = when {
@@ -162,5 +237,8 @@ class SessionSummaryViewModel @Inject constructor(
 
     companion object {
         const val ARG_SESSION_ID = "sessionId"
+
+        private const val DEFAULT_REP_LOW = 8
+        private const val DEFAULT_REP_HIGH = 12
     }
 }

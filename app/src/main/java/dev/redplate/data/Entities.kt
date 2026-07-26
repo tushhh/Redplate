@@ -35,8 +35,16 @@ enum class LoadingScheme {
     BANDED            // qualitative resistance
 }
 
+/**
+ * What the user is training for. Drives rep ranges, rest and volume distribution.
+ *
+ * Stored as its name through [Converters], so adding a value is not a schema change.
+ * LEAN exists because the intake offers it as a distinct answer (design 2c); it is the
+ * hypertrophy prescription with shorter rests, never a diet setting — COACHING.md §1
+ * rules out weight targets entirely.
+ */
 @Serializable
-enum class Goal { STRENGTH, HYPERTROPHY, GENERAL }
+enum class Goal { STRENGTH, HYPERTROPHY, LEAN, GENERAL }
 
 @Serializable
 enum class ProgressionRule { DOUBLE_PROGRESSION, LOAD_PROGRESSION, RIR_AUTOREGULATED, NONE }

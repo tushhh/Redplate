@@ -82,6 +82,160 @@ class ProgramGenerator @Inject constructor(
         }
     }
 
+    /**
+     * Builds a one-off session around the muscles the user tapped on the body map, and
+     * returns its template id (design 3d).
+     *
+     * Compounds first while they're fresh, isolation after, trimmed to the time they have.
+     * The template is stored so set logging can read a real prescription and walk the
+     * running order — the same machinery a programmed day uses. It is parked on an
+     * inactive "Freestyle" mesocycle and given a negative day index, so it never appears
+     * as a day on the Plan tab.
+     */
+    suspend fun generateAdHocTemplate(
+        muscles: Set<MuscleGroup>,
+        profile: ProfileEntity,
+        now: Long = System.currentTimeMillis(),
+    ): Long {
+        val available = equipmentDao.getAll().filter { it.isAvailable }.map { it.id }.toSet()
+        val pool = exerciseDao.getAll()
+            .filter { !it.isExcluded }
+            .filter { it.pattern !in profile.excludedPatterns }
+            .filter { ex -> ex.requiredEquipmentIds.all { it in available } }
+            .sortedBy { it.id }
+
+        // Compounds first, then isolation, cycling the picked muscles so no single one
+        // takes the whole session.
+        val chosen = mutableListOf<Pair<ExerciseEntity, Boolean>>()
+        val used = mutableSetOf<String>()
+        for (compound in listOf(true, false)) {
+            for (muscle in muscles) {
+                pool.firstOrNull {
+                    it.primaryMuscle == muscle && it.isCompound == compound && it.id !in used
+                }?.let {
+                    used += it.id
+                    chosen += it to compound
+                }
+            }
+        }
+        if (chosen.isEmpty()) error("No exercises available for the selected muscles")
+
+        return db.withTransaction {
+            val mesocycleId = programDao.getActiveMesocycle()?.id
+                ?: programDao.insertMesocycle(
+                    MesocycleEntity(
+                        name = FREESTYLE_BLOCK,
+                        goal = profile.goal,
+                        startedAt = now,
+                        lengthWeeks = 1,
+                        isActive = false,
+                    ),
+                )
+
+            val templateId = programDao.insertTemplate(
+                SessionTemplateEntity(
+                    mesocycleId = mesocycleId,
+                    label = muscles.joinToString(" + ") { it.name.lowercase().replaceFirstChar(Char::uppercase) },
+                    dayIndex = AD_HOC_DAY_INDEX,
+                ),
+            )
+
+            var budget = profile.sessionCeilingMinutes
+            val slots = mutableListOf<TemplateSlotEntity>()
+            for ((exercise, compound) in chosen) {
+                val rx = Prescription.of(profile.goal, compound)
+                val sets = if (compound) 3 else 2
+                val cost = sets * MINUTES_PER_SET
+                if (budget - cost < 0 && slots.isNotEmpty()) break
+                budget -= cost
+
+                slots += TemplateSlotEntity(
+                    templateId = templateId,
+                    exerciseId = exercise.id,
+                    orderIndex = slots.size,
+                    targetSets = sets,
+                    repRangeLow = rx.repLow,
+                    repRangeHigh = rx.repHigh,
+                    targetRir = rx.targetRir,
+                    restSeconds = rx.restSeconds,
+                    progression = ProgressionRule.DOUBLE_PROGRESSION,
+                )
+            }
+            programDao.insertSlots(slots)
+            templateId
+        }
+    }
+
+    // ── Editing a template in place (8c: swap a row, add a row) ─────────
+
+    /**
+     * Appends an exercise to the end of a template and returns the new slot.
+     *
+     * The prescription comes from the same [Prescription] table the generator uses, so a
+     * lift the user added by hand is programmed exactly as one the engine chose — there
+     * is no second, weaker code path for "manual" slots.
+     */
+    suspend fun appendSlot(
+        templateId: Long,
+        exerciseId: String,
+        profile: ProfileEntity,
+    ): TemplateSlotEntity? {
+        val exercise = exerciseDao.getById(exerciseId) ?: return null
+        val existing = programDao.getSlots(templateId)
+        val slot = prescribe(
+            templateId = templateId,
+            exercise = exercise,
+            orderIndex = existing.size,
+            goal = profile.goal,
+        )
+        return slot.copy(id = programDao.insertSlot(slot))
+    }
+
+    /**
+     * Swaps the exercise in an existing slot, re-prescribing for the new movement.
+     *
+     * A compound cannot inherit an isolation's rep range and still make sense, so the
+     * whole prescription is rebuilt. The working load is dropped deliberately: it belongs
+     * to the lift that was there, and carrying it over would put someone under a bar at a
+     * weight they have never lifted on that movement.
+     */
+    suspend fun replaceSlotExercise(
+        slotId: Long,
+        exerciseId: String,
+        profile: ProfileEntity,
+    ): TemplateSlotEntity? {
+        val slot = programDao.getSlotById(slotId) ?: return null
+        val exercise = exerciseDao.getById(exerciseId) ?: return null
+        val replacement = prescribe(
+            templateId = slot.templateId,
+            exercise = exercise,
+            orderIndex = slot.orderIndex,
+            goal = profile.goal,
+        ).copy(id = slot.id, supersetGroup = slot.supersetGroup)
+        programDao.updateSlot(replacement)
+        return replacement
+    }
+
+    private fun prescribe(
+        templateId: Long,
+        exercise: ExerciseEntity,
+        orderIndex: Int,
+        goal: Goal,
+    ): TemplateSlotEntity {
+        val rx = Prescription.of(goal, exercise.isCompound)
+        return TemplateSlotEntity(
+            templateId = templateId,
+            exerciseId = exercise.id,
+            orderIndex = orderIndex,
+            targetSets = if (exercise.isCompound) 3 else 2,
+            repRangeLow = rx.repLow,
+            repRangeHigh = rx.repHigh,
+            targetRir = rx.targetRir,
+            restSeconds = rx.restSeconds,
+            progression = exercise.defaultProgression,
+        )
+    }
+
     // ── Plan assembly ───────────────────────────────────────────────────
 
     private fun buildPlan(
@@ -212,6 +366,14 @@ class ProgramGenerator @Inject constructor(
                     Prescription(10, 15, 1, 90)
                 }
 
+                // Same stimulus as hypertrophy, shorter rests. Nothing here is a calorie
+                // target: the only lever the engine has is how the training is arranged.
+                Goal.LEAN -> if (compound) {
+                    Prescription(6, 12, 2, 105)
+                } else {
+                    Prescription(12, 18, 1, 60)
+                }
+
                 Goal.GENERAL -> if (compound) {
                     Prescription(5, 10, 2, 150)
                 } else {
@@ -237,6 +399,10 @@ class ProgramGenerator @Inject constructor(
         private const val MIN_EXERCISES = 3
         private const val NOVICE_MONTHS = 12
 
+        /** Parks ad-hoc templates outside the Mon–Sun grid so the Plan tab ignores them. */
+        private const val AD_HOC_DAY_INDEX = -1
+        private const val FREESTYLE_BLOCK = "Freestyle"
+
         /**
          * One line explaining why a slot is prescribed the way it is. The engine must
          * always be able to answer "why am I doing this?" without a network call.
@@ -250,6 +416,7 @@ class ProgramGenerator @Inject constructor(
             val why = when (goal) {
                 Goal.STRENGTH -> "heavy, low reps and long rests are what move a max"
                 Goal.HYPERTROPHY -> "moderate reps close to failure is what drives growth"
+                Goal.LEAN -> "the same reps with shorter rests keeps the work density up"
                 Goal.GENERAL -> "a middle rep range keeps strength and size both moving"
             }
             return "$exerciseName: ${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} " +

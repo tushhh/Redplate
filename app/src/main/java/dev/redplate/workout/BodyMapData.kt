@@ -2,318 +2,192 @@ package dev.redplate.workout
 
 import dev.redplate.data.MuscleGroup
 
-// ── Volume state ─────────────────────────────────────────────────────────────
+/**
+ * Body-map geometry, traced from the calibration sheet in the revamp handoff
+ * (`project/assets/_paths.json`) and used verbatim.
+ *
+ * The figure itself is the artwork — `body_front_cut.png` / `body_back_cut.png`, the same
+ * files the design used. The app paints translucent volume tints and hit shapes *on top*,
+ * so nothing needs recolouring and the drawing stays the drawing.
+ *
+ * All paths are in the design's own coordinate space: viewBox 0 0 230 520.
+ */
 
+/** Width of the coordinate space every [BodyRegion] path is expressed in. */
+const val BODY_MAP_VIEWPORT_WIDTH = 230f
+
+/** Height of that coordinate space. */
+const val BODY_MAP_VIEWPORT_HEIGHT = 520f
+
+/**
+ * One traced region. Bilateral muscles appear twice — once per side — and both carry the
+ * same [muscle], so tapping either arm opens the same sheet. MuscleGroup has no left/right
+ * variant and does not need one.
+ */
+data class BodyRegion(
+    val muscle: MuscleGroup,
+    val label: String,
+    /** SVG path data in the 230×520 viewport. */
+    val pathData: String,
+)
+
+/** How a region is shaded: what the week's volume has done to it. */
 enum class VolumeLevel { NONE, BELOW_MEV, MEV_TO_MAV, APPROACHING_MRV, AT_MRV, PICKED }
 
-// ── Shape / zone types ───────────────────────────────────────────────────────
-
-/**
- * A rounded-rectangle muscle shape from the SVG.
- * All coordinates are in the SVG viewBox space (0 0 280 560).
- */
-data class VisualShape(
-    val muscle: MuscleGroup,
-    val left: Float,
-    val top: Float,
-    val right: Float,
-    val bottom: Float,
-    val cornerRadius: Float,
-) {
-    val centerX get() = (left + right) / 2f
-    val centerY get() = (top + bottom) / 2f
-}
-
-/** What happens when the user taps a hit zone. */
-sealed interface HitBehavior {
-    /** Routes directly to a single muscle's exercise sheet. */
-    data class Direct(val muscle: MuscleGroup) : HitBehavior
-
-    /**
-     * Opens an anchored chip-popover with [muscles] choices.
-     * Used for two-stage clusters and fuzzy trigger bands.
-     */
-    data class Cluster(val muscles: List<MuscleGroup>) : HitBehavior
-}
-
-/**
- * An interactable padded rectangle on the body map.
- * All coordinates in SVG viewBox space (280 × 560).
- * Zones are stored in priority order; the first zone whose rect contains
- * the touch point wins.
- */
-data class HitZone(
-    val left: Float,
-    val top: Float,
-    val right: Float,
-    val bottom: Float,
-    val behavior: HitBehavior,
-) {
-    fun contains(x: Float, y: Float) = x >= left && x <= right && y >= top && y <= bottom
-}
-
-// ── Private builder helpers ───────────────────────────────────────────────────
-
-private fun vs(m: MuscleGroup, l: Float, t: Float, r: Float, b: Float, cr: Float) =
-    VisualShape(m, l, t, r, b, cr)
-
-private fun direct(l: Float, t: Float, r: Float, b: Float, m: MuscleGroup) =
-    HitZone(l, t, r, b, HitBehavior.Direct(m))
-
-private fun cluster(l: Float, t: Float, r: Float, b: Float, vararg ms: MuscleGroup) =
-    HitZone(l, t, r, b, HitBehavior.Cluster(ms.toList()))
-
-// ── FRONT VIEW ───────────────────────────────────────────────────────────────
-//
-// SVG paths decoded from Body_Map_Front.svg (viewBox 280 × 560).
-// Bilateral muscles produce two shapes (left and right side).
-
-/**
- * Visual shapes for the front-body map, drawn in SVG layer order.
- * Bilateral muscles (BICEPS, FOREARMS, etc.) appear twice.
- */
-val frontVisuals: List<VisualShape> = listOf(
-    vs(MuscleGroup.NECK,        124f,  72f, 156f,  94f,  6f),
-    // Front delts — bilateral
-    vs(MuscleGroup.FRONT_DELTS,  44f,  98f,  88f, 138f, 16f),
-    vs(MuscleGroup.FRONT_DELTS, 192f,  98f, 236f, 138f, 16f),
-    // Side delts — bilateral (front view)
-    vs(MuscleGroup.SIDE_DELTS,   20f, 110f,  56f, 156f, 14f),
-    vs(MuscleGroup.SIDE_DELTS,  224f, 110f, 260f, 156f, 14f),
-    vs(MuscleGroup.CHEST,        96f, 100f, 184f, 164f, 12f),
-    // Biceps — bilateral
-    vs(MuscleGroup.BICEPS,       30f, 150f,  74f, 220f, 14f),
-    vs(MuscleGroup.BICEPS,      206f, 150f, 250f, 220f, 14f),
-    // Forearms — bilateral
-    vs(MuscleGroup.FOREARMS,     28f, 224f,  68f, 308f, 12f),
-    vs(MuscleGroup.FOREARMS,    212f, 224f, 252f, 308f, 12f),
-    vs(MuscleGroup.ABS,         108f, 168f, 172f, 256f, 10f),
-    // Obliques — bilateral (visual only — no direct hit zone; TalkBack action only)
-    vs(MuscleGroup.OBLIQUES,     90f, 172f, 106f, 254f,  6f),
-    vs(MuscleGroup.OBLIQUES,    174f, 172f, 190f, 254f,  6f),
-    // Quads — bilateral
-    vs(MuscleGroup.QUADS,        70f, 314f, 122f, 432f, 18f),
-    vs(MuscleGroup.QUADS,       158f, 314f, 210f, 432f, 18f),
-    vs(MuscleGroup.ADDUCTORS,   122f, 320f, 158f, 428f, 14f),
-    // Calves — bilateral
-    vs(MuscleGroup.CALVES,       84f, 440f, 136f, 546f, 18f),
-    vs(MuscleGroup.CALVES,      144f, 440f, 196f, 546f, 18f),
+/** Front view: traps, shoulders, chest, biceps, abs, quads. */
+val frontRegions: List<BodyRegion> = listOf(
+    BodyRegion(
+        muscle = MuscleGroup.TRAPS,
+        label = "Traps",
+        pathData = "M88.6 96.4 L88.1 97.5 L88.1 98.0 L83.1 104.7 L82.0 105.2 L68.1 111.9 L67.6 112.4 L79.2 118.5 L81.4 119.1 L96.4 122.4 L96.9 122.4 L96.9 119.1 L96.9 118.5 L94.7 112.4 L94.2 111.9 L92.0 105.2 L92.0 104.7 L89.7 98.0 L89.7 97.5 L89.2 96.4 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.TRAPS,
+        label = "Traps",
+        pathData = "M119.1 95.8 L118.0 97.5 L118.0 98.0 L115.8 104.7 L115.2 105.2 L113.5 111.9 L113.0 112.4 L110.8 118.5 L110.2 119.1 L110.2 123.0 L110.2 123.0 L126.3 119.1 L130.2 118.5 L140.1 112.4 L139.0 111.9 L126.3 105.2 L125.2 104.7 L119.6 98.0 L119.6 97.5 L119.1 95.8 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.SIDE_DELTS,
+        label = "Shoulders",
+        pathData = "M51.0 118.5 L48.2 119.1 L38.2 125.7 L38.8 126.3 L33.2 132.9 L32.1 139.6 L32.1 140.1 L31.6 146.8 L31.6 147.3 L32.1 154.0 L34.3 160.6 L33.8 161.2 L35.5 161.2 L36.0 160.6 L42.6 154.0 L49.9 147.3 L50.4 146.8 L54.3 140.1 L54.3 139.6 L58.7 132.9 L63.7 126.3 L64.3 125.7 L61.5 119.1 L59.3 118.5 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.SIDE_DELTS,
+        label = "Shoulders",
+        pathData = "M151.2 118.0 L147.9 118.5 L146.2 119.1 L142.9 125.7 L143.5 126.3 L149.0 132.9 L152.3 139.6 L152.9 140.1 L157.3 146.8 L157.9 147.3 L164.5 154.0 L171.7 160.6 L172.3 161.2 L173.4 161.2 L173.4 160.6 L175.6 154.0 L176.1 147.3 L176.1 146.8 L175.6 140.1 L175.6 139.6 L173.4 132.9 L168.9 126.3 L168.9 125.7 L159.0 119.1 L157.3 118.5 L154.5 118.0 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.CHEST,
+        label = "Chest",
+        pathData = "M70.9 124.6 L69.8 125.7 L69.2 126.3 L62.6 132.9 L58.7 139.6 L58.2 140.1 L54.8 146.8 L54.8 147.3 L57.0 154.0 L60.4 160.6 L60.9 161.2 L68.1 167.8 L68.7 168.4 L71.5 170.0 L83.1 170.0 L87.0 168.4 L88.6 167.8 L98.6 161.2 L98.6 160.6 L99.7 154.0 L99.7 147.3 L99.7 146.8 L99.7 140.1 L99.7 139.6 L97.5 132.9 L88.1 126.3 L85.8 125.7 L79.2 124.6 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.CHEST,
+        label = "Chest",
+        pathData = "M129.6 124.6 L122.4 125.7 L120.8 126.3 L109.7 132.9 L107.5 139.6 L107.5 140.1 L107.5 146.8 L107.5 147.3 L107.5 154.0 L108.6 160.6 L108.6 161.2 L118.0 167.8 L119.1 168.4 L124.6 170.0 L136.3 170.0 L137.9 168.4 L139.0 167.8 L147.3 161.2 L147.9 160.6 L151.2 154.0 L152.9 147.3 L152.9 146.8 L149.6 140.1 L149.0 139.6 L144.6 132.9 L138.5 126.3 L137.9 125.7 L136.3 124.6 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.BICEPS,
+        label = "Biceps",
+        pathData = "M51.5 151.8 L48.2 154.0 L40.4 160.6 L39.9 161.2 L36.0 167.8 L35.5 168.4 L33.8 174.5 L33.2 175.0 L32.1 181.7 L32.1 182.2 L31.0 188.9 L31.0 189.4 L31.6 195.5 L31.6 196.1 L32.7 202.7 L33.2 203.3 L33.8 204.9 L33.8 204.9 L36.0 203.3 L36.6 202.7 L43.2 196.1 L44.3 195.5 L47.6 189.4 L48.2 188.9 L50.4 182.2 L50.4 181.7 L52.1 175.0 L52.1 174.5 L53.2 168.4 L53.2 167.8 L53.2 161.2 L53.2 160.6 L52.6 154.0 L51.5 151.8 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.BICEPS,
+        label = "Biceps",
+        pathData = "M155.6 152.3 L155.6 154.0 L154.0 160.6 L154.0 161.2 L154.5 167.8 L154.5 168.4 L155.1 174.5 L155.6 175.0 L157.3 181.7 L157.3 182.2 L159.5 188.9 L160.1 189.4 L163.4 195.5 L163.9 196.1 L170.6 202.7 L171.2 203.3 L173.9 205.5 L174.5 205.5 L175.6 203.3 L175.6 202.7 L176.1 196.1 L176.1 195.5 L176.1 189.4 L176.1 188.9 L175.6 182.2 L175.6 181.7 L174.5 175.0 L174.5 174.5 L172.3 168.4 L171.7 167.8 L167.8 161.2 L167.3 160.6 L159.0 154.0 L157.3 152.3 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.ABS,
+        label = "Abs",
+        pathData = "M95.8 171.2 L89.2 174.5 L88.6 175.0 L83.6 181.7 L83.1 182.2 L92.5 188.9 L92.0 189.4 L84.2 195.5 L83.6 196.1 L88.1 224.3 L85.8 231.0 L87.5 237.6 L87.5 238.2 L89.2 244.8 L89.7 245.4 L91.4 251.5 L92.0 252.0 L93.6 258.7 L94.2 259.2 L97.5 265.9 L98.0 266.4 L99.7 267.5 L100.8 267.5 L100.8 266.4 L100.8 265.9 L100.8 259.2 L100.8 258.7 L100.8 252.0 L100.8 251.5 L100.8 245.4 L100.8 244.8 L100.8 238.2 L100.8 237.6 L100.3 231.0 L89.2 224.3 L100.3 196.1 L100.3 195.5 L100.3 189.4 L99.7 188.9 L96.9 182.2 L97.5 181.7 L100.3 175.0 L100.3 174.5 L96.4 171.2 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.ABS,
+        label = "Abs",
+        pathData = "M108.0 171.2 L106.9 174.5 L106.9 175.0 L109.1 181.7 L110.2 182.2 L107.5 188.9 L107.5 189.4 L106.3 195.5 L106.9 196.1 L118.5 224.3 L107.5 231.0 L106.3 237.6 L106.3 238.2 L106.3 244.8 L106.3 245.4 L106.3 251.5 L106.3 252.0 L106.9 258.7 L106.9 259.2 L106.9 265.9 L106.9 266.4 L106.9 267.5 L108.6 267.5 L109.7 266.4 L110.2 265.9 L113.0 259.2 L113.0 258.7 L115.8 252.0 L115.8 251.5 L118.0 245.4 L118.0 244.8 L120.2 238.2 L120.2 237.6 L121.9 231.0 L120.2 224.3 L124.1 196.1 L124.1 195.5 L115.8 189.4 L114.1 188.9 L124.6 182.2 L124.1 181.7 L119.1 175.0 L118.0 174.5 L111.3 171.2 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.QUADS,
+        label = "Quads",
+        pathData = "M70.3 260.9 L68.7 265.9 L68.1 266.4 L65.4 272.5 L65.4 273.1 L62.0 279.7 L61.5 280.3 L58.7 286.9 L55.9 293.6 L55.4 294.1 L53.2 300.8 L53.2 301.3 L52.1 308.0 L51.5 314.6 L51.5 315.2 L51.5 321.8 L51.5 322.4 L52.6 328.5 L52.6 329.0 L53.7 335.7 L53.7 336.2 L55.4 342.9 L55.9 343.4 L58.2 349.5 L58.7 350.1 L77.0 356.7 L77.5 357.3 L80.9 360.6 L82.0 360.6 L86.4 357.3 L87.0 356.7 L90.3 350.1 L90.3 349.5 L91.4 343.4 L91.4 342.9 L90.8 336.2 L90.8 335.7 L89.7 329.0 L89.7 328.5 L88.1 322.4 L88.1 321.8 L86.4 315.2 L85.8 314.6 L83.6 308.0 L82.5 301.3 L82.0 300.8 L79.2 294.1 L79.2 293.6 L77.0 286.9 L74.8 280.3 L74.8 279.7 L73.1 273.1 L72.6 272.5 L71.5 266.4 L71.5 265.9 L70.3 260.9 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.QUADS,
+        label = "Quads",
+        pathData = "M136.3 259.2 L135.2 265.9 L135.2 266.4 L134.0 272.5 L134.0 273.1 L133.5 279.7 L132.9 280.3 L130.7 286.9 L128.0 293.6 L128.0 294.1 L125.2 300.8 L125.2 301.3 L123.5 308.0 L121.3 314.6 L120.8 315.2 L119.1 321.8 L119.1 322.4 L116.9 328.5 L117.4 329.0 L116.3 335.7 L116.3 336.2 L116.9 342.9 L116.9 343.4 L117.4 349.5 L117.4 350.1 L120.8 356.7 L120.8 357.3 L126.8 360.6 L126.8 360.6 L130.2 357.3 L130.2 356.7 L149.0 350.1 L149.0 349.5 L151.8 343.4 L151.8 342.9 L154.0 336.2 L154.0 335.7 L154.5 329.0 L155.1 328.5 L155.6 322.4 L155.6 321.8 L155.6 315.2 L155.6 314.6 L155.1 308.0 L154.0 301.3 L154.0 300.8 L152.3 294.1 L151.8 293.6 L149.0 286.9 L145.7 280.3 L146.2 279.7 L142.3 273.1 L141.8 272.5 L139.6 266.4 L139.0 265.9 L136.3 259.2 Z",
+    ),
 )
 
-/**
- * Hit zones for the front-body map, in priority order (first match wins).
- *
- * Strategy per SCREENS.md:
- *  [0]   NECK  — padded upward to canvas top, widened to 64 SVG units.
- *  [1–2] {FRONT_DELTS, SIDE_DELTS} delt clusters — bilateral; first tap → 2-chip popover.
- *  [3–4] QUADS/ADDUCTORS inner-edge clusters — inner 20 SVG of each QUADS visual toward
- *        the body midline; taps there → "Quads / Adductors" 2-chip popover.
- *  [5–]  Individual direct zones: CHEST, BICEPS, FOREARMS, ABS, QUADS outer, CALVES.
- *        OBLIQUES has no hit zone (16dp wide, blocked on all sides; TalkBack only).
- */
-val frontHitZones: List<HitZone> = listOf(
-    // ── [0] NECK ─────────────────────────────────────────────────────────────
-    // Visual (124, 72, 156, 94) → padded: top to canvas edge, width to 64 SVG.
-    direct(108f,   0f, 172f,  94f, MuscleGroup.NECK),
-
-    // ── [1–2] Front / Side delt clusters ─────────────────────────────────────
-    // Combined bounding box of FRONT_DELTS (44–88) + SIDE_DELTS (20–56) on each side.
-    // Neither region independently reaches 64dp in both axes at the relevant scale;
-    // the combined zone opens a 2-chip popover on first tap.
-    cluster( 20f,  98f,  88f, 156f, MuscleGroup.FRONT_DELTS, MuscleGroup.SIDE_DELTS),
-    cluster(192f,  98f, 260f, 156f, MuscleGroup.FRONT_DELTS, MuscleGroup.SIDE_DELTS),
-
-    // ── [3–4] Quads / Adductors midline clusters ──────────────────────────────
-    // QUADS L inner edge = x 122; QUADS R inner edge = x 158; body midline = 140.
-    // Inner 20 SVG (~27dp at 384dp canvas) from each visual inner edge → popover.
-    // Outer zones below handle the remaining QUADS area as Direct.
-    cluster(102f, 314f, 122f, 432f, MuscleGroup.QUADS, MuscleGroup.ADDUCTORS),
-    cluster(158f, 314f, 178f, 432f, MuscleGroup.QUADS, MuscleGroup.ADDUCTORS),
-
-    // ── [5–] Direct zones ─────────────────────────────────────────────────────
-    // CHEST — passes natively (88×64 SVG); small buffer added.
-    direct( 92f,  96f, 188f, 168f, MuscleGroup.CHEST),
-    // BICEPS — padded laterally toward canvas edge (L→x=0, R→x=280).
-    direct(  0f, 150f,  74f, 220f, MuscleGroup.BICEPS),
-    direct(206f, 150f, 280f, 220f, MuscleGroup.BICEPS),
-    // FOREARMS — padded laterally toward canvas edge.
-    direct(  0f, 224f,  68f, 308f, MuscleGroup.FOREARMS),
-    direct(212f, 224f, 280f, 308f, MuscleGroup.FOREARMS),
-    // ABS — passes natively (64×88 SVG); small buffer added.
-    direct(104f, 164f, 176f, 260f, MuscleGroup.ABS),
-    // QUADS outer zones — padded away from midline; inner zones handled above.
-    direct(  0f, 314f, 102f, 432f, MuscleGroup.QUADS),   // left outer  (x=0 → 122−20)
-    direct(178f, 314f, 280f, 432f, MuscleGroup.QUADS),   // right outer (x=158+20 → 280)
-    // CALVES — padded outward away from midline.
-    direct(  0f, 440f, 136f, 546f, MuscleGroup.CALVES),
-    direct(144f, 440f, 280f, 546f, MuscleGroup.CALVES),
+/** Back view: traps, upper back, triceps, lats, lower back, glutes, hamstrings, calves. */
+val backRegions: List<BodyRegion> = listOf(
+    BodyRegion(
+        muscle = MuscleGroup.TRAPS,
+        label = "Traps",
+        pathData = "M103.6 81.4 L101.4 83.6 L101.4 84.2 L99.7 90.8 L99.7 91.4 L95.8 97.5 L95.3 98.0 L87.5 104.7 L86.4 105.2 L73.7 111.9 L72.6 112.4 L74.8 118.5 L74.8 119.1 L89.2 125.7 L90.8 126.3 L99.2 132.9 L105.2 139.0 L105.2 139.0 L105.2 132.9 L103.6 126.3 L103.6 125.7 L100.8 119.1 L100.3 118.5 L98.6 112.4 L98.6 111.9 L100.8 105.2 L101.4 104.7 L103.6 98.0 L104.1 97.5 L105.2 91.4 L105.2 90.8 L105.2 84.2 L105.2 83.6 L103.6 81.4 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.TRAPS,
+        label = "Traps",
+        pathData = "M116.3 82.0 L115.2 83.6 L115.2 84.2 L115.2 90.8 L115.2 91.4 L116.3 97.5 L116.3 98.0 L119.1 104.7 L119.6 105.2 L121.3 111.9 L121.3 112.4 L120.2 118.5 L119.6 119.1 L116.3 125.7 L116.3 126.3 L115.2 132.9 L114.7 139.0 L115.2 139.0 L120.2 132.9 L129.1 126.3 L130.7 125.7 L143.5 119.1 L144.6 118.5 L147.3 112.4 L146.2 111.9 L134.6 105.2 L133.5 104.7 L124.6 98.0 L124.1 97.5 L120.8 91.4 L120.2 90.8 L118.5 84.2 L118.5 83.6 L117.4 82.0 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.UPPER_BACK,
+        label = "Upper back",
+        pathData = "M90.3 131.3 L90.3 132.9 L90.8 139.6 L90.8 140.1 L90.8 146.8 L90.8 147.3 L91.4 154.0 L93.0 160.6 L93.0 161.2 L96.9 167.8 L97.5 168.4 L100.8 174.5 L101.4 175.0 L104.7 181.7 L105.8 181.7 L105.8 175.0 L105.8 174.5 L105.8 168.4 L105.8 167.8 L105.8 161.2 L106.3 160.6 L105.8 154.0 L105.8 147.3 L105.8 146.8 L100.3 140.1 L99.7 139.6 L93.0 132.9 L90.3 131.3 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.UPPER_BACK,
+        label = "Upper back",
+        pathData = "M129.6 131.3 L127.4 132.9 L120.2 139.6 L120.2 140.1 L114.7 146.8 L114.1 147.3 L114.1 154.0 L114.1 160.6 L114.1 161.2 L114.1 167.8 L114.1 168.4 L114.1 174.5 L114.1 175.0 L114.7 181.7 L115.2 181.7 L119.1 175.0 L119.6 174.5 L122.4 168.4 L122.4 167.8 L126.8 161.2 L127.4 160.6 L128.5 154.0 L129.1 147.3 L129.1 146.8 L129.1 140.1 L129.1 139.6 L130.2 132.9 L130.2 131.3 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.TRICEPS,
+        label = "Triceps",
+        pathData = "M52.6 147.9 L42.6 154.0 L36.6 160.6 L36.0 161.2 L33.2 167.8 L32.7 168.4 L31.6 174.5 L31.6 175.0 L30.5 181.7 L30.5 182.2 L30.5 188.9 L30.5 189.4 L30.5 195.5 L31.0 196.1 L31.0 196.1 L31.6 195.5 L31.6 189.4 L31.6 188.9 L53.7 182.2 L54.3 181.7 L56.5 175.0 L57.0 174.5 L56.5 168.4 L56.5 167.8 L55.4 161.2 L55.4 160.6 L54.3 154.0 L53.2 147.9 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.TRICEPS,
+        label = "Triceps",
+        pathData = "M168.4 147.9 L165.6 154.0 L165.1 160.6 L165.1 161.2 L163.9 167.8 L163.9 168.4 L163.9 174.5 L163.9 175.0 L166.2 181.7 L166.7 182.2 L173.4 188.9 L188.3 189.4 L188.9 195.5 L188.9 196.1 L188.9 197.7 L189.4 197.7 L190.0 196.1 L190.0 195.5 L190.5 189.4 L190.5 188.9 L190.0 182.2 L189.4 181.7 L188.9 175.0 L188.9 174.5 L187.8 168.4 L187.2 167.8 L184.4 161.2 L184.4 160.6 L178.3 154.0 L168.4 147.9 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.LATS,
+        label = "Lats",
+        pathData = "M59.8 161.7 L60.4 167.8 L59.8 168.4 L62.6 174.5 L62.6 175.0 L64.8 181.7 L64.8 182.2 L67.0 188.9 L67.0 189.4 L69.8 195.5 L69.8 196.1 L73.1 202.7 L73.7 203.3 L77.0 209.9 L80.9 216.6 L81.4 217.1 L85.3 223.8 L85.8 224.3 L85.8 224.9 L87.0 224.9 L87.5 224.3 L87.5 223.8 L89.2 217.1 L89.2 216.6 L93.6 209.9 L98.0 203.3 L98.6 202.7 L100.8 196.1 L101.4 195.5 L102.5 189.4 L102.5 188.9 L100.8 182.2 L100.3 181.7 L96.4 175.0 L95.8 174.5 L92.5 168.4 L92.5 167.8 L89.2 161.7 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.LATS,
+        label = "Lats",
+        pathData = "M159.5 161.7 L128.0 167.8 L128.0 168.4 L124.6 174.5 L124.6 175.0 L120.2 181.7 L120.2 182.2 L118.0 188.9 L118.0 189.4 L118.5 195.5 L119.1 196.1 L122.4 202.7 L122.4 203.3 L126.8 209.9 L130.7 216.6 L131.3 217.1 L133.5 223.8 L133.5 224.3 L133.5 224.9 L133.5 224.9 L134.0 224.3 L133.5 223.8 L138.5 217.1 L139.0 216.6 L142.9 209.9 L146.8 203.3 L147.3 202.7 L150.1 196.1 L150.7 195.5 L152.9 189.4 L152.9 188.9 L155.1 182.2 L155.6 181.7 L157.3 175.0 L157.3 174.5 L159.0 168.4 L159.0 167.8 L160.1 161.7 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.LOWER_BACK,
+        label = "Lower back",
+        pathData = "M104.7 201.6 L103.0 202.7 L103.0 203.3 L99.7 209.9 L94.7 216.6 L94.7 217.1 L92.0 223.8 L92.0 224.3 L89.2 231.0 L95.8 237.6 L96.9 238.2 L104.1 244.8 L104.7 245.4 L108.6 251.5 L108.6 252.0 L110.8 254.2 L110.8 254.2 L111.3 252.0 L111.9 251.5 L116.3 245.4 L116.9 244.8 L124.1 238.2 L124.6 237.6 L131.3 231.0 L129.6 224.3 L129.6 223.8 L127.4 217.1 L126.8 216.6 L121.3 209.9 L116.3 203.3 L116.3 202.7 L115.2 201.6 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.GLUTES,
+        label = "Glutes",
+        pathData = "M78.7 236.0 L72.6 237.6 L72.6 238.2 L68.7 244.8 L68.7 245.4 L67.6 251.5 L67.6 252.0 L68.7 258.7 L68.7 259.2 L69.8 265.9 L69.8 266.4 L69.8 272.5 L69.8 273.1 L70.3 279.7 L70.3 280.3 L72.6 286.9 L81.4 293.6 L80.9 294.1 L92.0 294.7 L93.0 294.7 L93.0 294.1 L94.2 293.6 L105.2 286.9 L107.5 280.3 L108.0 279.7 L108.0 273.1 L108.0 272.5 L108.0 266.4 L108.0 265.9 L106.9 259.2 L106.9 258.7 L103.6 252.0 L103.0 251.5 L98.6 245.4 L98.0 244.8 L89.7 238.2 L88.6 237.6 L84.2 236.0 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.GLUTES,
+        label = "Glutes",
+        pathData = "M141.2 236.0 L133.5 237.6 L130.7 238.2 L121.9 244.8 L121.3 245.4 L116.9 251.5 L116.3 252.0 L113.0 258.7 L113.0 259.2 L111.9 265.9 L111.9 266.4 L111.9 272.5 L111.9 273.1 L112.4 279.7 L112.4 280.3 L114.7 286.9 L125.2 293.6 L128.0 294.1 L131.8 295.2 L135.7 295.2 L137.4 294.1 L139.0 293.6 L147.3 286.9 L149.6 280.3 L149.6 279.7 L150.7 273.1 L150.7 272.5 L150.1 266.4 L150.1 265.9 L151.2 259.2 L151.8 258.7 L152.9 252.0 L152.9 251.5 L151.8 245.4 L151.8 244.8 L147.3 238.2 L146.2 237.6 L142.9 236.0 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.HAMSTRINGS,
+        label = "Hamstrings",
+        pathData = "M85.3 296.9 L77.0 300.8 L76.4 301.3 L71.5 308.0 L69.2 314.6 L68.7 315.2 L67.0 321.8 L67.0 322.4 L65.9 328.5 L65.9 329.0 L64.8 335.7 L64.8 336.2 L64.8 342.9 L64.8 343.4 L64.8 349.5 L64.8 350.1 L64.8 356.7 L64.8 357.3 L64.8 363.9 L64.8 370.6 L64.8 371.1 L88.1 377.8 L88.6 378.3 L89.2 380.0 L89.7 380.0 L91.4 378.3 L92.0 377.8 L93.0 371.1 L93.0 370.6 L94.7 363.9 L95.3 357.3 L95.8 356.7 L95.8 350.1 L95.8 349.5 L96.4 343.4 L96.4 342.9 L97.5 336.2 L97.5 335.7 L96.4 329.0 L96.4 328.5 L96.9 322.4 L96.9 321.8 L95.8 315.2 L95.8 314.6 L93.6 308.0 L92.0 301.3 L92.0 300.8 L89.7 296.9 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.HAMSTRINGS,
+        label = "Hamstrings",
+        pathData = "M130.2 296.9 L128.5 300.8 L126.8 301.3 L126.8 308.0 L124.1 314.6 L124.1 315.2 L124.1 321.8 L124.1 322.4 L123.5 328.5 L123.5 329.0 L124.1 335.7 L124.1 336.2 L123.5 342.9 L124.1 343.4 L124.6 349.5 L125.2 350.1 L125.7 356.7 L125.7 357.3 L125.7 363.9 L127.4 370.6 L127.4 371.1 L129.1 377.8 L129.6 378.3 L129.6 382.2 L129.6 382.2 L132.4 378.3 L132.4 377.8 L134.6 371.1 L134.6 370.6 L155.1 363.9 L155.1 357.3 L155.1 356.7 L155.1 350.1 L155.1 349.5 L155.1 343.4 L155.1 342.9 L154.5 336.2 L154.5 335.7 L154.0 329.0 L153.4 328.5 L152.9 322.4 L152.9 321.8 L151.2 315.2 L151.2 314.6 L149.0 308.0 L144.0 301.3 L143.5 300.8 L131.3 296.9 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.CALVES,
+        label = "Calves",
+        pathData = "M76.4 357.3 L73.7 363.9 L69.8 370.6 L69.2 371.1 L65.9 377.8 L65.4 378.3 L62.6 385.0 L60.9 391.6 L60.9 392.2 L59.8 398.8 L59.8 399.4 L58.7 405.5 L58.7 406.0 L59.3 412.7 L59.3 413.2 L60.4 419.9 L60.4 420.4 L62.0 426.5 L63.1 427.1 L65.9 433.7 L66.5 434.3 L68.7 440.9 L70.3 447.5 L70.3 448.1 L72.0 454.8 L72.0 455.3 L73.1 462.0 L73.1 468.6 L73.1 469.2 L73.7 475.8 L74.8 476.4 L77.5 480.8 L77.5 480.8 L78.7 476.4 L78.7 475.8 L79.2 469.2 L79.2 468.6 L79.2 462.0 L80.3 455.3 L80.3 454.8 L82.0 448.1 L82.5 447.5 L84.2 440.9 L86.4 434.3 L86.4 433.7 L89.2 427.1 L89.2 426.5 L90.8 420.4 L90.8 419.9 L92.0 413.2 L92.0 412.7 L92.0 406.0 L92.0 405.5 L91.4 399.4 L91.4 398.8 L89.7 392.2 L89.7 391.6 L87.5 385.0 L84.8 378.3 L84.8 377.8 L81.4 371.1 L80.9 370.6 L78.7 363.9 L77.0 357.3 Z",
+    ),
+    BodyRegion(
+        muscle = MuscleGroup.CALVES,
+        label = "Calves",
+        pathData = "M142.9 357.3 L140.7 363.9 L137.9 370.6 L137.4 371.1 L135.2 377.8 L135.2 378.3 L131.8 385.0 L130.2 391.6 L130.2 392.2 L129.1 398.8 L129.1 399.4 L128.0 405.5 L128.0 406.0 L128.0 412.7 L128.0 413.2 L129.1 419.9 L129.1 420.4 L131.3 426.5 L131.3 427.1 L133.5 433.7 L133.5 434.3 L136.3 440.9 L137.9 447.5 L137.9 448.1 L139.6 454.8 L139.6 455.3 L140.7 462.0 L141.8 468.6 L141.8 469.2 L141.8 475.8 L141.8 476.4 L141.8 481.3 L144.0 481.3 L145.1 476.4 L145.1 475.8 L145.7 469.2 L145.7 468.6 L146.8 462.0 L147.9 455.3 L148.4 454.8 L149.6 448.1 L149.6 447.5 L151.2 440.9 L153.4 434.3 L155.1 433.7 L157.3 427.1 L157.9 426.5 L159.5 420.4 L159.5 419.9 L160.6 413.2 L161.2 412.7 L161.2 406.0 L161.2 405.5 L160.6 399.4 L160.6 398.8 L159.0 392.2 L159.0 391.6 L157.3 385.0 L154.5 378.3 L154.5 377.8 L150.7 371.1 L150.1 370.6 L146.2 363.9 L142.9 357.3 Z",
+    ),
 )
 
-// ── BACK VIEW ────────────────────────────────────────────────────────────────
-//
-// SVG paths decoded from Body_Map_Back.svg (viewBox 280 × 560).
+/** Every muscle the map can reach, front and back. */
+val bodyMapMuscles: List<MuscleGroup> =
+    (frontRegions + backRegions).map { it.muscle }.distinct()
 
-val backVisuals: List<VisualShape> = listOf(
-    vs(MuscleGroup.NECK,        124f,  72f, 156f,  94f,  6f),
-    vs(MuscleGroup.TRAPS,       104f,  88f, 176f, 118f,  8f),
-    // Rear delts — bilateral
-    vs(MuscleGroup.REAR_DELTS,   40f, 100f,  84f, 140f, 16f),
-    vs(MuscleGroup.REAR_DELTS,  196f, 100f, 240f, 140f, 16f),
-    // Side delts — bilateral (back view)
-    vs(MuscleGroup.SIDE_DELTS,   20f, 112f,  54f, 158f, 14f),
-    vs(MuscleGroup.SIDE_DELTS,  226f, 112f, 260f, 158f, 14f),
-    vs(MuscleGroup.UPPER_BACK,   92f, 120f, 188f, 156f, 10f),
-    // Lats — bilateral
-    vs(MuscleGroup.LATS,         76f, 158f, 128f, 224f, 12f),
-    vs(MuscleGroup.LATS,        152f, 158f, 204f, 224f, 12f),
-    vs(MuscleGroup.LOWER_BACK,   98f, 226f, 182f, 262f,  8f),
-    // Triceps — bilateral
-    vs(MuscleGroup.TRICEPS,      30f, 150f,  76f, 222f, 14f),
-    vs(MuscleGroup.TRICEPS,     204f, 150f, 250f, 222f, 14f),
-    // Forearms — bilateral
-    vs(MuscleGroup.FOREARMS,     28f, 224f,  68f, 308f, 12f),
-    vs(MuscleGroup.FOREARMS,    212f, 224f, 252f, 308f, 12f),
-    vs(MuscleGroup.GLUTES,       88f, 264f, 192f, 324f, 18f),
-    // Hamstrings — bilateral
-    vs(MuscleGroup.HAMSTRINGS,   80f, 328f, 140f, 432f, 18f),
-    vs(MuscleGroup.HAMSTRINGS,  142f, 328f, 202f, 432f, 18f),
-    // Calves — bilateral
-    vs(MuscleGroup.CALVES,       84f, 442f, 136f, 546f, 18f),
-    vs(MuscleGroup.CALVES,      144f, 442f, 196f, 546f, 18f),
-)
-
-/**
- * Hit zones for the back-body map, in priority order (first match wins).
- *
- *  [0]   NECK — same padding strategy as front; highest precedence.
- *  [1]   TRAPS — padded upward to canvas top. NECK zone [0] is checked first,
- *        so taps in the overlapping area (x=108–172, y=0–94) go to NECK, not TRAPS.
- *        Priority-order resolution: NECK wins for its padded zone; TRAPS wins elsewhere.
- *  [2–3] {REAR_DELTS, SIDE_DELTS} delt clusters — bilateral.
- *  [4]   UPPER_BACK fuzzy trigger band — the entire 36px-tall visible strip sits at
- *        2dp from TRAPS below and 2dp from LATS above; any tap is genuinely ambiguous
- *        at real thumb width. Zone always shows a 3-chip popover {TRAPS, UPPER_BACK, LATS}.
- *  [5]   LOWER_BACK fuzzy band — 2dp from GLUTES below; 2-chip popover {LOWER_BACK, GLUTES}.
- *  [6]   GLUTES seam zone — top 20 SVG of GLUTES visual, same 2-chip popover.
- *  [7–]  Individual direct zones: LATS (padded inward to spine midline), TRICEPS,
- *        FOREARMS, GLUTES main, HAMSTRINGS (padded outward), CALVES.
- */
-val backHitZones: List<HitZone> = listOf(
-    // ── [0] NECK ─────────────────────────────────────────────────────────────
-    direct(108f,   0f, 172f,  94f, MuscleGroup.NECK),
-
-    // ── [1] TRAPS — padded upward to canvas top ───────────────────────────────
-    // Overlaps NECK zone in (108–172, 0–94); NECK [0] wins there.
-    // TRAPS-exclusive area: lateral strips x=104–108 and 172–176 plus y=94–118 row.
-    direct(104f,   0f, 176f, 118f, MuscleGroup.TRAPS),
-
-    // ── [2–3] Rear / Side delt clusters ──────────────────────────────────────
-    // Combined bounding box of REAR_DELTS (40–84) + SIDE_DELTS (20–54) on each side.
-    cluster( 20f, 100f,  84f, 158f, MuscleGroup.REAR_DELTS, MuscleGroup.SIDE_DELTS),
-    cluster(196f, 100f, 260f, 158f, MuscleGroup.REAR_DELTS, MuscleGroup.SIDE_DELTS),
-
-    // ── [4] UPPER_BACK fuzzy trigger band ────────────────────────────────────
-    // Strip height 36 SVG (y=120–156); 2dp gap to TRAPS bottom (118) and LATS top (158).
-    // Ambiguous at every real thumb press — popover is the correct outcome, not a fallback.
-    cluster( 92f, 120f, 188f, 156f,
-        MuscleGroup.TRAPS, MuscleGroup.UPPER_BACK, MuscleGroup.LATS),
-
-    // ── [5] LOWER_BACK fuzzy band ─────────────────────────────────────────────
-    // Strip height 36 SVG (y=226–262); 2dp gap to GLUTES top (264).
-    cluster( 98f, 226f, 182f, 262f, MuscleGroup.LOWER_BACK, MuscleGroup.GLUTES),
-
-    // ── [6] GLUTES seam zone (top 20 SVG of GLUTES visual) ───────────────────
-    // y=262–284; same popover as LOWER_BACK band — thumb reaching the seam from
-    // either side sees the same disambiguation choices.
-    cluster( 88f, 262f, 192f, 284f, MuscleGroup.LOWER_BACK, MuscleGroup.GLUTES),
-
-    // ── [7–] Direct zones ─────────────────────────────────────────────────────
-    // LATS — padded inward toward the spine gap (x=128–152 → 24 SVG gap → mid x=140).
-    // L: extend right to x=140; R: extend left to x=140. Width reaches 64 SVG each.
-    direct( 76f, 158f, 140f, 224f, MuscleGroup.LATS),
-    direct(140f, 158f, 204f, 224f, MuscleGroup.LATS),
-    // TRICEPS — padded laterally toward canvas edge.
-    direct(  0f, 150f,  76f, 222f, MuscleGroup.TRICEPS),
-    direct(204f, 150f, 280f, 222f, MuscleGroup.TRICEPS),
-    // FOREARMS — padded laterally toward canvas edge.
-    direct(  0f, 224f,  68f, 308f, MuscleGroup.FOREARMS),
-    direct(212f, 224f, 280f, 308f, MuscleGroup.FOREARMS),
-    // GLUTES main body — below the seam zone (y > 284).
-    direct( 88f, 284f, 192f, 324f, MuscleGroup.GLUTES),
-    // HAMSTRINGS — padded outward (away from midline x=140).
-    direct(  0f, 328f, 140f, 432f, MuscleGroup.HAMSTRINGS),
-    direct(140f, 328f, 280f, 432f, MuscleGroup.HAMSTRINGS),
-    // CALVES — padded outward.
-    direct(  0f, 442f, 136f, 546f, MuscleGroup.CALVES),
-    direct(144f, 442f, 280f, 546f, MuscleGroup.CALVES),
-)
-
-// ── Accessibility ─────────────────────────────────────────────────────────────
-
-/**
- * Every muscle in the enum is exposed as a discrete TalkBack custom action on the map,
- * regardless of whether it has a visual hit zone (OBLIQUES) or requires a popover
- * (clusters). Screen-reader users are never routed through the two-stage flow.
- */
-val allMusclesForAccessibility: List<MuscleGroup> = MuscleGroup.entries.toList()
-
-/** Human-readable label for TalkBack announcements and popover chips. */
-val MuscleGroup.displayName: String get() = when (this) {
-    MuscleGroup.CHEST -> "Chest"
-    MuscleGroup.UPPER_BACK -> "Upper Back"
-    MuscleGroup.LATS -> "Lats"
-    MuscleGroup.LOWER_BACK -> "Lower Back"
-    MuscleGroup.FRONT_DELTS -> "Front Delts"
-    MuscleGroup.SIDE_DELTS -> "Side Delts"
-    MuscleGroup.REAR_DELTS -> "Rear Delts"
-    MuscleGroup.BICEPS -> "Biceps"
-    MuscleGroup.TRICEPS -> "Triceps"
-    MuscleGroup.FOREARMS -> "Forearms"
-    MuscleGroup.QUADS -> "Quads"
-    MuscleGroup.HAMSTRINGS -> "Hamstrings"
-    MuscleGroup.GLUTES -> "Glutes"
-    MuscleGroup.ADDUCTORS -> "Adductors"
-    MuscleGroup.CALVES -> "Calves"
-    MuscleGroup.ABS -> "Abs"
-    MuscleGroup.OBLIQUES -> "Obliques"
-    MuscleGroup.TRAPS -> "Traps"
-    MuscleGroup.NECK -> "Neck"
-}
-
-// ── Callout labels ────────────────────────────────────────────────────────────
-// Anchored floating labels that appear beside muscles on the body map.
-// anchorX/Y are in SVG viewBox coords (280×560); side = LEFT or RIGHT of body.
-
-enum class CalloutSide { LEFT, RIGHT }
-
-data class CalloutAnchor(
-    val muscle: MuscleGroup,
-    val anchorX: Float,
-    val anchorY: Float,
-    val side: CalloutSide,
-)
-
-/** Callout anchors for the front-body map. Only muscles with meaningful volume data get labels. */
-val frontCallouts: List<CalloutAnchor> = listOf(
-    CalloutAnchor(MuscleGroup.FRONT_DELTS,  66f, 118f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.CHEST,       184f, 146f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.BICEPS,       52f, 176f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.ABS,         140f, 212f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.FOREARMS,     48f, 266f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.QUADS,        96f, 373f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.CALVES,      170f, 493f, CalloutSide.RIGHT),
-)
-
-/** Callout anchors for the back-body map. */
-val backCallouts: List<CalloutAnchor> = listOf(
-    CalloutAnchor(MuscleGroup.TRAPS,       140f, 103f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.REAR_DELTS,   62f, 120f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.UPPER_BACK,  140f, 138f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.LATS,        102f, 191f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.TRICEPS,     227f, 186f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.LOWER_BACK,  140f, 244f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.GLUTES,      140f, 294f, CalloutSide.LEFT),
-    CalloutAnchor(MuscleGroup.HAMSTRINGS,  170f, 380f, CalloutSide.RIGHT),
-    CalloutAnchor(MuscleGroup.CALVES,       110f, 493f, CalloutSide.LEFT),
-)
-
+/** Everyday label for a muscle, used by the map's callouts and TalkBack. */
+val MuscleGroup.displayName: String
+    get() = when (this) {
+        MuscleGroup.UPPER_BACK -> "Upper back"
+        MuscleGroup.LOWER_BACK -> "Lower back"
+        MuscleGroup.FRONT_DELTS -> "Front delts"
+        MuscleGroup.SIDE_DELTS -> "Shoulders"
+        MuscleGroup.REAR_DELTS -> "Rear delts"
+        else -> name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercaseChar() }
+    }

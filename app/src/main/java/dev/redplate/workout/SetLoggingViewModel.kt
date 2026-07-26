@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @HiltViewModel
 class SetLoggingViewModel @Inject constructor(
@@ -94,6 +95,7 @@ class SetLoggingViewModel @Inject constructor(
                     exerciseName = ex?.name ?: "Exercise",
                     primaryMuscle = ex?.primaryMuscle ?: dev.redplate.data.MuscleGroup.CHEST,
                     imageUri = mediaResolver.startImage(exerciseId),
+                    endImageUri = mediaResolver.endImage(exerciseId),
                     supersetLabel = supersetLabel(sl?.supersetGroup),
                     // Guidance is worth opening whenever there is anything to show:
                     // stills, the muscles worked, or equipment-valid swaps. Gating it on
@@ -156,8 +158,33 @@ class SetLoggingViewModel @Inject constructor(
                     name = candidate.name,
                     equipmentLabel = repo.getPrimaryEquipment(candidate)?.displayName
                         ?: "No equipment",
+                    overlapPercent = overlapPercent(current, candidate),
+                    startImageUri = mediaResolver.startImage(candidate.id),
+                    endImageUri = mediaResolver.endImage(candidate.id),
+                    primaryMuscle = candidate.primaryMuscle,
                 )
             }
+
+    /**
+     * Share of the original's muscles a candidate also trains, as a percentage.
+     *
+     * Primary counts double: an exercise that hits the same primary muscle is a far
+     * closer substitute than one that merely shares two secondaries.
+     */
+    private fun overlapPercent(current: ExerciseEntity, candidate: ExerciseEntity): Int {
+        val wanted = buildMap {
+            put(current.primaryMuscle, PRIMARY_WEIGHT)
+            current.secondaryMuscles.forEach { put(it, SECONDARY_WEIGHT) }
+        }
+        val covered = buildSet {
+            add(candidate.primaryMuscle)
+            addAll(candidate.secondaryMuscles)
+        }
+        val total = wanted.values.sum()
+        if (total == 0.0) return 0
+        val matched = wanted.filterKeys { it in covered }.values.sum()
+        return ((matched / total) * 100).roundToInt().coerceIn(0, 100)
+    }
 
     private fun nextSlot(): TemplateSlotEntity? =
         if (slotIndex >= 0) sessionSlots.getOrNull(slotIndex + 1) else null
@@ -226,6 +253,7 @@ class SetLoggingViewModel @Inject constructor(
                         headerSubtitle = buildHeaderSubtitle(
                             setNum, ts, it.repRangeLow, it.repRangeHigh, remaining
                         ),
+                        restSubtitle = buildRestSubtitle(workingCount, remaining),
                         coachReasoningLine = buildReasoningLine(logged, previous),
                         prBadgeText = if (hasPr && lastLogged != null)
                             "Best set you've done at ${formatKg(lastLogged.loadKg)} kg."
@@ -269,28 +297,18 @@ class SetLoggingViewModel @Inject constructor(
         }
     }
 
-    // ── Rep / RIR steppers ──
+    // ── Rep stepper ──
 
     fun repsUp() = _state.update { it.copy(reps = it.reps + 1) }
     fun repsDown() = _state.update { it.copy(reps = (it.reps - 1).coerceAtLeast(0)) }
 
-    /** null (unreported) → 0 → … → MAX_RIR, then clamps; stepping down off 0 returns to unreported. */
-    fun rirUp() = _state.update {
-        it.copy(rir = when (val r = it.rir) {
-            null -> 0
-            else -> (r + 1).coerceAtMost(MAX_RIR)
-        })
-    }
-
-    fun rirDown() = _state.update {
-        it.copy(rir = when (val r = it.rir) {
-            null -> null
-            0 -> null
-            else -> r - 1
-        })
-    }
-
-    /** Set difficulty via chips (replaces RIR stepper in revamped UI). */
+    /**
+     * How hard that was, in the words the design asks the question in (8a).
+     *
+     * This is the only way RIR is entered. A numeric stepper existed alongside it and had
+     * no control on any screen — two ways to write one field, one of them unreachable, is
+     * how the two drift apart.
+     */
     fun setDifficulty(difficulty: Difficulty?) {
         _state.update {
             it.copy(
@@ -299,8 +317,6 @@ class SetLoggingViewModel @Inject constructor(
             )
         }
     }
-
-    fun toggleWarmup() = _state.update { it.copy(isWarmup = !it.isWarmup) }
 
     // ── Completing a set ──
 
@@ -441,6 +457,12 @@ class SetLoggingViewModel @Inject constructor(
         return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
     }
 
+    /** Resting, so the subtitle reports what is behind you, not what is next. */
+    private fun buildRestSubtitle(logged: Int, remaining: Int): String = when {
+        remaining > 0 -> "SET $logged LOGGED · $remaining TO GO"
+        else -> "SET $logged LOGGED · LAST ONE"
+    }
+
     private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
         val lastWorking = logged.lastOrNull { !it.isWarmup }
         return when {
@@ -478,12 +500,14 @@ class SetLoggingViewModel @Inject constructor(
         private const val DEFAULT_REP_HIGH = 12
         private const val DEFAULT_REST_SECONDS = 120
         private const val MAX_REST_SECONDS = 60 * 60
-        private const val MAX_RIR = 5
 
         /** Sub-second so the readout never sits a whole second behind the deadline. */
         private const val TICK_MILLIS = 250L
 
         /** Enough to find a free station without turning the sheet into a catalogue. */
         private const val MAX_SUBSTITUTES = 5
+
+        private const val PRIMARY_WEIGHT = 2.0
+        private const val SECONDARY_WEIGHT = 1.0
     }
 }

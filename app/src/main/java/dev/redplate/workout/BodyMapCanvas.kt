@@ -3,71 +3,51 @@ package dev.redplate.workout
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.absoluteOffset
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.redplate.R
 import dev.redplate.data.MuscleGroup
-import dev.redplate.ui.theme.PlexMono
 import dev.redplate.ui.theme.RedplateTheme
-import dev.redplate.ui.theme.RedplateType
-import kotlin.math.roundToInt
-
-private const val SVG_W = 280f
-private const val SVG_H = 560f
+import dev.redplate.ui.theme.StateColor
 
 /**
- * Interactive anatomical body map with figure background and callout labels.
+ * The body map — design 5a and 5b.
  *
- * Renders the body figure PNG (body-front-cut / body-back-cut) as background,
- * overlays translucent volume-tinted shapes per muscle, and draws floating
- * callout labels connected by leader lines — matching the HTML 5a/5b design.
+ * The artwork carries the figure; this paints the week's volume on top of it. That is the
+ * point of the screen: navigation and the per-muscle dashboard are one object, so you see
+ * what is undertrained *while* choosing what to train.
  *
- * @param isFrontView  true = front-body; false = back-body
- * @param volumeMap    current-week volume state per muscle; absent keys → NONE
- * @param pickedMuscles  muscles the user has selected for this session
- * @param onMuscleSelected  called with the resolved [MuscleGroup] on tap
+ * Shading follows 5a's legend — dashed outline when untrained, solid blue on target,
+ * hatched yellow near the cap, and a thick ink outline once picked.
  */
 @Composable
 fun BodyMapCanvas(
@@ -77,261 +57,259 @@ fun BodyMapCanvas(
     modifier: Modifier = Modifier,
     pickedMuscles: Set<MuscleGroup> = emptySet(),
 ) {
+    val regions = if (isFrontView) frontRegions else backRegions
     val colors = RedplateTheme.colors
-    val visuals = if (isFrontView) frontVisuals else backVisuals
-    val zones   = if (isFrontView) frontHitZones else backHitZones
-    val callouts = if (isFrontView) frontCallouts else backCallouts
 
-    // Actual pixel size of the Canvas — updated via onSizeChanged before any touch.
-    var canvasSize by remember { mutableStateOf(Size.Zero) }
-    // Pending cluster popover; cleared on outside tap or chip selection.
-    var popover by remember(isFrontView) { mutableStateOf<PopoverTarget?>(null) }
+    // Parsing is not free and the path set never changes, so do it once per view.
+    val parsed = remember(isFrontView) {
+        regions.map { it to PathParser().parsePathString(it.pathData).toPath() }
+    }
+    val muscles = remember(isFrontView) { regions.map { it.muscle }.distinct() }
 
-    val textMeasurer = rememberTextMeasurer()
-
-    // The body figure drawable
-    val figureRes = if (isFrontView) R.drawable.body_front_cut else R.drawable.body_back_cut
-
-    Box(modifier = modifier) {
-
-        // ── Body figure PNG background ────────────────────────────────────────
+    Box(
+        modifier = modifier.semantics {
+            // Every muscle is a discrete TalkBack action however thin its shape is — a
+            // screen-reader user must never depend on hit-testing to reach one.
+            customActions = muscles.map { muscle ->
+                CustomAccessibilityAction(muscle.displayName) {
+                    onMuscleSelected(muscle)
+                    true
+                }
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
         Image(
-            painter = painterResource(figureRes),
-            contentDescription = if (isFrontView) "Front view of body" else "Back view of body",
+            painter = painterResource(
+                if (isFrontView) R.drawable.body_front_cut else R.drawable.body_back_cut,
+            ),
+            contentDescription = if (isFrontView) {
+                "Front view of the body. Tap a muscle to train it."
+            } else {
+                "Back view of the body. Tap a muscle to train it."
+            },
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
 
-        // ── Drawing + touch surface ───────────────────────────────────────────
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
-                // TalkBack: all 19 muscles as discrete custom actions.
-                .semantics {
-                    customActions = allMusclesForAccessibility.map { muscle ->
-                        CustomAccessibilityAction(
-                            label = muscle.displayName,
-                            action = { onMuscleSelected(muscle); true },
-                        )
+                .pointerInput(isFrontView, parsed) {
+                    detectTapGestures { tap ->
+                        hitTest(tap, parsed, size.width.toFloat(), size.height.toFloat())
+                            ?.let(onMuscleSelected)
                     }
-                }
-                // Touch: fit-scale SVG coords, then walk zones in priority order.
-                .pointerInput(isFrontView) {
-                    detectTapGestures { offset ->
-                        val cs = canvasSize
-                        if (cs == Size.Zero) return@detectTapGestures
-                        val scl = minOf(cs.width / SVG_W, cs.height / SVG_H)
-                        val ox  = (cs.width  - SVG_W * scl) / 2f
-                        val oy  = (cs.height - SVG_H * scl) / 2f
-                        val svgX = (offset.x - ox) / scl
-                        val svgY = (offset.y - oy) / scl
-                        val hit = zones.firstOrNull { it.contains(svgX, svgY) }
-                        when (val beh = hit?.behavior) {
-                            is HitBehavior.Direct  -> { popover = null; onMuscleSelected(beh.muscle) }
-                            is HitBehavior.Cluster -> { popover = PopoverTarget(beh.muscles, offset.x, offset.y) }
-                            null                   -> { popover = null }
-                        }
-                    }
-                }
-        ) {
-            val scl = minOf(size.width / SVG_W, size.height / SVG_H)
-            val ox  = (size.width  - SVG_W * scl) / 2f
-            val oy  = (size.height - SVG_H * scl) / 2f
-
-            // ── Muscle shape overlays ─────────────────────────────────────────
-             for (shape in visuals) {
-                 val isPicked = shape.muscle in pickedMuscles
-                 val level = if (isPicked) VolumeLevel.PICKED else volumeMap[shape.muscle]
-                 val fill = level.toFillColor()
-                 val l  = shape.left         * scl + ox
-                 val t  = shape.top          * scl + oy
-                 val w  = (shape.right  - shape.left)   * scl
-                 val h  = (shape.bottom - shape.top)    * scl
-                 val r  = shape.cornerRadius * scl
-                 val cr = CornerRadius(r, r)
-
-                 if (fill != Color.Transparent) {
-                     drawRoundRect(
-                         color    = fill,
-                         topLeft  = Offset(l, t),
-                         size     = Size(w, h),
-                         cornerRadius = cr,
-                     )
-                 }
-
-                 // PICKED state: glowing highlight with thick border
-                 if (isPicked) {
-                     // Glow effect: larger, more transparent layer
-                     drawRoundRect(
-                         color    = Color(0xFFF5F5F0).copy(alpha = 0.25f),
-                         topLeft  = Offset(l - 3f * scl, t - 3f * scl),
-                         size     = Size(w + 6f * scl, h + 6f * scl),
-                         cornerRadius = CornerRadius(r + 3f * scl, r + 3f * scl),
-                     )
-                     // Bright border
-                     drawRoundRect(
-                         color    = Color(0xFFF5F5F0),
-                         topLeft  = Offset(l, t),
-                         size     = Size(w, h),
-                         cornerRadius = cr,
-                         style    = Stroke(width = (4f * scl).coerceAtLeast(2.5f)),
-                     )
-                 } else if (level == null || level == VolumeLevel.NONE || level == VolumeLevel.BELOW_MEV) {
-                     // Dashed outline for under-trained / none
-                     drawRoundRect(
-                         color    = Color(0xFF6B737D),
-                         topLeft  = Offset(l, t),
-                         size     = Size(w, h),
-                         cornerRadius = cr,
-                         style    = Stroke(
-                             width = (1.8f * scl).coerceAtLeast(1f),
-                             pathEffect = PathEffect.dashPathEffect(
-                                 floatArrayOf(6f * scl, 5f * scl), 0f
-                             ),
-                         ),
-                     )
-                 } else {
-                     // Subtle outline for trained muscles
-                     drawRoundRect(
-                         color    = Color.Black.copy(alpha = 0.2f),
-                         topLeft  = Offset(l, t),
-                         size     = Size(w, h),
-                         cornerRadius = cr,
-                         style    = Stroke(width = (1f * scl).coerceAtLeast(0.5f)),
-                     )
-                 }
-             }
-
-            // ── Callout labels with leader lines ─────────────────────────────
-            for (callout in callouts) {
-                val level = if (callout.muscle in pickedMuscles) VolumeLevel.PICKED
-                            else volumeMap[callout.muscle]
-                // Only draw callouts for muscles that have volume data or are picked
-                if (level == null || level == VolumeLevel.NONE) continue
-
-                val anchorPx = Offset(callout.anchorX * scl + ox, callout.anchorY * scl + oy)
-                val labelText = callout.muscle.displayName.uppercase()
-                val volText = volumeMap[callout.muscle]?.let { "" } ?: "" // Placeholder
-
-                // Label box positioning
-                val labelW = 66f * scl
-                val labelH = 42f * scl
-                val lineLen = 40f * scl
-
-                val (lineEndX, boxLeft) = when (callout.side) {
-                    CalloutSide.LEFT -> {
-                        val endX = anchorPx.x - lineLen
-                        val bLeft = endX - labelW
-                        Pair(endX, bLeft)
-                    }
-                    CalloutSide.RIGHT -> {
-                        val endX = anchorPx.x + lineLen
-                        Pair(endX, endX)
-                    }
-                }
-                val boxTop = anchorPx.y - labelH / 2f
-
-                // Leader line
-                drawLine(
-                    color = Color(0xFF8B939E),
-                    start = anchorPx,
-                    end = Offset(lineEndX, anchorPx.y),
-                    strokeWidth = (1.6f * scl).coerceAtLeast(1f),
-                )
-
-                // Label background box
-                drawRoundRect(
-                    color = Color(0xFF242A32),
-                    topLeft = Offset(boxLeft, boxTop),
-                    size = Size(labelW, labelH),
-                    cornerRadius = CornerRadius(11f * scl, 11f * scl),
-                )
-
-                 // Label text
-                 val nameColor = when (level) {
-                     VolumeLevel.PICKED -> Color(0xFFF5F5F0)
-                     VolumeLevel.MEV_TO_MAV -> Color(0xFF2F9BD8)
-                     VolumeLevel.APPROACHING_MRV -> Color(0xFFFFD100)
-                     VolumeLevel.AT_MRV -> Color(0xFFFF5C1A)
-                     else -> Color(0xFFF5F5F0)
-                 }
-
-                val nameStyle = TextStyle(
-                    fontFamily = PlexMono,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = (11f * scl).coerceAtLeast(8f).sp,
-                    letterSpacing = 0.4.sp,
-                    color = nameColor,
-                )
-                val nameResult = textMeasurer.measure(labelText, nameStyle)
-                drawText(
-                    nameResult,
-                    topLeft = Offset(
-                        boxLeft + (labelW - nameResult.size.width) / 2f,
-                        boxTop + labelH * 0.18f,
-                    ),
-                )
-            }
-        }
-
-        // ── Cluster chip popover ──────────────────────────────────────────────
-        val pop = popover
-        if (pop != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.absoluteOffset {
-                    val halfRowPx = pop.muscles.size * 50.dp.toPx()
-                    val rawX = (pop.tapX - halfRowPx).roundToInt()
-                    val rawY = (pop.tapY - 52.dp.toPx()).roundToInt()
-                    val clampedX = rawX.coerceIn(8.dp.toPx().roundToInt(),
-                        (canvasSize.width - halfRowPx * 2 - 8.dp.toPx()).roundToInt()
-                            .coerceAtLeast(8.dp.toPx().roundToInt()))
-                    val clampedY = rawY.coerceAtLeast(8.dp.toPx().roundToInt())
-                    IntOffset(clampedX, clampedY)
                 },
-            ) {
-                pop.muscles.forEach { muscle ->
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .height(44.dp)
-                            .defaultMinSize(minWidth = 88.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.surface)
-                            .border(0.5.dp, colors.line, RoundedCornerShape(8.dp))
-                            .clickable { popover = null; onMuscleSelected(muscle) }
-                            .padding(horizontal = 12.dp),
-                    ) {
-                        Text(
-                            text  = muscle.displayName,
-                            style = RedplateType.label,
-                            color = colors.ink,
-                        )
+        ) {
+            val scale = fitScale(size.width, size.height)
+            val dx = (size.width - BODY_MAP_VIEWPORT_WIDTH * scale) / 2f
+            val dy = (size.height - BODY_MAP_VIEWPORT_HEIGHT * scale) / 2f
+
+            translate(dx, dy) {
+                parsed.forEach { (region, path) ->
+                    val scaled = Path().apply {
+                        addPath(path)
+                        transform(Matrix().apply { scale(scale, scale) })
                     }
+                    val picked = region.muscle in pickedMuscles
+                    val level = if (picked) {
+                        VolumeLevel.PICKED
+                    } else {
+                        volumeMap[region.muscle] ?: VolumeLevel.NONE
+                    }
+                    drawRegion(
+                        path = scaled,
+                        level = level,
+                        picked = picked,
+                        inkColor = colors.ink,
+                        dashedColor = colors.outlineDashed,
+                        infoColor = colors.info,
+                    )
                 }
             }
         }
     }
 }
 
-// ── Private types ─────────────────────────────────────────────────────────────
+/** Fill and outline for one region, per the legend in 5a. */
+private fun DrawScope.drawRegion(
+    path: Path,
+    level: VolumeLevel,
+    picked: Boolean,
+    inkColor: Color,
+    dashedColor: Color,
+    infoColor: Color,
+) {
+    when (level) {
+        VolumeLevel.NONE, VolumeLevel.BELOW_MEV -> {
+            drawPath(path, inkColor.copy(alpha = 0.05f))
+            drawPath(
+                path,
+                dashedColor,
+                style = Stroke(
+                    width = 1.8.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(6.dp.toPx(), 5.dp.toPx()),
+                    ),
+                ),
+            )
+        }
 
-private data class PopoverTarget(
-    val muscles: List<MuscleGroup>,
-    val tapX: Float,
-    val tapY: Float,
-)
+        VolumeLevel.MEV_TO_MAV -> drawPath(path, infoColor.copy(alpha = 0.55f))
 
-// ── Volume → fill colour ──────────────────────────────────────────────────
-// Matches the HTML 5a design: 4 visual states, with strong visual distinction.
+        VolumeLevel.APPROACHING_MRV, VolumeLevel.AT_MRV -> {
+            drawPath(path, StateColor.pr.copy(alpha = 0.34f))
+            // Clipped to the region, so the hatch reads as texture rather than overlay.
+            clipPath(path) {
+                val stripe = 3.dp.toPx()
+                var x = -size.height
+                while (x < size.width + size.height) {
+                    drawLine(
+                        color = StateColor.pr.copy(alpha = 0.85f),
+                        start = Offset(x, size.height),
+                        end = Offset(x + size.height, 0f),
+                        strokeWidth = stripe,
+                    )
+                    x += stripe * 2
+                }
+            }
+        }
 
-private fun VolumeLevel?.toFillColor(): Color = when (this) {
-    null,
-    VolumeLevel.NONE            -> Color(0xFFF5F5F0).copy(alpha = 0.08f)   // very faint (under-trained)
-    VolumeLevel.BELOW_MEV       -> Color(0xFF8B939E).copy(alpha = 0.20f)   // gray (under-trained)
-    VolumeLevel.MEV_TO_MAV      -> Color(0xFF2F9BD8).copy(alpha = 0.70f)   // bright blue (on target)
-    VolumeLevel.APPROACHING_MRV -> Color(0xFFFFD100).copy(alpha = 0.70f)   // bright yellow (near cap)
-    VolumeLevel.AT_MRV          -> Color(0xFFFF5C1A).copy(alpha = 0.70f)   // orange (over cap — live accent)
-    VolumeLevel.PICKED          -> Color(0xFFF5F5F0).copy(alpha = 0.12f)   // white faint (picked)
+        VolumeLevel.PICKED -> drawPath(path, inkColor.copy(alpha = 0.18f))
+    }
+
+    if (picked) {
+        drawPath(path, inkColor, style = Stroke(width = 3.dp.toPx()))
+    }
+}
+
+/**
+ * The artwork draws with ContentScale.Fit, so the overlay letterboxes identically or the
+ * regions land off the body.
+ */
+private fun fitScale(width: Float, height: Float): Float =
+    minOf(width / BODY_MAP_VIEWPORT_WIDTH, height / BODY_MAP_VIEWPORT_HEIGHT)
+
+/**
+ * Which muscle a tap landed on.
+ *
+ * Containing region first, then the nearest one within a thumb's width. That fallback is
+ * what makes the thin regions reachable without a two-stage popover: a near miss resolves
+ * to the obvious target instead of to nothing.
+ */
+private fun hitTest(
+    tap: Offset,
+    regions: List<Pair<BodyRegion, Path>>,
+    width: Float,
+    height: Float,
+): MuscleGroup? {
+    val scale = fitScale(width, height)
+    if (scale <= 0f) return null
+    val dx = (width - BODY_MAP_VIEWPORT_WIDTH * scale) / 2f
+    val dy = (height - BODY_MAP_VIEWPORT_HEIGHT * scale) / 2f
+
+    // Back into the design's coordinate space, where the paths are expressed.
+    val point = Offset((tap.x - dx) / scale, (tap.y - dy) / scale)
+
+    regions.firstOrNull { (_, path) -> path.containsPoint(point) }?.let { return it.first.muscle }
+
+    val tolerance = TAP_TOLERANCE_VIEWPORT
+    return regions
+        .map { (region, path) -> region to path.distanceToOutline(point) }
+        .filter { it.second <= tolerance }
+        .minByOrNull { it.second }
+        ?.first
+        ?.muscle
+}
+
+/** Bounds check, then an intersection probe for the real shape. */
+private fun Path.containsPoint(point: Offset): Boolean {
+    val bounds = getBounds()
+    if (point.x < bounds.left || point.x > bounds.right) return false
+    if (point.y < bounds.top || point.y > bounds.bottom) return false
+
+    val probe = Path().apply {
+        addRect(Rect(point.x - 0.5f, point.y - 0.5f, point.x + 0.5f, point.y + 0.5f))
+    }
+    val hit = Path()
+    hit.op(this, probe, PathOperation.Intersect)
+    return !hit.isEmpty
+}
+
+/** Rough distance from a point to the outline, sampled along its length. */
+private fun Path.distanceToOutline(point: Offset): Float {
+    val measure = PathMeasure().apply { setPath(this@distanceToOutline, false) }
+    val length = measure.length
+    if (length <= 0f) return Float.MAX_VALUE
+
+    var best = Float.MAX_VALUE
+    var travelled = 0f
+    val step = (length / OUTLINE_SAMPLES).coerceAtLeast(1f)
+    while (travelled <= length) {
+        val distance = (measure.getPosition(travelled) - point).getDistance()
+        if (distance < best) best = distance
+        travelled += step
+    }
+    return best
+}
+
+/** Roughly a thumb's width in the 230×520 viewport. */
+private const val TAP_TOLERANCE_VIEWPORT = 14f
+
+private const val OUTLINE_SAMPLES = 48
+
+// ── Previews ────────────────────────────────────────────────────────
+
+@Preview(name = "5a · front", widthDp = 240, heightDp = 520, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun BodyMapFrontPreview() {
+    RedplateTheme {
+        Box(
+            Modifier
+                .background(RedplateTheme.colors.ground)
+                .padding(8.dp),
+        ) {
+            BodyMapCanvas(
+                isFrontView = true,
+                volumeMap = mapOf(
+                    MuscleGroup.CHEST to VolumeLevel.APPROACHING_MRV,
+                    MuscleGroup.SIDE_DELTS to VolumeLevel.MEV_TO_MAV,
+                    MuscleGroup.ABS to VolumeLevel.MEV_TO_MAV,
+                    MuscleGroup.QUADS to VolumeLevel.NONE,
+                ),
+                pickedMuscles = setOf(MuscleGroup.BICEPS),
+                onMuscleSelected = {},
+                modifier = Modifier
+                    .width(198.dp)
+                    .height(447.dp),
+            )
+        }
+    }
+}
+
+@Preview(name = "5b · back", widthDp = 240, heightDp = 520, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun BodyMapBackPreview() {
+    RedplateTheme {
+        Box(
+            Modifier
+                .background(RedplateTheme.colors.ground)
+                .padding(8.dp),
+        ) {
+            BodyMapCanvas(
+                isFrontView = false,
+                volumeMap = mapOf(
+                    MuscleGroup.TRAPS to VolumeLevel.APPROACHING_MRV,
+                    MuscleGroup.LATS to VolumeLevel.MEV_TO_MAV,
+                    MuscleGroup.GLUTES to VolumeLevel.MEV_TO_MAV,
+                    MuscleGroup.CALVES to VolumeLevel.MEV_TO_MAV,
+                ),
+                onMuscleSelected = {},
+                modifier = Modifier
+                    .width(198.dp)
+                    .height(447.dp),
+            )
+        }
+    }
 }

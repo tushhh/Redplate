@@ -3,9 +3,11 @@ package dev.redplate.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.EquipmentCategory
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.Goal
+import dev.redplate.data.LoadingScheme
 import dev.redplate.data.ProfileDao
 import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramGenerator
@@ -29,7 +31,18 @@ class IntakeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val equipment = equipmentDao.getAll()
-            _state.update { it.copy(allEquipment = equipment) }
+            _state.update { state ->
+                state.copy(
+                    allEquipment = equipment,
+                    // The seed already itemises the user's gym, so the inventory opens
+                    // pre-ticked. Unticking three rows is cheap; ticking fourteen from
+                    // scratch is the form everyone abandons.
+                    selectedEquipmentIds = equipment
+                        .filter { it.isAvailable }
+                        .map { it.id }
+                        .toSet(),
+                )
+            }
         }
     }
 
@@ -52,6 +65,8 @@ class IntakeViewModel @Inject constructor(
     fun setPlanChoice(choice: PlanChoice) = _state.update { it.copy(planChoice = choice) }
 
     fun setEquipmentFilter(filter: EquipmentFilter) = _state.update { it.copy(equipmentFilter = filter) }
+
+    fun setEquipmentSearch(query: String) = _state.update { it.copy(equipmentSearch = query) }
 
     /**
      * A preset is a structure, so choosing one sets the inputs that structure implies —
@@ -100,8 +115,20 @@ class IntakeViewModel @Inject constructor(
             )
 
             // Equipment first — the generator only picks what the user can actually load.
+            // The dumbbell answer is written here too. It is the entire reason 2e asks the
+            // follow-up, and it was previously collected and discarded, which left the
+            // engine free to prescribe loads that do not exist on the rack.
             s.allEquipment.forEach { eq ->
-                equipmentDao.update(eq.copy(isAvailable = eq.id in s.selectedEquipmentIds))
+                val available = eq.id in s.selectedEquipmentIds
+                val loads = if (
+                    eq.category == EquipmentCategory.DUMBBELL &&
+                    eq.loadingScheme == LoadingScheme.FIXED_INCREMENT
+                ) {
+                    s.dumbbellStep.ladder(eq.availableLoads)
+                } else {
+                    eq.availableLoads
+                }
+                equipmentDao.update(eq.copy(isAvailable = available, availableLoads = loads))
             }
 
             if (s.planChoice == PlanChoice.GIVE_ME_A_PLAN) {
@@ -129,26 +156,36 @@ data class IntakeState(
     val dumbbellStep: DumbbellStep = DumbbellStep.TWO_POINT_FIVE,
     val planChoice: PlanChoice = PlanChoice.GIVE_ME_A_PLAN,
     val equipmentFilter: EquipmentFilter = EquipmentFilter.ALL,
+    val equipmentSearch: String = "",
     val selectedPresetId: String? = null,
     /** Guards the finish button: generating a plan writes a lot of rows. */
     val isSaving: Boolean = false,
 ) {
     val selectedEquipmentCount: Int get() = selectedEquipmentIds.size
 
-    val filteredEquipment: List<EquipmentEntity> get() = when (equipmentFilter) {
-        EquipmentFilter.ALL -> allEquipment
-        EquipmentFilter.BAR -> allEquipment.filter {
-            it.category == dev.redplate.data.EquipmentCategory.BARBELL
+    /** What "ALL n" counts — the whole inventory, not whatever survived the filter. */
+    val totalEquipmentCount: Int get() = allEquipment.size
+
+    val filteredEquipment: List<EquipmentEntity> get() {
+        val byCategory = when (equipmentFilter) {
+            EquipmentFilter.ALL -> allEquipment
+            EquipmentFilter.BAR -> allEquipment.filter { it.category == EquipmentCategory.BARBELL }
+            EquipmentFilter.MACHINE -> allEquipment.filter { it.category == EquipmentCategory.MACHINE }
+            EquipmentFilter.CABLE -> allEquipment.filter { it.category == EquipmentCategory.CABLE }
         }
-        EquipmentFilter.MACHINE -> allEquipment.filter {
-            it.category == dev.redplate.data.EquipmentCategory.MACHINE
-        }
-        EquipmentFilter.CABLE -> allEquipment.filter {
-            it.category == dev.redplate.data.EquipmentCategory.CABLE
+        val query = equipmentSearch.trim()
+        return if (query.isEmpty()) {
+            byCategory
+        } else {
+            byCategory.filter { it.displayName.contains(query, ignoreCase = true) }
         }
     }
 
-    val splitDescription: String get() {
+    /**
+     * The live "THAT MEANS" line on 2d, in parts so the screen can bring the sets phrase
+     * forward in full-strength ink without pattern-matching its own sentence.
+     */
+    val consequence: ScheduleConsequence get() {
         val split = when (daysPerWeek) {
             2 -> "Full body, both days"
             3 -> "Full body, three sessions"
@@ -164,14 +201,48 @@ data class IntakeState(
             sessionMinutes <= 75 -> "22–26"
             else -> "26–30"
         }
-        return "$split. Around $setsPerSession sets a session, every muscle hit ${if (daysPerWeek >= 4) "twice" else "1–2×"} a week — which is the point where progress actually shows up."
+        val tail = if (daysPerWeek >= 4) {
+            "every muscle hit twice a week — which is the point where progress actually shows up."
+        } else {
+            "every muscle hit once or twice a week — enough to grow, with room to add a day later."
+        }
+        return ScheduleConsequence(
+            split = split,
+            setsPhrase = "$setsPerSession sets a session",
+            tail = tail,
+        )
     }
 }
 
-enum class DumbbellStep(val label: String, val kgStep: Double) {
-    TWO_POINT_FIVE("2.5 kg", 2.5),
-    FIVE("5 kg", 5.0),
-    CUSTOM("Pick", 0.0),
+/** The three parts of 2d's consequence sentence: "$split. Around $setsPhrase, $tail" */
+data class ScheduleConsequence(
+    val split: String,
+    val setsPhrase: String,
+    val tail: String,
+)
+
+/**
+ * The 2e follow-up: which dumbbells actually exist on the rack.
+ *
+ * [AS_RACKED] keeps whatever the seed itemised from the real gym, rather than pretending
+ * a per-dumbbell editor exists. It is the honest third answer and it loses nothing.
+ */
+enum class DumbbellStep(val label: String, val caption: String, val kgStep: Double?) {
+    TWO_POINT_FIVE("2.5 kg", "steps", 2.5),
+    FIVE("5 kg", "steps", 5.0),
+    AS_RACKED("Pick", "each", null);
+
+    /** Rebuilds the ladder between the rack's own floor and ceiling. */
+    fun ladder(existing: List<Double>): List<Double> {
+        val step = kgStep ?: return existing
+        val floor = existing.minOrNull() ?: step
+        val ceiling = existing.maxOrNull() ?: DEFAULT_CEILING_KG
+        return generateSequence(floor) { it + step }.takeWhile { it <= ceiling }.toList()
+    }
+
+    private companion object {
+        const val DEFAULT_CEILING_KG = 40.0
+    }
 }
 
 enum class PlanChoice {

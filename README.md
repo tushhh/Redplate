@@ -52,7 +52,7 @@ plates, the app says so rather than showing a number you can't load.
 Most trackers are a spreadsheet with rounded corners. Redplate prescribes the session, then
 adapts it from your own history.
 
-- **Program generation** — answer four questions and get a full mesocycle: a split matched to
+- **Program generation** — answer five questions and get a full mesocycle: a split matched to
   your days, exercises filtered by the equipment you actually have, rep ranges and rest
   intervals set by your goal, and a deload planned at the end of the block.
 - **Volume landmarks** — weekly hard sets per muscle tracked against MV / MEV / MAV / MRV.
@@ -95,6 +95,27 @@ The ergonomics are hard rules, not preferences ([`CLAUDE.md`](CLAUDE.md) §4):
 
 ---
 
+## Setting up, once
+
+Five questions, one per screen, no keyboard. Every answer states its consequence before you
+commit to it — pick four days at sixty minutes and the screen tells you, live, that it means
+Upper/Lower twice each at 18–22 sets a session.
+
+```
+goal  →  schedule  →  equipment  →  who picks the exercises?  →  ⟨ plan library ⟩
+```
+
+The equipment step is the one that matters most and the one every other app gets wrong. It
+doesn't ask *whether* you have dumbbells — it asks **which ones**, because that answer becomes
+the only ladder progressions are allowed to step along. Anything you don't tick disappears from
+the archive and stops being prescribed.
+
+The last question is a fork, not a difficulty setting: **give me a plan**, or **I'll choose each
+day**. Neither is the advanced path — the difference is only who picks the exercises, and both
+track volume identically. You can mix them: follow the plan on Monday, freestyle on Saturday.
+
+---
+
 ## A session, end to end
 
 ```
@@ -116,8 +137,26 @@ Today  →  set logging  ⇄  rest  →  next lift  →  …  →  summary
 **Rack occupied?** Open guidance and swap in one tap — substitutes are ranked by
 secondary-muscle overlap and filtered to equipment you own, without leaving the session.
 
-**No program?** The body-map picker lets you tap the muscles you feel like training and builds
-a session around them, still tracking volume.
+### Freestyle, without giving up the coaching
+
+```
+body map  →  the session it built  →  swap / add anything  →  train
+```
+
+Tap the muscles you feel like training. The map is a status display while you do it: every
+region is shaded against that muscle's own weekly landmarks, so you see what's undertrained
+*while* deciding what to train.
+
+What comes back is a real session — compounds first while you're fresh, fitted to the minutes
+you said you had, filtered to your kit — with a one-line reason beside every exercise ("chest is
+seven sets under target this week"). You read it before the first set, not after the last one.
+Any row can be swapped and anything can be added, and both go through the same prescription
+engine a programmed day does, so a lift you picked by hand is programmed exactly like one the
+engine chose.
+
+The browser behind it is tiered rather than alphabetical — what's in this session, then what you
+actually train, then the archive — and each card cross-fades the start and end position of the
+movement on a staggered loop, which makes a grid readable without reading a single name.
 
 ---
 

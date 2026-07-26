@@ -1,7 +1,6 @@
 package dev.redplate.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,9 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.redplate.ui.components.SecondaryButton
+import dev.redplate.ui.components.BorderedCard
+import dev.redplate.ui.components.ConsequenceRow
+import dev.redplate.ui.components.ScreenHeader
+import dev.redplate.ui.components.SectionLabel
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
+import dev.redplate.ui.theme.StateColor
 
 /**
  * Route. Owns the Storage Access Framework launchers \u2014 the app never picks a location
@@ -86,63 +89,54 @@ fun BackupScreen(
             .background(colors.ground)
             .statusBarsPadding(),
     ) {
+        ScreenHeader(title = "Backup & export", onBack = onBack)
+
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 22.dp)
+                .padding(top = 4.dp),
         ) {
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                text = "Backup",
-                style = RedplateType.headline,
-                color = colors.ink,
-            )
-            Spacer(Modifier.height(20.dp))
-
-            // What is actually in the database. This card used to read
-            // "SAFE \u00B7 Last backup: today \u00B7 42 sessions \u00B7 1,284 sets" as hardcoded text,
-            // which told the user their data was safe regardless of whether it was.
-            Box(
+            // Stated as a date, never as "enabled". Losing the log is the only failure
+            // you cannot undo, so this card says when, how many, and how big.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(22.dp))
                     .background(colors.surface)
-                    .padding(20.dp),
+                    .padding(18.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier
-                            .size(10.dp)
+                        Modifier
+                            .size(8.dp)
                             .clip(CircleShape)
                             .background(if (state.hasData) colors.safe else colors.inkMuted),
                     )
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "ON THIS PHONE",
-                            style = RedplateType.mono.copy(fontSize = 11.sp),
-                            color = colors.inkMuted,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = state.lastSessionLabel,
-                            style = RedplateType.body.copy(fontSize = 14.sp),
-                            color = colors.inkSecondary,
-                        )
-                        Text(
-                            text = "${state.sessionCount} sessions \u00B7 ${state.setCount} working sets",
-                            style = RedplateType.mono.copy(fontSize = 10.sp),
-                            color = colors.inkMuted,
-                        )
-                    }
+                    Spacer(Modifier.width(8.dp))
+                    SectionLabel(
+                        text = if (state.hasData) "On this phone" else "Nothing logged yet",
+                        color = if (state.hasData) colors.safe else colors.inkMuted,
+                    )
                 }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = state.headline,
+                    style = RedplateType.headline.copy(fontSize = 28.sp, lineHeight = 31.sp),
+                    color = colors.ink,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = state.detail,
+                    style = RedplateType.body.copy(fontSize = 14.5.sp, lineHeight = 22.sp),
+                    color = colors.inkSecondary,
+                )
             }
             Spacer(Modifier.height(12.dp))
 
-            // Result of the last export or restore, success or failure. Silence here is
-            // the dangerous outcome: it lets the user believe a backup exists.
+            // Success or failure of the last file operation. Silence here is the
+            // dangerous outcome — it lets the user believe a backup exists.
             if (state.message != null) {
                 Box(
                     modifier = Modifier
@@ -154,141 +148,78 @@ fun BackupScreen(
                 ) {
                     Text(
                         text = state.message,
-                        style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 22.sp),
+                        style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 21.sp),
                         color = if (state.isError) colors.live else colors.inkSecondary,
                     )
                 }
                 Spacer(Modifier.height(12.dp))
             }
 
-            Spacer(Modifier.height(12.dp))
-
-            // Export section
-            Text(
-                text = "EXPORT",
-                style = RedplateType.mono.copy(fontSize = 10.sp),
-                color = colors.inkMuted,
-            )
-            Spacer(Modifier.height(10.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ExportCard(
-                    format = "JSON",
-                    description = "Full fidelity. Can restore everything.",
-                    onClick = onExportJson,
-                    modifier = Modifier.weight(1f),
-                )
-                ExportCard(
-                    format = "CSV",
-                    description = "For spreadsheets. Lossy.",
+            SectionLabel(text = "Take a copy out")
+            Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ConsequenceRow(
+                    label = "Spreadsheet (CSV)",
+                    detail = "One row per set. Opens anywhere, restores nothing.",
                     onClick = onExportCsv,
-                    modifier = Modifier.weight(1f),
+                )
+                ConsequenceRow(
+                    label = "Full archive (JSON)",
+                    detail = "Everything, including PRs and settings. Restores exactly.",
+                    onClick = onExportJson,
                 )
             }
-            Spacer(Modifier.height(24.dp))
-
-            // Import section
-            Text(
-                text = "IMPORT",
-                style = RedplateType.mono.copy(fontSize = 10.sp),
-                color = colors.inkMuted,
-            )
-            Spacer(Modifier.height(10.dp))
-
-            SecondaryButton(
-                label = "Restore from a file",
-                onClick = onImport,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Restoring replaces everything currently on this phone. If the file " +
-                    "can't be read, nothing changes.",
-                style = RedplateType.body.copy(fontSize = 13.sp, lineHeight = 20.sp),
-                color = colors.inkMuted,
-            )
             Spacer(Modifier.height(20.dp))
 
-            // Warning card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .border(1.dp, colors.line, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-            ) {
-                Column {
+            SectionLabel(text = "Bring a copy in")
+            Spacer(Modifier.height(8.dp))
+            ConsequenceRow(
+                label = "Restore from a file",
+                detail = "Replaces everything. A file it can't read changes nothing.",
+                onClick = onImport,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            BorderedCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     Text(
-                        text = "IF YOU UNINSTALL",
-                        style = RedplateType.mono.copy(fontSize = 10.sp),
-                        color = colors.live,
+                        text = "!",
+                        style = RedplateType.mono.copy(fontSize = 12.sp),
+                        color = StateColor.pr,
                     )
-                    Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "Android Auto Backup keeps your data for a while, but it's not guaranteed. Export a JSON backup before uninstalling.",
-                        style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 22.sp),
-                        color = colors.inkSecondary,
+                        text = "Uninstalling clears the device copy. Android Auto Backup may " +
+                            "keep one, but it is not guaranteed — export the JSON archive " +
+                            "before you uninstall.",
+                        style = RedplateType.body.copy(fontSize = 12.5.sp, lineHeight = 19.sp),
+                        color = colors.inkMuted,
                     )
                 }
             }
 
             Spacer(Modifier.height(24.dp))
         }
-
-        // Back affordance. The screen had none — it relied entirely on the system
-        // gesture, which CLAUDE.md §4 allows only as a duplicate of a visible control.
-        SecondaryButton(
-            label = "Back",
-            onClick = onBack,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-        )
     }
 }
 
-@Composable
-private fun ExportCard(
-    format: String,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = RedplateTheme.colors
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.surface)
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-    ) {
-        Text(
-            text = format,
-            style = RedplateType.title.copy(fontSize = 18.sp),
-            color = colors.ink,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = description,
-            style = RedplateType.body.copy(fontSize = 13.sp, lineHeight = 20.sp),
-            color = colors.inkMuted,
-        )
-    }
-}
-
-@Preview(name = "Backup · with history")
+@Preview(name = "9b · backup", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun BackupScreenPreview() {
     RedplateTheme {
         BackupScreen(
             state = BackupUiState(
-                sessionCount = 42,
-                setCount = 1284,
-                lastSessionLabel = "Last session: yesterday",
+                sessionCount = 146,
+                setCount = 3912,
+                headline = "Last session yesterday",
+                detail = "146 sessions, 3912 working sets and your equipment setup — " +
+                    "about 1.4 MB. Nothing leaves this phone unless you export it.",
                 hasData = true,
             ),
         )
     }
 }
 
-@Preview(name = "Backup · nothing logged yet")
+@Preview(name = "9b · nothing logged yet", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun BackupScreenEmptyPreview() {
     RedplateTheme {
@@ -296,15 +227,17 @@ private fun BackupScreenEmptyPreview() {
     }
 }
 
-@Preview(name = "Backup · restore failed")
+@Preview(name = "9b · restore failed", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun BackupScreenErrorPreview() {
     RedplateTheme {
         BackupScreen(
             state = BackupUiState(
-                sessionCount = 42,
-                setCount = 1284,
-                lastSessionLabel = "Last session: today",
+                sessionCount = 146,
+                setCount = 3912,
+                headline = "Last session today",
+                detail = "146 sessions, 3912 working sets and your equipment setup — " +
+                    "about 1.4 MB. Nothing leaves this phone unless you export it.",
                 hasData = true,
                 message = "That file isn't a Redplate backup. Pick the .json file written by Export.",
                 isError = true,

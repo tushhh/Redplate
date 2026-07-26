@@ -2,7 +2,6 @@ package dev.redplate.workout
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,9 +29,9 @@ import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
 import dev.redplate.ui.components.SecondaryButton
+import dev.redplate.ui.components.SectionLabel
+import dev.redplate.ui.components.StatCard
 import dev.redplate.ui.components.VolumeBar
-import dev.redplate.ui.theme.PlexCondensed
-import dev.redplate.ui.theme.PlexMono
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
 import dev.redplate.ui.theme.StateColor
@@ -49,6 +48,10 @@ data class SessionSummaryState(
     val volumeCoachLine: String,
 )
 
+/**
+ * One line of "what changes next time". [deltaLabel] is the decision — "+2.5", "HOLD",
+ * "−5" — and [description] is why, which is the part other trackers never show.
+ */
 data class ProgressionChange(
     val deltaLabel: String,
     val description: String,
@@ -62,8 +65,8 @@ data class VolumeRow(
 )
 
 /**
- * Route wrapper. Shows nothing until the summary is computed — a blank frame is better
- * than a screen of zeroes that fills in a moment later.
+ * Session summary — design 7d. Not a trophy cabinet: what happened, and what it changed.
+ * Every number here is a consequence rather than a stat.
  */
 @Composable
 fun SessionSummaryRoute(
@@ -98,36 +101,26 @@ fun SessionSummaryScreen(
                 .padding(horizontal = 22.dp),
         ) {
             Spacer(Modifier.height(20.dp))
-
             MonoLabel(text = state.eyebrow)
             Spacer(Modifier.height(10.dp))
-
             CoachHeadline(text = state.headline)
             Spacer(Modifier.height(8.dp))
-
             Text(
                 text = state.coachBody,
-                style = RedplateType.body,
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = colors.inkSecondary,
-                lineHeight = 24.sp,
             )
             Spacer(Modifier.height(16.dp))
 
-            // Stats row: SETS / LIFTED / PRs
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatCard(
-                    label = "SETS",
+                    label = "Sets",
                     value = state.totalSets.toString(),
-                    valueColor = colors.ink,
                     modifier = Modifier.weight(1f),
                 )
                 StatCard(
-                    label = "LIFTED",
+                    label = "Lifted",
                     value = state.totalTonnage,
-                    valueColor = colors.ink,
                     modifier = Modifier.weight(1f),
                 )
                 StatCard(
@@ -139,7 +132,7 @@ fun SessionSummaryScreen(
             }
             Spacer(Modifier.height(10.dp))
 
-            // Progression changes card
+            // The part that makes this a coaching screen rather than a receipt.
             if (state.progressionChanges.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -148,77 +141,70 @@ fun SessionSummaryScreen(
                         .background(colors.surface)
                         .padding(horizontal = 17.dp, vertical = 15.dp),
                 ) {
-                    Text(
-                        text = "WHAT CHANGES NEXT TIME",
-                        style = RedplateType.mono.copy(fontSize = 9.5.sp),
-                        color = colors.inkMuted,
-                    )
+                    SectionLabel(text = "What changes next time")
                     Spacer(Modifier.height(10.dp))
-
-                    state.progressionChanges.forEach { change ->
-                        Row(
-                            modifier = Modifier.padding(vertical = 4.5.dp),
-                        ) {
-                            Text(
-                                text = change.deltaLabel,
-                                style = RedplateType.mono.copy(fontSize = 11.sp),
-                                color = if (change.isUp) colors.live else colors.inkMuted,
-                                modifier = Modifier.padding(end = 11.dp),
-                            )
-                            Text(
-                                text = change.description,
-                                style = RedplateType.body.copy(fontSize = 13.5.sp, lineHeight = 21.sp),
-                                color = colors.inkBright,
-                            )
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        state.progressionChanges.forEach { change ->
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = change.deltaLabel,
+                                    style = RedplateType.mono.copy(fontSize = 11.sp),
+                                    color = if (change.isUp) colors.live else colors.inkMuted,
+                                    modifier = Modifier.width(38.dp),
+                                )
+                                Spacer(Modifier.width(11.dp))
+                                Text(
+                                    text = change.description,
+                                    style = RedplateType.body.copy(
+                                        fontSize = 13.5.sp,
+                                        lineHeight = 20.sp,
+                                    ),
+                                    color = colors.inkBright,
+                                )
+                            }
                         }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
             }
 
-            // Volume card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(colors.surface)
-                    .padding(horizontal = 17.dp, vertical = 14.dp),
-            ) {
-                Text(
-                    text = "WEEK SO FAR",
-                    style = RedplateType.mono.copy(fontSize = 9.5.sp),
-                    color = colors.inkMuted,
-                )
-                Spacer(Modifier.height(9.dp))
-
-                state.volumeRows.forEach { row ->
-                    VolumeBar(
-                        label = row.label,
-                        current = row.current,
-                        target = row.target,
+            if (state.volumeRows.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .padding(horizontal = 17.dp, vertical = 14.dp),
+                ) {
+                    SectionLabel(text = "Week so far")
+                    Spacer(Modifier.height(9.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        state.volumeRows.forEach { row ->
+                            VolumeBar(
+                                label = row.label,
+                                current = row.current,
+                                target = row.target,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = state.volumeCoachLine,
+                        style = RedplateType.body.copy(fontSize = 12.5.sp, lineHeight = 19.sp),
+                        color = colors.inkMuted,
                     )
-                    Spacer(Modifier.height(7.dp))
                 }
-
-                Text(
-                    text = state.volumeCoachLine,
-                    style = RedplateType.body.copy(fontSize = 12.5.sp),
-                    color = colors.inkMuted,
-                    lineHeight = 19.sp,
-                )
             }
+
             Spacer(Modifier.height(16.dp))
         }
 
-        // Secondary buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp),
         ) {
-            // "Add a note" sat here with an empty handler and no note editor behind it.
-            // Removed until it does something; see the log is the one real action.
             SecondaryButton(
                 label = "See the log",
                 onClick = onSeeLog,
@@ -226,7 +212,6 @@ fun SessionSummaryScreen(
             )
         }
 
-        // Primary bar
         PrimaryBar(
             label = "Done",
             onClick = onDone,
@@ -235,35 +220,7 @@ fun SessionSummaryScreen(
     }
 }
 
-@Composable
-private fun StatCard(
-    label: String,
-    value: String,
-    valueColor: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    val colors = RedplateTheme.colors
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(colors.surface)
-            .padding(horizontal = 15.dp, vertical = 13.dp),
-    ) {
-        Text(
-            text = label,
-            style = RedplateType.mono.copy(fontSize = 9.5.sp),
-            color = colors.inkMuted,
-        )
-        Spacer(Modifier.height(5.dp))
-        Text(
-            text = value,
-            style = RedplateType.title.copy(fontSize = 25.sp),
-            color = valueColor,
-        )
-    }
-}
-
-@Preview(widthDp = 384, heightDp = 824, backgroundColor = 0xFF101317, showBackground = true)
+@Preview(name = "7d · session done", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun SessionSummaryPreview() {
     RedplateTheme {
@@ -271,14 +228,27 @@ private fun SessionSummaryPreview() {
             state = SessionSummaryState(
                 eyebrow = "UPPER A · 61 MINUTES",
                 headline = "That was a good one.",
-                coachBody = "Twenty sets, one PR, and every set inside its rep range — which is exactly what week 3 is supposed to look like.",
+                coachBody = "Twenty sets, one PR, and every set inside its rep range — " +
+                    "which is exactly what week 3 is supposed to look like.",
                 totalSets = 20,
                 totalTonnage = "8.6 t",
                 prCount = 1,
                 progressionChanges = listOf(
-                    ProgressionChange("+2.5", "Bench press — you finished at 1 rep left, so it goes to 105 kg", true),
-                    ProgressionChange("HOLD", "Overhead press — 8 reps twice in a row, stay at 45 kg", false),
-                    ProgressionChange("−5", "Lat pulldown — fell 4 reps short, dropping to 59 kg", false),
+                    ProgressionChange(
+                        "+2.5",
+                        "Bench press — you finished at 1 rep left, so it goes to 105 kg",
+                        isUp = true,
+                    ),
+                    ProgressionChange(
+                        "HOLD",
+                        "Overhead press — 8 reps twice in a row, stay at 45 kg",
+                        isUp = false,
+                    ),
+                    ProgressionChange(
+                        "−5",
+                        "Lat pulldown — fell 4 reps short, dropping to 59 kg",
+                        isUp = false,
+                    ),
                 ),
                 volumeRows = listOf(
                     VolumeRow("Chest", 16, 18),
