@@ -16,6 +16,7 @@ class WorkoutRepository @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
+    private val volumeRecorder: VolumeRecorder,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -51,12 +52,22 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
 
-    /** Stamps the finish time. A session without one is still in progress. */
+    /**
+     * Stamps the finish time and refreshes the block week's volume snapshot. A session
+     * without a finish time is still in progress.
+     *
+     * The snapshot write lives here rather than on the summary screen because a session
+     * can be finished without the summary ever being opened, and `volume_snapshots` is
+     * what every volume readout in the app reads from.
+     */
     suspend fun endSession(sessionId: Long, endedAt: Long) {
         val session = sessionDao.getSessionById(sessionId) ?: return
-        if (session.endedAt == null) {
-            sessionDao.updateSession(session.copy(endedAt = endedAt))
+        val finished = if (session.endedAt == null) {
+            session.copy(endedAt = endedAt).also { sessionDao.updateSession(it) }
+        } else {
+            session
         }
+        volumeRecorder.recordForSession(finished)
     }
 
     suspend fun markExerciseIntroduced(exerciseId: String) =
@@ -85,11 +96,20 @@ class WorkoutRepository @Inject constructor(
     suspend fun startTemplatedSession(templateId: Long, now: Long): Long {
         val template = programDao.getTemplateById(templateId)
         val mesocycle = programDao.getActiveMesocycle()
+        val inActiveBlock = mesocycle != null && template?.mesocycleId == mesocycle.id
+        val week = mesocycle?.currentWeek?.takeIf { inActiveBlock }
         return sessionDao.insertSession(
             SessionEntity(
                 templateId = templateId,
                 mesocycleId = template?.mesocycleId,
-                weekNumber = mesocycle?.currentWeek?.takeIf { template?.mesocycleId == mesocycle.id },
+                weekNumber = week,
+                // Was hardcoded to ACCUMULATION, which made a deload week's history
+                // indistinguishable from a hard one.
+                phase = if (mesocycle != null && week != null) {
+                    mesocycle.phaseForWeek(week)
+                } else {
+                    BlockPhase.ACCUMULATION
+                },
                 startedAt = now,
             )
         )

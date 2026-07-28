@@ -24,5 +24,58 @@ object Migrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2)
+    /**
+     * 2 → 3 adds the schedule and day-boundary settings to the profile, and gives volume
+     * snapshots the foreign key they always should have had.
+     *
+     * - `profile.trainingDays` — which weekdays the user actually trains, overriding the
+     *   split's own layout. Nullable, so an existing row keeps the split default.
+     * - `profile.dayStartHour` — when a training day begins, so a session logged at 02:00
+     *   counts against the previous day. See [TrainingClock].
+     * - `volume_snapshots.mesocycleId` gains `REFERENCES mesocycles(id) ON DELETE CASCADE`.
+     *   SQLite cannot add a constraint in place, so the table is rebuilt and copied.
+     *   Rows whose mesocycle is already gone are orphans by definition and would violate
+     *   the new constraint, so they are not carried over. No history is lost: every
+     *   snapshot is derived from set logs, and set logs are untouched here.
+     */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `profile` ADD COLUMN `trainingDays` TEXT")
+            db.execSQL("ALTER TABLE `profile` ADD COLUMN `dayStartHour` INTEGER NOT NULL DEFAULT 4")
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `volume_snapshots_new` (
+                    `mesocycleId` INTEGER NOT NULL,
+                    `weekNumber` INTEGER NOT NULL,
+                    `muscle` TEXT NOT NULL,
+                    `hardSets` REAL NOT NULL,
+                    `mev` INTEGER NOT NULL,
+                    `mav` INTEGER NOT NULL,
+                    `mrv` INTEGER NOT NULL,
+                    PRIMARY KEY(`mesocycleId`, `weekNumber`, `muscle`),
+                    FOREIGN KEY(`mesocycleId`) REFERENCES `mesocycles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `volume_snapshots_new`
+                    (`mesocycleId`, `weekNumber`, `muscle`, `hardSets`, `mev`, `mav`, `mrv`)
+                SELECT `mesocycleId`, `weekNumber`, `muscle`, `hardSets`, `mev`, `mav`, `mrv`
+                FROM `volume_snapshots`
+                WHERE `mesocycleId` IN (SELECT `id` FROM `mesocycles`)
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `volume_snapshots`")
+            db.execSQL("ALTER TABLE `volume_snapshots_new` RENAME TO `volume_snapshots`")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_volume_snapshots_mesocycleId` " +
+                    "ON `volume_snapshots` (`mesocycleId`)"
+            )
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

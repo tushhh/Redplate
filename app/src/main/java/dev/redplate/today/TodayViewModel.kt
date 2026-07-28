@@ -13,6 +13,7 @@ import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 data class ExerciseRow(
     val orderIndex: Int,
@@ -98,6 +99,7 @@ class TodayViewModel @Inject constructor(
     private val volumeDao: VolumeDao,
     private val exerciseDao: ExerciseDao,
     private val equipmentDao: EquipmentDao,
+    private val mesocycleAdvancer: MesocycleAdvancer,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<TodayState>(TodayState.Loading)
@@ -130,11 +132,16 @@ class TodayViewModel @Inject constructor(
             return
         }
 
-        val meso = programDao.getActiveMesocycle()
-        if (meso == null) {
+        val active = programDao.getActiveMesocycle()
+        if (active == null) {
             _state.value = TodayState.NoProgramYet
             return
         }
+
+        // A block moves forward here, on the screen that asks "what do I do today?".
+        // Nothing else was ever going to notice that a week had been completed.
+        mesocycleAdvancer.advanceIfDue(active, profile)
+        val meso = programDao.getActiveMesocycle() ?: active
 
         val templates = programDao.observeTemplates(meso.id).first()
         if (templates.isEmpty()) {
@@ -253,10 +260,17 @@ class TodayViewModel @Inject constructor(
             val slots = programDao.getSlots(templateId)
             if (slots.isEmpty()) return@launch
 
+            val meso = mesoId?.let { programDao.getMesocycleById(it) }
             val session = SessionEntity(
                 templateId = templateId,
                 mesocycleId = mesoId,
                 weekNumber = week,
+                // Was hardcoded to ACCUMULATION, so a deload week logged as a hard one.
+                phase = if (meso != null && week != null) {
+                    meso.phaseForWeek(week)
+                } else {
+                    BlockPhase.ACCUMULATION
+                },
                 startedAt = System.currentTimeMillis(),
             )
             val sessionId = sessionDao.insertSession(session)
@@ -337,11 +351,15 @@ class TodayViewModel @Inject constructor(
             .firstNotNullOfOrNull { equipmentDao.getById(it) }
             ?.takeIf { it.isAvailable }
 
-    /** Accepts the deload: drops the block into its deload week and reloads. */
+    /**
+     * Accepts the deload: halves the sets, drops the loads, and moves the block into its
+     * deload week. This used to relabel the week and change nothing at all, so the screen
+     * promised a lighter week and then prescribed the same one.
+     */
     fun takeDeload() {
         viewModelScope.launch {
             val meso = programDao.getActiveMesocycle() ?: return@launch
-            programDao.updateMesocycle(meso.copy(currentWeek = meso.lengthWeeks))
+            mesocycleAdvancer.forceDeload(meso)
             stallDismissed = true
             load()
         }
@@ -376,26 +394,31 @@ class TodayViewModel @Inject constructor(
             ?: templates.minByOrNull { it.dayIndex } // wrap to next week
     }
 
+    /**
+     * The muscles most in need of work this week, worst first.
+     *
+     * This used to take the first three rows the database returned, from a query with no
+     * `ORDER BY` — so "arbitrary" was literal, and because nothing ever wrote a snapshot
+     * they all read zero. Ranking by shortfall against MEV makes the footer answer the
+     * only question it can usefully answer: what is this week still missing?
+     */
     private suspend fun buildVolumeRows(mesoId: Long, week: Int): List<VolumeRow> {
-        val snapshots = volumeDao.getSnapshots(mesoId, week)
-        if (snapshots.isEmpty()) {
-            // Return landmarks with zero progress
-            val landmarks = volumeDao.observeAllLandmarks().first()
-            return landmarks.take(3).map { lm ->
+        val landmarks = volumeDao.getAllLandmarks().ifEmpty { VolumeLandmarks.DEFAULTS }
+        val credited = volumeDao.getSnapshots(mesoId, week).associateBy { it.muscle }
+
+        return landmarks
+            .map { landmark ->
+                val done = credited[landmark.muscle]?.hardSets ?: 0.0
+                val shortfall = landmark.mev - done
                 VolumeRow(
-                    label = lm.muscle.displayName(),
-                    current = 0,
-                    target = lm.mavHigh,
-                )
+                    label = landmark.muscle.displayName(),
+                    current = done.roundToInt(),
+                    target = credited[landmark.muscle]?.mav ?: landmark.mavHigh,
+                ) to shortfall
             }
-        }
-        return snapshots.take(3).map { snap ->
-            VolumeRow(
-                label = snap.muscle.displayName(),
-                current = snap.hardSets.toInt(),
-                target = snap.mav,
-            )
-        }
+            .sortedByDescending { (_, shortfall) -> shortfall }
+            .take(VOLUME_ROWS)
+            .map { (row, _) -> row }
     }
 
     private fun buildVolumeCoachLine(rows: List<VolumeRow>): String {
@@ -458,6 +481,7 @@ class TodayViewModel @Inject constructor(
 
     private companion object {
         const val VISIBLE_SLOTS = 3
+        const val VOLUME_ROWS = 3
         const val E1RM_WEEKS = 6
         const val STALL_WEEKS_REQUIRED = 3
         const val STALL_TOLERANCE_KG = 0.5

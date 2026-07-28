@@ -20,6 +20,9 @@ interface ProgramDao {
     @Query("SELECT * FROM mesocycles WHERE isActive = 1 LIMIT 1")
     suspend fun getActiveMesocycle(): MesocycleEntity?
 
+    @Query("SELECT * FROM mesocycles WHERE id = :id")
+    suspend fun getMesocycleById(id: Long): MesocycleEntity?
+
     @Query("SELECT * FROM mesocycles ORDER BY startedAt DESC")
     fun observeAllMesocycles(): Flow<List<MesocycleEntity>>
 

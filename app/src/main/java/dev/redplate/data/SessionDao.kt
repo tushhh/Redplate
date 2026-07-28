@@ -29,6 +29,13 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY id ASC")
     suspend fun getAllSessions(): List<SessionEntity>
 
+    /** Every session logged against one week of one block — the unit a volume snapshot covers. */
+    @Query("SELECT * FROM sessions WHERE mesocycleId = :mesocycleId AND weekNumber = :week")
+    suspend fun getSessionsForBlockWeek(mesocycleId: Long, week: Int): List<SessionEntity>
+
+    @Query("SELECT * FROM sessions WHERE mesocycleId = :mesocycleId ORDER BY startedAt ASC")
+    suspend fun getSessionsForMesocycle(mesocycleId: Long): List<SessionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSessions(sessions: List<SessionEntity>)
 
@@ -52,8 +59,15 @@ interface SessionDao {
     @Query("SELECT * FROM set_logs WHERE sessionId = :sessionId ORDER BY setIndex ASC")
     suspend fun getSetsForSession(sessionId: Long): List<SetLogEntity>
 
+    /**
+     * The whole table. Only the JSON and CSV exports have any business calling this —
+     * everything else wants a bounded query, because this grows without limit.
+     */
     @Query("SELECT * FROM set_logs ORDER BY id ASC")
     suspend fun getAllSetLogs(): List<SetLogEntity>
+
+    @Query("SELECT * FROM set_logs WHERE sessionId IN (:sessionIds)")
+    suspend fun getSetsForSessions(sessionIds: List<Long>): List<SetLogEntity>
 
     @Query("""
         SELECT * FROM set_logs

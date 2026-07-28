@@ -53,6 +53,11 @@ class Converters {
     @TypeConverter fun fromDoubleList(v: List<Double>): String = json.encodeToString(v)
     @TypeConverter fun toDoubleList(v: String): List<Double> = json.decodeFromString(v)
 
+    // Nullable on purpose: a null `trainingDays` means "use the split's own layout",
+    // which is a different answer from "train on no days at all".
+    @TypeConverter fun fromIntList(v: List<Int>?): String? = v?.let { json.encodeToString(it) }
+    @TypeConverter fun toIntList(v: String?): List<Int>? = v?.let { json.decodeFromString(it) }
+
     @TypeConverter fun fromStringList(v: List<String>): String = json.encodeToString(v)
     @TypeConverter fun toStringList(v: String): List<String> = json.decodeFromString(v)
 

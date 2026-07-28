@@ -35,7 +35,9 @@ interface VolumeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertLandmarks(landmarks: List<VolumeLandmarkEntity>)
 
-    @Query("SELECT * FROM volume_landmarks")
+    // Ordered so "the first three landmarks" is a stable answer rather than whatever
+    // SQLite happened to return.
+    @Query("SELECT * FROM volume_landmarks ORDER BY muscle ASC")
     fun observeAllLandmarks(): Flow<List<VolumeLandmarkEntity>>
 
     @Query("SELECT * FROM volume_landmarks WHERE muscle = :muscle")

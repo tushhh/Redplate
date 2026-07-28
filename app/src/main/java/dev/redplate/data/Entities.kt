@@ -52,8 +52,14 @@ enum class ProgressionRule { DOUBLE_PROGRESSION, LOAD_PROGRESSION, RIR_AUTOREGUL
 @Serializable
 enum class Complexity { BEGINNER, INTERMEDIATE, ADVANCED }
 
+/**
+ * Where a session sits in its block. A Redplate block is [MesocycleEntity.lengthWeeks]
+ * long: accumulation until the final week, then a deload. There is no intensification
+ * phase — an `INTENSIFICATION` value existed here, was never written by anything, and was
+ * removed rather than left as a value the app could not produce.
+ */
 @Serializable
-enum class BlockPhase { ACCUMULATION, INTENSIFICATION, DELOAD }
+enum class BlockPhase { ACCUMULATION, DELOAD }
 
 // ---------------------------------------------------------------------------
 // Profile
@@ -71,7 +77,21 @@ data class ProfileEntity(
     val priorityMuscles: List<MuscleGroup> = emptyList(),   // max 2
     val excludedPatterns: List<MovementPattern> = emptyList(),
     val readinessFlagged: Boolean = false,       // from the one-time screening
-    val useMetric: Boolean = true
+    val useMetric: Boolean = true,
+    /**
+     * Which weekdays the user actually trains on, 0 = Monday. Null falls back to the
+     * split's own layout. Validated against [daysPerWeek] before it is written.
+     */
+    val trainingDays: List<Int>? = null,
+    /**
+     * Hour at which a training day begins. A session logged before it belongs to the
+     * previous training day — see [TrainingClock].
+     *
+     * The literal default must match [TrainingClock.DEFAULT_DAY_START_HOUR]; Room needs a
+     * compile-time constant here so the migration's `DEFAULT 4` and the entity agree.
+     */
+    @ColumnInfo(defaultValue = "4")
+    val dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR
 )
 
 // ---------------------------------------------------------------------------
@@ -165,7 +185,15 @@ data class MesocycleEntity(
     val currentWeek: Int = 1,
     val isActive: Boolean = true,
     val completedAt: Long? = null
-)
+) {
+    /**
+     * A block accumulates until its final week, which is the deload. Sessions used to be
+     * stamped [BlockPhase.ACCUMULATION] unconditionally, so a deload week's history was
+     * indistinguishable from a hard one.
+     */
+    fun phaseForWeek(week: Int): BlockPhase =
+        if (week >= lengthWeeks) BlockPhase.DELOAD else BlockPhase.ACCUMULATION
+}
 
 @Serializable
 @Entity(
@@ -260,7 +288,16 @@ data class SetLogEntity(
 }
 
 @Serializable
-@Entity(tableName = "volume_snapshots", primaryKeys = ["mesocycleId", "weekNumber", "muscle"])
+@Entity(
+    tableName = "volume_snapshots",
+    primaryKeys = ["mesocycleId", "weekNumber", "muscle"],
+    foreignKeys = [ForeignKey(
+        entity = MesocycleEntity::class,
+        parentColumns = ["id"], childColumns = ["mesocycleId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("mesocycleId")],
+)
 data class VolumeSnapshotEntity(
     val mesocycleId: Long,
     val weekNumber: Int,
