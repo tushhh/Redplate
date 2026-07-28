@@ -61,6 +61,7 @@ fun TodayRoute(
     onPickExercise: () -> Unit,
     onEditSession: (Long) -> Unit = {},
     onSeeFullWeek: () -> Unit = {},
+    onSeeSummary: (Long) -> Unit = {},
 ) {
     val viewModel: TodayViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -84,6 +85,8 @@ fun TodayRoute(
         onSeeFullWeek = onSeeFullWeek,
         onTakeDeload = viewModel::takeDeload,
         onDismissStall = viewModel::pushOnThroughStall,
+        onSeeSummary = onSeeSummary,
+        onTrainAgain = { templateId -> viewModel.startAnotherSession(templateId, onStartWorkout) },
     )
 }
 
@@ -96,6 +99,8 @@ fun TodayScreen(
     onSeeFullWeek: () -> Unit = {},
     onTakeDeload: () -> Unit = {},
     onDismissStall: () -> Unit = {},
+    onSeeSummary: (Long) -> Unit = {},
+    onTrainAgain: (Long) -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -119,6 +124,13 @@ fun TodayScreen(
             state = state,
             onStartWorkout = onStartWorkout,
             onEditSession = { onEditSession(state.sessionCard.templateId) },
+            onSeeFullWeek = onSeeFullWeek,
+        )
+
+        is TodayState.Completed -> CompletedScreen(
+            state = state,
+            onSeeSummary = { onSeeSummary(state.sessionId) },
+            onTrainAgain = { onTrainAgain(state.templateId) },
             onSeeFullWeek = onSeeFullWeek,
         )
 
@@ -483,6 +495,90 @@ private fun E1rmBars(weeks: List<E1rmWeek>) {
     }
 }
 
+// ── Today is done (2.2) ─────────────────────────────────────────────
+
+/**
+ * The day's session is behind you.
+ *
+ * Finishing a workout used to leave Today showing the same "Let's go" card, which said
+ * nothing about what had happened and made a duplicate session one mistaken tap away.
+ * The primary action here is to look at what was achieved; training again is possible but
+ * secondary, so it is always a decision rather than a slip.
+ */
+@Composable
+private fun CompletedScreen(
+    state: TodayState.Completed,
+    onSeeSummary: () -> Unit,
+    onTrainAgain: () -> Unit,
+    onSeeFullWeek: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(horizontal = 22.dp),
+        ) {
+            Spacer(Modifier.height(22.dp))
+            MonoLabel(text = state.eyebrow)
+            Spacer(Modifier.height(10.dp))
+            CoachHeadline(text = state.headline)
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = state.summaryLine,
+                style = RedplateType.mono.copy(fontSize = 13.sp),
+                color = colors.live,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            VolumeFooter(
+                rows = state.volumeRows,
+                coachLine = state.volumeCoachLine,
+                onSeeFullWeek = onSeeFullWeek,
+            )
+
+            if (state.nextSessionLabel != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colors.surface)
+                        .clickable(onClick = onSeeFullWeek)
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = state.nextSessionLabel,
+                        style = RedplateType.body.copy(fontSize = 15.sp),
+                        color = colors.inkSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Chevron()
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(label = "Train again today", onClick = onTrainAgain)
+            Spacer(Modifier.height(16.dp))
+        }
+
+        PrimaryBar(
+            label = "See what changed",
+            onClick = onSeeSummary,
+            modifier = Modifier.padding(horizontal = 22.dp),
+        )
+    }
+}
+
 // ── Rest day and empty ──────────────────────────────────────────────
 
 @Composable
@@ -690,6 +786,31 @@ private fun TodayRestDayPreview() {
                 headline = "Rest day. You've earned it.",
                 coachBody = "Next session is Upper A, tomorrow.",
                 nextSessionLabel = "Upper A",
+            ),
+            onStartWorkout = {},
+            onPickExercise = {},
+        )
+    }
+}
+
+@Preview(name = "Today · done", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Composable
+private fun TodayCompletedPreview() {
+    RedplateTheme {
+        TodayScreen(
+            state = TodayState.Completed(
+                eyebrow = "TUESDAY · WEEK 3 OF 5",
+                headline = "Upper A. Done.",
+                summaryLine = "18 sets · 47 min · 2 PRs",
+                volumeRows = listOf(
+                    VolumeRow("Chest", 12, 18),
+                    VolumeRow("Lats", 10, 20),
+                    VolumeRow("Triceps", 8, 16),
+                ),
+                volumeCoachLine = "Lats is still short of target this week — Thursday covers it.",
+                nextSessionLabel = "Next: Lower A, Thursday",
+                sessionId = 42L,
+                templateId = 7L,
             ),
             onStartWorkout = {},
             onPickExercise = {},

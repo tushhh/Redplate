@@ -9,6 +9,7 @@ import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.Goal
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.PlanSettings
 import dev.redplate.data.ProfileDao
 import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramGenerator
@@ -121,12 +122,21 @@ class IntakeViewModel @Inject constructor(
 
         viewModelScope.launch {
             val s = _state.value
-            val profile = ProfileEntity(
-                trainingAgeMonths = s.trainingAgeMonths,
+            // The same [PlanSettings] the "Your plan" screen edits, normalised by the same
+            // rules. Intake and Settings write one shape of answer, not two.
+            val plan = PlanSettings(
+                goal = s.goal ?: Goal.HYPERTROPHY,
                 daysPerWeek = s.daysPerWeek,
                 sessionCeilingMinutes = s.sessionMinutes,
-                goal = s.goal ?: Goal.HYPERTROPHY,
-                bodyweightKg = s.bodyweightKg,
+            ).normalised()
+            val profile = plan.applyTo(
+                ProfileEntity(
+                    trainingAgeMonths = s.trainingAgeMonths,
+                    daysPerWeek = plan.daysPerWeek,
+                    sessionCeilingMinutes = plan.sessionCeilingMinutes,
+                    goal = plan.goal,
+                    bodyweightKg = s.bodyweightKg,
+                )
             )
 
             // Equipment first — the generator only picks what the user can actually load.

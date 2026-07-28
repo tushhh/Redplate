@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
+import dev.redplate.data.Goal
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.ProfileDao
+import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,8 @@ data class SettingsState(
     val sinceLabel: String = "YOU",
     /** "82.4 KG · 146 SESSIONS · 4 PRS THIS BLOCK" */
     val statsLine: String = "",
+    /** "Build muscle · 4 days · 60 min" — the plan, readable without tapping in. */
+    val planSummary: String = "—",
     val plateSummary: String = "—",
     val useMetric: Boolean = true,
     val equipmentSummary: String = "—",
@@ -82,6 +86,7 @@ class SettingsViewModel @Inject constructor(
                     append(" · ${sessions.size} SESSION${plural(sessions.size)}")
                     if (meso != null) append(" · $prCount PR${plural(prCount)} THIS BLOCK")
                 },
+                planSummary = describePlan(profile),
                 plateSummary = describePlates(available),
                 useMetric = profile.useMetric,
                 equipmentSummary = "${available.size} item${plural(available.size)}",
@@ -103,6 +108,16 @@ class SettingsViewModel @Inject constructor(
                 _equipmentState.value = EquipmentListState(equipment, isLoading = false)
             }
         }
+    }
+
+    private fun describePlan(profile: ProfileEntity): String {
+        val goal = when (profile.goal) {
+            Goal.STRENGTH -> "Get stronger"
+            Goal.HYPERTROPHY -> "Build muscle"
+            Goal.LEAN -> "Lean"
+            Goal.GENERAL -> "Generally fitter"
+        }
+        return "$goal · ${profile.daysPerWeek} days · ${profile.sessionCeilingMinutes} min"
     }
 
     /** "25·20·15·10·5·2.5·1.25" — what the plate stack can round to. */

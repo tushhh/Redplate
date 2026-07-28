@@ -17,6 +17,7 @@ class WorkoutRepository @Inject constructor(
     private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
     private val volumeRecorder: VolumeRecorder,
+    private val trainingClock: TrainingClock,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -132,19 +133,17 @@ class WorkoutRepository @Inject constructor(
      * what to train.
      */
     suspend fun weeklyHardSetsPerMuscle(now: Long = System.currentTimeMillis()): Map<MuscleGroup, Double> {
-        val since = now - SEVEN_DAYS_MILLIS
-        val recent = sessionDao.getAllSetLogs()
-            .filter { it.completedAt >= since && it.countsTowardVolume }
+        // Seven training days back, so a session logged at 01:00 falls on the day it
+        // belongs to rather than tipping in or out of the window by an hour.
+        val dayStartHour = trainingClock.dayStartHour()
+        val today = trainingClock.trainingDate(now, dayStartHour)
+        val since = trainingClock.dayBounds(today.minusDays(SEVEN_DAYS - 1), dayStartHour).first
+        val until = trainingClock.dayBounds(today, dayStartHour).last + 1
+
+        val recent = sessionDao.getSetLogsBetween(since, until)
         if (recent.isEmpty()) return emptyMap()
 
-        val exercises = exerciseDao.getAll().associateBy { it.id }
-        val perMuscle = mutableMapOf<MuscleGroup, Double>()
-        for (set in recent) {
-            val exercise = exercises[set.exerciseId] ?: continue
-            perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
-            exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
-        }
-        return perMuscle
+        return VolumeCredit.perMuscle(recent, exerciseDao.getAll().associateBy { it.id })
     }
 
     /** The whole archive, one query — the exercise browser tiers and filters it in memory. */
@@ -195,6 +194,6 @@ class WorkoutRepository @Inject constructor(
         EquipmentAvailability.availableIds(equipmentDao.getAll())
 
     private companion object {
-        const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1000
+        const val SEVEN_DAYS = 7L
     }
 }

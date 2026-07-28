@@ -13,6 +13,7 @@ import dev.redplate.data.ProgressionOutcome
 import dev.redplate.data.ProgressionRule
 import dev.redplate.data.SessionDao
 import dev.redplate.data.SessionEntity
+import dev.redplate.data.SessionOutcomeReader
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
 import dev.redplate.data.VolumeDao
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -40,6 +40,7 @@ class SessionSummaryViewModel @Inject constructor(
     private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
     private val volumeDao: VolumeDao,
+    private val outcomeReader: SessionOutcomeReader,
 ) : ViewModel() {
 
     private val sessionId: Long = savedState.get<Long>(ARG_SESSION_ID) ?: 0L
@@ -57,13 +58,10 @@ class SessionSummaryViewModel @Inject constructor(
         val working = sets.filter { !it.isWarmup }
         val slots = session.templateId?.let { programDao.getSlots(it) }.orEmpty()
 
-        val tonnage = working.sumOf { it.loadKg * it.reps }
-        val durationMinutes = session.endedAt
-            ?.let { TimeUnit.MILLISECONDS.toMinutes(it - session.startedAt) }
-            ?.toInt()
-            ?: 0
-
-        val prs = countPrs(working)
+        // Shared with Today's completed card, so the two screens cannot disagree about
+        // how many sets were done or how long it took.
+        val outcome = outcomeReader.read(session)
+        val prs = outcome.prCount
         val volumeRows = buildVolumeRows(working)
 
         val templateLabel = session.templateId
@@ -71,38 +69,16 @@ class SessionSummaryViewModel @Inject constructor(
             ?: "Freestyle"
 
         _state.value = SessionSummaryState(
-            eyebrow = buildEyebrow(templateLabel, durationMinutes, working.size),
-            headline = buildHeadline(prs, working.size),
+            eyebrow = buildEyebrow(templateLabel, outcome.durationMinutes, outcome.workingSets),
+            headline = buildHeadline(prs, outcome.workingSets),
             coachBody = buildCoachBody(working, prs),
-            totalSets = working.size,
-            totalTonnage = formatTonnage(tonnage),
+            totalSets = outcome.workingSets,
+            totalTonnage = formatTonnage(outcome.tonnageKg),
             prCount = prs,
             progressionChanges = applyProgression(session, working, slots),
             volumeRows = volumeRows,
             volumeCoachLine = buildVolumeCoachLine(volumeRows),
         )
-    }
-
-    /**
-     * A set is a PR if its estimated 1RM beats everything logged for that exercise
-     * before this session. Compared against prior history only, so two good sets in
-     * one session do not both get counted as beating each other.
-     */
-    private suspend fun countPrs(working: List<SetLogEntity>): Int {
-        var count = 0
-        for ((exerciseId, exerciseSets) in working.groupBy { it.exerciseId }) {
-            val priorBest = sessionDao.getAllSetLogs()
-                .filter {
-                    it.exerciseId == exerciseId &&
-                        !it.isWarmup &&
-                        it.sessionId != sessionId &&
-                        it.reps in 1..12
-                }
-                .maxOfOrNull { it.estimated1Rm() }
-                ?: 0.0
-            count += exerciseSets.count { it.reps in 1..12 && it.estimated1Rm() > priorBest + 1e-6 }
-        }
-        return count
     }
 
     /**

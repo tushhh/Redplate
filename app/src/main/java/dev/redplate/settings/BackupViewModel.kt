@@ -6,14 +6,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import dev.redplate.data.BackupRepository
+import dev.redplate.data.TrainingClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -41,6 +40,7 @@ data class BackupUiState(
 @HiltViewModel
 class BackupViewModel @Inject constructor(
     private val repo: BackupRepository,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BackupUiState())
@@ -108,11 +108,14 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    private fun describeLastSession(epochMillis: Long?): String {
+    private suspend fun describeLastSession(epochMillis: Long?): String {
         if (epochMillis == null) return "Nothing logged yet"
 
-        val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-        return when (val days = ChronoUnit.DAYS.between(date, LocalDate.now())) {
+        // Training days, so "Last session yesterday" agrees with what History says.
+        val dayStartHour = trainingClock.dayStartHour()
+        val date = trainingClock.trainingDate(epochMillis, dayStartHour)
+        val today = trainingClock.trainingDate(System.currentTimeMillis(), dayStartHour)
+        return when (val days = ChronoUnit.DAYS.between(date, today)) {
             0L -> "Last session today"
             1L -> "Last session yesterday"
             in 2L..6L -> "Last session $days days ago"
@@ -141,6 +144,7 @@ class BackupViewModel @Inject constructor(
 
         fun suggestedCsvName(): String = "redplate-sets-${today()}.csv"
 
+        /** Wall-clock, not the training day: a file is named for the day it was written. */
         private fun today(): String = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     }
 }

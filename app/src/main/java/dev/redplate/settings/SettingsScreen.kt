@@ -44,6 +44,7 @@ fun SettingsRoute(
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
     onNavigateToPlates: () -> Unit = {},
+    onNavigateToPlan: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -54,6 +55,7 @@ fun SettingsRoute(
         onNavigateToBackup = onNavigateToBackup,
         onNavigateToEquipment = onNavigateToEquipment,
         onNavigateToPlates = onNavigateToPlates,
+        onNavigateToPlan = onNavigateToPlan,
     )
 }
 
@@ -65,6 +67,7 @@ fun SettingsScreen(
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
     onNavigateToPlates: () -> Unit = {},
+    onNavigateToPlan: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -110,6 +113,16 @@ fun SettingsScreen(
             }
         }
         Spacer(Modifier.height(16.dp))
+
+        SectionLabel(text = "Your plan")
+        Spacer(Modifier.height(8.dp))
+        ConsequenceRow(
+            label = "Goal, days and session length",
+            detail = "The answers your program is built from",
+            value = state.planSummary,
+            onClick = onNavigateToPlan,
+        )
+        Spacer(Modifier.height(24.dp))
 
         SectionLabel(text = "Gets the numbers wrong if wrong")
         Spacer(Modifier.height(8.dp))

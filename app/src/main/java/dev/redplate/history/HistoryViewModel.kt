@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.SessionDao
+import dev.redplate.data.TrainingClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -61,6 +62,7 @@ data class HistoryState(
 class HistoryViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HistoryState())
@@ -109,6 +111,7 @@ class HistoryViewModel @Inject constructor(
      * genuine improvement rather than only the last.
      */
     private suspend fun loadAllPrs() {
+        dayStartHour = trainingClock.dayStartHour()
         val names = exerciseDao.getAll().associate { it.id to it.name }
         val prs = mutableListOf<Pair<Long, PrEntry>>()
 
@@ -142,6 +145,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     private suspend fun loadExerciseHistory(exerciseId: String) {
+        dayStartHour = trainingClock.dayStartHour()
         val range = _state.value.timeRange
         val cutoff = when (range) {
             TimeRange.TWELVE_WEEKS -> System.currentTimeMillis() - 12L * 7 * 24 * 3600 * 1000
@@ -245,11 +249,17 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Cached per load so the non-suspend label helpers can reach it. History dates have to
+     * agree with Today and the week plan, which means the training day, not the calendar
+     * day — a set logged at 01:00 reads as yesterday's session, because it was.
+     */
+    private var dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR
+
     private fun relativeDay(epochMillis: Long): String {
-        val date = java.time.Instant.ofEpochMilli(epochMillis)
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDate()
-        return when (val days = java.time.temporal.ChronoUnit.DAYS.between(date, java.time.LocalDate.now())) {
+        val date = trainingClock.trainingDate(epochMillis, dayStartHour)
+        val today = trainingClock.trainingDate(System.currentTimeMillis(), dayStartHour)
+        return when (val days = java.time.temporal.ChronoUnit.DAYS.between(date, today)) {
             0L -> "TODAY"
             1L -> "YESTERDAY"
             in 2L..13L -> "$days DAYS AGO"
@@ -259,9 +269,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     private fun dayMonth(epochMillis: Long): String {
-        val date = java.time.Instant.ofEpochMilli(epochMillis)
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDate()
+        val date = trainingClock.trainingDate(epochMillis, dayStartHour)
         return "${date.dayOfMonth} ${date.month.name.take(3)}"
     }
 

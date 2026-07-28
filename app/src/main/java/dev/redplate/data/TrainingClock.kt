@@ -23,11 +23,27 @@ import javax.inject.Singleton
  * spreadsheet.
  */
 @Singleton
-class TrainingClock internal constructor(private val zone: ZoneId) {
+class TrainingClock private constructor(
+    private val profileDao: ProfileDao?,
+    private val zone: ZoneId,
+) {
 
-    /** Production always reads the device zone; the zone-taking constructor is for tests. */
     @Inject
-    constructor() : this(ZoneId.systemDefault())
+    constructor(profileDao: ProfileDao) : this(profileDao, ZoneId.systemDefault())
+
+    /**
+     * For testing the date maths, which reads no profile and must not depend on the
+     * machine's own zone. A null [profileDao] means [dayStartHour] answers the default.
+     */
+    internal constructor(zone: ZoneId) : this(null, zone)
+
+    /** The user's configured boundary, or the default when there is no profile yet. */
+    suspend fun dayStartHour(): Int =
+        profileDao?.get()?.dayStartHour ?: DEFAULT_DAY_START_HOUR
+
+    /** Today's training date, reading the boundary from the profile. */
+    suspend fun todayDate(now: Long = System.currentTimeMillis()): LocalDate =
+        trainingDate(now, dayStartHour())
 
     /** The training date [epochMillis] belongs to. */
     fun trainingDate(epochMillis: Long, dayStartHour: Int): LocalDate =

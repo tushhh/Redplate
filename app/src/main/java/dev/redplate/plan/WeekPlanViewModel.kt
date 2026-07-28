@@ -12,7 +12,10 @@ import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
 import dev.redplate.data.SessionEntity
 import dev.redplate.data.SessionTemplateEntity
+import dev.redplate.data.SessionEstimate
 import dev.redplate.data.SetLogEntity
+import dev.redplate.data.TrainingClock
+import dev.redplate.data.VolumeCredit
 import dev.redplate.data.VolumeDao
 import dev.redplate.data.VolumeLandmarks
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -67,6 +68,7 @@ class WeekPlanViewModel @Inject constructor(
     private val sessionDao: SessionDao,
     private val volumeDao: VolumeDao,
     private val exerciseDao: ExerciseDao,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WeekPlanState())
@@ -92,7 +94,8 @@ class WeekPlanViewModel @Inject constructor(
         val allSets = sessionDao.getAllSetLogs()
         val sessions = sessionDao.getAllSessions().associateBy { it.id }
 
-        val balance = buildBalance(allSets, exercises)
+        val dayStartHour = trainingClock.dayStartHour()
+        val balance = buildBalance(allSets, exercises, dayStartHour)
 
         _state.value = WeekPlanState(
             weekNumber = meso.currentWeek,
@@ -104,7 +107,7 @@ class WeekPlanViewModel @Inject constructor(
             } else {
                 BlockPhase.ACCUMULATION
             },
-            days = buildDayCards(templates, allSets, sessions),
+            days = buildDayCards(templates, allSets, sessions, dayStartHour),
             balance = balance,
             balanceCoachLine = buildBalanceCoachLine(balance),
             blockNote = buildBlockNote(meso),
@@ -118,15 +121,21 @@ class WeekPlanViewModel @Inject constructor(
         templates: List<SessionTemplateEntity>,
         allSets: List<SetLogEntity>,
         sessions: Map<Long, SessionEntity>,
+        dayStartHour: Int,
     ): List<DayCard> {
-        val today = LocalDate.now()
-        val weekStart = today.with(DayOfWeek.MONDAY)
+        // Training days, not calendar days: a session logged at 01:00 belongs to the day
+        // before, and to last week if that day was a Sunday.
+        val today = trainingClock.todayDate()
+        val weekStart = trainingClock.weekStart(today)
         val dayLabels = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
         // Tonnage per template for sessions logged this week, so a finished day reports
         // what it actually cost rather than what it was supposed to.
         val tonnageByTemplate = allSets
-            .filter { !it.isWarmup && localDate(it.completedAt) >= weekStart }
+            .filter {
+                !it.isWarmup &&
+                    trainingClock.trainingDate(it.completedAt, dayStartHour) >= weekStart
+            }
             .groupBy { sessions[it.sessionId]?.templateId }
             .mapValues { (_, sets) -> sets.sumOf { it.loadKg * it.reps } }
 
@@ -157,7 +166,8 @@ class WeekPlanViewModel @Inject constructor(
                         "$sets SETS · ${"%.1f".format(tonnes)} T"
                     }
 
-                    DayStatus.TODAY -> "$sets SETS · ${sets * MINUTES_PER_SET} MIN · TODAY"
+                    DayStatus.TODAY ->
+                        "$sets SETS · ${SessionEstimate.minutes(slots)} MIN · TODAY"
                     else -> "$sets SETS · PLANNED"
                 },
             )
@@ -195,24 +205,26 @@ class WeekPlanViewModel @Inject constructor(
      * tick. Secondaries count half and only 0–3 RIR sets count, so this agrees with
      * Today's footer and the session summary by construction rather than by coincidence.
      */
-    private fun buildBalance(
+    private suspend fun buildBalance(
         allSets: List<SetLogEntity>,
         exercises: Map<String, ExerciseEntity>,
+        dayStartHour: Int,
     ): List<VolumeTarget> {
-        val weekStart = LocalDate.now().with(DayOfWeek.MONDAY)
+        val weekStart = trainingClock.weekStart(trainingClock.todayDate())
         val credited = allSets.filter { it.countsTowardVolume }
+        fun dateOf(set: SetLogEntity) = trainingClock.trainingDate(set.completedAt, dayStartHour)
 
-        val thisWeek = creditPerMuscle(
-            credited.filter { localDate(it.completedAt) >= weekStart },
+        val thisWeek = VolumeCredit.perMuscle(
+            credited.filter { dateOf(it) >= weekStart },
             exercises,
         )
 
         val priorWeeks = (1..PRIOR_WEEKS).map { back ->
             val start = weekStart.minusWeeks(back.toLong())
             val end = start.plusWeeks(1)
-            creditPerMuscle(
+            VolumeCredit.perMuscle(
                 credited.filter {
-                    val d = localDate(it.completedAt)
+                    val d = dateOf(it)
                     d >= start && d < end
                 },
                 exercises,
@@ -233,19 +245,6 @@ class WeekPlanViewModel @Inject constructor(
                 },
             )
         }
-    }
-
-    private fun creditPerMuscle(
-        sets: List<SetLogEntity>,
-        exercises: Map<String, ExerciseEntity>,
-    ): Map<MuscleGroup, Double> {
-        val perMuscle = mutableMapOf<MuscleGroup, Double>()
-        for (set in sets) {
-            val exercise = exercises[set.exerciseId] ?: continue
-            perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
-            exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
-        }
-        return perMuscle
     }
 
     /**
@@ -291,11 +290,7 @@ class WeekPlanViewModel @Inject constructor(
         }
     }
 
-    private fun localDate(epochMillis: Long): LocalDate =
-        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-
     private companion object {
-        const val MINUTES_PER_SET = 3
         const val PRIOR_WEEKS = 4
 
         /** The eleven groups the chart draws, in the design's order. */
