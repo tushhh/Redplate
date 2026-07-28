@@ -27,7 +27,16 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercises WHERE pattern = :pattern AND isExcluded = 0 ORDER BY name ASC")
     fun observeByPattern(pattern: MovementPattern): Flow<List<ExerciseEntity>>
 
-    @Query("SELECT * FROM exercises WHERE name LIKE '%' || :query || '%' AND isExcluded = 0 ORDER BY name ASC")
+    /**
+     * Pass user input through [escapeLike] before calling this. Unescaped, a query
+     * containing `%` matches everything and `_` matches any character, so typing a
+     * underscore in a search box quietly returns the wrong list.
+     */
+    @Query("""
+        SELECT * FROM exercises
+        WHERE name LIKE '%' || :query || '%' ESCAPE '\' AND isExcluded = 0
+        ORDER BY name ASC
+    """)
     fun search(query: String): Flow<List<ExerciseEntity>>
 
     @Query("SELECT * FROM exercises ORDER BY name ASC")
@@ -46,3 +55,13 @@ interface ExerciseDao {
     @Query("DELETE FROM exercises")
     suspend fun deleteAll()
 }
+
+/**
+ * Neutralises the LIKE wildcards in a user's search string, matching the `ESCAPE '\'`
+ * clause in [ExerciseDao.search]. The backslash has to be escaped first or it would
+ * escape the escapes.
+ */
+fun escapeLike(query: String): String = query
+    .replace("\\", "\\\\")
+    .replace("%", "\\%")
+    .replace("_", "\\_")

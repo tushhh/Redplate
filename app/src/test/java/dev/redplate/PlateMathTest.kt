@@ -93,7 +93,40 @@ class PlateMathTest {
 
         assertFalse(load.exact)
         assertTrue("Never overshoots the target", load.totalKg <= 101.0)
-        assertEquals(load.totalKg, PlateMath.closestLoadable(101.0, barbell), 1e-9)
+        assertEquals(load.totalKg, PlateMath.largestLoadableAtOrBelow(101.0, barbell), 1e-9)
+    }
+
+    /**
+     * The case greedy gets wrong. One pair of 10s and two pairs of 7.5s: greedy takes the
+     * 10 and strands the remaining 5 kg, reaching 40. Two 7.5s make the 50 exactly.
+     *
+     * The old comment claimed greedy was optimal "because each denomination >= 2x the next
+     * smaller" — untrue even of a standard 25/20/15/10/5/2.5/1.25 set, and this stock
+     * breaks it outright.
+     */
+    @Test
+    fun `lopsided plate stock still reaches a weight greedy would miss`() {
+        val lopsided = barbell.copy(platePairs = mapOf(10.0 to 1, 7.5 to 2))
+        val load = PlateMath.load(50.0, lopsided)
+
+        assertEquals(50.0, load.totalKg, 1e-9)
+        assertEquals(listOf(7.5, 7.5), load.perSide)
+        assertTrue(load.exact)
+    }
+
+    @Test
+    fun `the exact search never overshoots or spends plates it does not have`() {
+        val lopsided = barbell.copy(platePairs = mapOf(10.0 to 1, 7.5 to 2))
+        for (target in listOf(30.0, 35.0, 42.5, 47.5, 50.0, 60.0, 100.0)) {
+            val load = PlateMath.load(target, lopsided)
+            assertTrue("Overshot $target", load.totalKg <= target + 1e-9)
+            for ((plate, count) in load.perSide.groupingBy { it }.eachCount()) {
+                assertTrue(
+                    "Used $count x $plate kg at target $target",
+                    count <= lopsided.platePairs.getValue(plate),
+                )
+            }
+        }
     }
 
     // ── Stepping ────────────────────────────────────────────────────
@@ -103,7 +136,7 @@ class PlateMathTest {
         val next = PlateMath.nextLoadUp(100.0, barbell)
 
         assertTrue(next > 100.0)
-        assertEquals(next, PlateMath.closestLoadable(next, barbell), 1e-9)
+        assertEquals(next, PlateMath.largestLoadableAtOrBelow(next, barbell), 1e-9)
     }
 
     @Test
@@ -150,7 +183,7 @@ class PlateMathTest {
     fun `a ten percent deload snaps to something that can be loaded`() {
         val deloaded = PlateMath.deload(100.0, 0.1, barbell)
 
-        assertEquals(deloaded, PlateMath.closestLoadable(deloaded, barbell), 1e-9)
+        assertEquals(deloaded, PlateMath.largestLoadableAtOrBelow(deloaded, barbell), 1e-9)
         assertTrue(deloaded < 100.0)
     }
 

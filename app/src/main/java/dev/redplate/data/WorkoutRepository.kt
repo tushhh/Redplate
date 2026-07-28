@@ -165,35 +165,36 @@ class WorkoutRepository @Inject constructor(
             .eachCount()
 
     /** One-shot list of exercises for a muscle that the available equipment can support. */
-    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =
-        exerciseDao.getAll()
+    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> {
+        val available = availableEquipmentIds()
+        return exerciseDao.getAll()
             .filter { it.primaryMuscle == muscle && !it.isExcluded }
-            .filter { isExerciseAvailable(it) }
+            .filter { EquipmentAvailability.canPerform(it, available) }
+    }
 
     /** Stream of all exercises that can be performed with available equipment, for a given muscle. */
     fun observeExercisesByMuscleWithAvailableEquipment(muscle: MuscleGroup): Flow<List<ExerciseEntity>> =
-        exerciseDao.observeByMuscle(muscle).map { exercises ->
-            exercises.filter { isExerciseAvailable(it) }
-        }
+        exerciseDao.observeByMuscle(muscle).map { exercises -> filterPerformable(exercises) }
 
     /** Stream of all exercises that can be performed with available equipment. */
     fun observeExercisesWithAvailableEquipment(): Flow<List<ExerciseEntity>> =
-        exerciseDao.observeAll().map { exercises ->
-            exercises.filter { isExerciseAvailable(it) }
-        }
+        exerciseDao.observeAll().map { exercises -> filterPerformable(exercises) }
+
+    /**
+     * The equipment set is read once per emission rather than once per exercise. The
+     * previous shape called a `suspend` lookup from inside a `filter` inside a `Flow.map`,
+     * which is one database round-trip per exercise per emission — 800 of them for the
+     * browser's full list.
+     */
+    private suspend fun filterPerformable(exercises: List<ExerciseEntity>): List<ExerciseEntity> {
+        val available = availableEquipmentIds()
+        return exercises.filter { EquipmentAvailability.canPerform(it, available) }
+    }
+
+    private suspend fun availableEquipmentIds(): Set<String> =
+        EquipmentAvailability.availableIds(equipmentDao.getAll())
 
     private companion object {
         const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1000
-    }
-
-    /** Check if an exercise can be performed with the available equipment in the gym. */
-    private suspend fun isExerciseAvailable(exercise: ExerciseEntity): Boolean {
-        // If exercise requires no equipment, it's always available
-        if (exercise.requiredEquipmentIds.isEmpty()) return true
-        // Check if any required equipment is available
-        return exercise.requiredEquipmentIds.any { eqId ->
-            val eq = equipmentDao.getById(eqId)
-            eq != null && eq.isAvailable
-        }
     }
 }

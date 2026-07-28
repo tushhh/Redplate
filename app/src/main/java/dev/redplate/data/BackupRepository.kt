@@ -13,6 +13,7 @@ import java.io.OutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,7 +53,7 @@ class BackupRepository @Inject constructor(
     }
 
     suspend fun exportToUri(uri: Uri) {
-        val stream = context.contentResolver.openOutputStream(uri)
+        val stream = context.contentResolver.openOutputStream(uri, TRUNCATING_WRITE)
             ?: throw IOException("Cannot open output stream")
         exportToStream(stream)
     }
@@ -84,7 +85,9 @@ class BackupRepository @Inject constructor(
                         set.rir?.toString().orEmpty(),
                         if (set.isWarmup) "1" else "0",
                         if (set.countsTowardVolume) "1" else "0",
-                        "%.2f".format(set.estimated1Rm()),
+                        // Locale.ROOT, not the default: on a comma-decimal locale the
+                        // default emits "12,34" and breaks the CSV it sits inside.
+                        String.format(Locale.ROOT, "%.2f", set.estimated1Rm()),
                     ).joinToString(",")
                 )
             }
@@ -92,11 +95,16 @@ class BackupRepository @Inject constructor(
     }
 
     suspend fun exportCsvToUri(uri: Uri) {
-        val stream = context.contentResolver.openOutputStream(uri)
+        val stream = context.contentResolver.openOutputStream(uri, TRUNCATING_WRITE)
             ?: throw IOException("Cannot open output stream")
         stream.bufferedWriter().use { it.write(exportCsv()) }
     }
 
+    /**
+     * Literal wall-clock time, deliberately *not* routed through `TrainingClock`. A CSV
+     * column called `completed_at` has to say when the set happened, not which training
+     * day the app files it under.
+     */
     private fun isoDate(epochMillis: Long): String =
         Instant.ofEpochMilli(epochMillis)
             .atZone(ZoneId.systemDefault())
@@ -201,6 +209,14 @@ class BackupRepository @Inject constructor(
     }
 
     private companion object {
+        /**
+         * "wt" — write *and truncate*. The default "w" does not truncate on many document
+         * providers, so overwriting a larger backup left the old file's tail behind and
+         * produced JSON that would not parse. Silently corrupting the restore path is the
+         * worst failure this project has.
+         */
+        const val TRUNCATING_WRITE = "wt"
+
         // Measured against pretty-printed output; only used for a rounded display size.
         const val BYTES_PER_SET = 260L
         const val BYTES_PER_SESSION = 220L

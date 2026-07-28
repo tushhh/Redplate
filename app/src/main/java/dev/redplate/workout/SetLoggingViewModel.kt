@@ -9,6 +9,7 @@ import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.PlateMath
+import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
 import dev.redplate.data.WorkoutRepository
@@ -57,6 +58,9 @@ class SetLoggingViewModel @Inject constructor(
     private var restJob: Job? = null
     private var restDeadlineMillis: Long = 0L
     private var restTotalSeconds: Int = 0
+
+    /** When the previous set of this lift was logged, so the next one can record real rest. */
+    private var lastSetCompletedAt: Long? = null
 
     init {
         bootstrap()
@@ -343,10 +347,14 @@ class SetLoggingViewModel @Inject constructor(
                     rir = s.rir,
                     isWarmup = s.isWarmup,
                     completedAt = now,
-                    restTakenSeconds = null,
+                    // How long the user actually rested before this set, not the
+                    // prescription. This column was always written null, which made it a
+                    // column that recorded nothing.
+                    restTakenSeconds = restTakenBefore(now),
                 )
             )
             if (isPr) prSetIds.update { it + id }
+            lastSetCompletedAt = now
 
             _events.tryEmit(if (isPr) WorkoutEvent.PrHit else WorkoutEvent.SetLogged)
 
@@ -355,6 +363,20 @@ class SetLoggingViewModel @Inject constructor(
 
             startRest()
         }
+    }
+
+    /**
+     * Seconds between the previous set finishing and this one, or null for the first set
+     * of a lift — there is nothing to have rested from.
+     *
+     * Measured from when the last set was logged rather than from the timer, so it stays
+     * honest whether the user waited out the countdown, skipped it, or left the app and
+     * came back.
+     */
+    private fun restTakenBefore(now: Long): Int? {
+        val previous = lastSetCompletedAt ?: return null
+        val seconds = ((now - previous) / 1000L).toInt()
+        return seconds.takeIf { it in 0..MAX_REST_SECONDS }
     }
 
     // ── Rest timer (auto-starts on completion at the prescribed interval) ──
@@ -463,23 +485,32 @@ class SetLoggingViewModel @Inject constructor(
         else -> "SET $logged LOGGED · LAST ONE"
     }
 
+    /**
+     * Why the weight on screen is the weight on screen.
+     *
+     * This used to say "Same weight as your last set" the moment anything was logged,
+     * including right after the user had changed the load — the one moment it is certainly
+     * untrue. It now reads the load actually showing against the load actually logged.
+     */
     private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
+        val currentLoad = _state.value.loadKg
         val lastWorking = logged.lastOrNull { !it.isWarmup }
         return when {
-            lastWorking != null -> "Same weight as your last set —"
-            previous.isNotEmpty() -> "Based on your last session —"
-            else -> ""
+            lastWorking == null ->
+                if (previous.isNotEmpty()) "Based on your last session —" else ""
+
+            kotlin.math.abs(lastWorking.loadKg - currentLoad) < LOAD_EPSILON ->
+                "Same weight as your last set —"
+
+            currentLoad > lastWorking.loadKg ->
+                "Up from ${formatKg(lastWorking.loadKg)} kg —"
+
+            else -> "Down from ${formatKg(lastWorking.loadKg)} kg —"
         }
     }
 
     private fun buildRestCoachText(remaining: Int, loadKg: Double, nextExercise: String?): String {
-        val restSeconds = slot?.restSeconds ?: DEFAULT_REST_SECONDS
-        val restMinutes = restSeconds / 60
-        val restLabel = if (restMinutes >= 1) {
-            "$restMinutes minute${if (restMinutes > 1) "s" else ""}"
-        } else {
-            "$restSeconds seconds"
-        }
+        val restLabel = ProgramGenerator.formatRest(slot?.restSeconds ?: DEFAULT_REST_SECONDS)
         return when {
             remaining > 0 -> "$restLabel is the prescription. Next set: same ${formatKg(loadKg)} kg."
             nextExercise != null -> "That's this lift done. $nextExercise is up next."
@@ -509,5 +540,8 @@ class SetLoggingViewModel @Inject constructor(
 
         private const val PRIMARY_WEIGHT = 2.0
         private const val SECONDARY_WEIGHT = 1.0
+
+        /** Loads are stored as doubles; this is "the same weight" in kg. */
+        private const val LOAD_EPSILON = 0.001
     }
 }

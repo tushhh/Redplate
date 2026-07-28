@@ -82,10 +82,15 @@ interface SessionDao {
     """)
     suspend fun getEstimated1Rm(exerciseId: String): Double?
 
+    /**
+     * The best set ever logged for a lift, ranked by estimated 1RM — the same Epley
+     * definition [getEstimated1Rm] uses. It used to rank by raw load, so 100 kg x 1 beat
+     * 95 kg x 8 while the PR banner beside it disagreed. One definition of "best".
+     */
     @Query("""
         SELECT * FROM set_logs
-        WHERE exerciseId = :exerciseId AND isWarmup = 0
-        ORDER BY loadKg DESC, reps DESC
+        WHERE exerciseId = :exerciseId AND isWarmup = 0 AND reps <= 12
+        ORDER BY (loadKg * (1 + reps / 30.0)) DESC, completedAt DESC
         LIMIT 1
     """)
     suspend fun getPrSet(exerciseId: String): SetLogEntity?

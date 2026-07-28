@@ -126,11 +126,39 @@ data class EquipmentEntity(
         LoadingScheme.BANDED -> 0.0
     }
 
-    /** Snap a desired load to the nearest load that can actually be assembled. */
+    /**
+     * Snap a desired load to the nearest assemblable one, in either direction.
+     *
+     * Use this when the goal is "the weight closest to what was asked for" — picking a
+     * starting load, or snapping a stepper. Use [largestLoadableAtOrBelow] when overshooting
+     * would be wrong. These two were one function under this name, which rounded to nearest
+     * for stacks and downward for barbells: two contracts, one name.
+     */
     fun nearestAchievable(desiredKg: Double): Double = when (loadingScheme) {
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.minByOrNull { kotlin.math.abs(it - desiredKg) } ?: desiredKg
-        LoadingScheme.PLATE_LOADED -> PlateMath.closestLoadable(desiredKg, this)
+
+        LoadingScheme.PLATE_LOADED -> {
+            val below = PlateMath.largestLoadableAtOrBelow(desiredKg, this)
+            val above = PlateMath.nextLoadUp(below, this)
+            if (above <= below || desiredKg - below <= above - desiredKg) below else above
+        }
+
+        else -> desiredKg
+    }
+
+    /**
+     * Heaviest assemblable load not above [desiredKg]. Never overshoots — this is what a
+     * deload and any "back off to" prescription mean.
+     */
+    fun largestLoadableAtOrBelow(desiredKg: Double): Double = when (loadingScheme) {
+        LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
+            availableLoads.lastOrNull { it <= desiredKg + 1e-6 }
+                ?: availableLoads.firstOrNull()
+                ?: desiredKg
+
+        LoadingScheme.PLATE_LOADED -> PlateMath.largestLoadableAtOrBelow(desiredKg, this)
+
         else -> desiredKg
     }
 }

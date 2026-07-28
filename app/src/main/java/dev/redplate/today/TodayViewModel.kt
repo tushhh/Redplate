@@ -152,7 +152,6 @@ class TodayViewModel @Inject constructor(
         val today = LocalDate.now()
         val todayDayOfWeek = today.dayOfWeek
         val dayName = todayDayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()).uppercase()
-        val timeOfDay = timeOfDayLabel()
 
         // Determine which template is today based on rotation
         val todayTemplate = findTodayTemplate(meso, templates, today)
@@ -203,7 +202,9 @@ class TodayViewModel @Inject constructor(
         }
 
         val totalSets = slots.sumOf { it.targetSets }
-        val estimatedMinutes = estimateSessionMinutes(slots, profile.sessionCeilingMinutes)
+        // The real number, rest included, and no longer clamped to the ceiling — reporting
+        // the ceiling when the session runs past it is just a lie with extra steps.
+        val estimatedMinutes = SessionEstimate.minutes(slots)
         val remaining = (slots.size - 3).coerceAtLeast(0)
 
         val isFirst = sessionDao.getLatestSession() == null
@@ -217,14 +218,14 @@ class TodayViewModel @Inject constructor(
             buildVolumeCoachLine(volumeRows)
         }
 
-        val eyebrow = "$dayName $timeOfDay · WEEK ${meso.currentWeek} OF ${meso.lengthWeeks}"
+        val eyebrow = "$dayName · WEEK ${meso.currentWeek} OF ${meso.lengthWeeks}"
 
         _state.value = TodayState.TrainingDay(
             eyebrow = eyebrow,
             headline = if (isFirst) {
                 "First one. Go light on purpose."
             } else {
-                "${todayTemplate.label}. About ${estimatedMinutes / 15 * 15} minutes."
+                "${todayTemplate.label}. About ${SessionEstimate.spokenMinutes(estimatedMinutes)} minutes."
             },
             coachBody = if (isFirst) {
                 "Pick a weight you could manage two more reps with. Today sets the baseline — every number after this is built off it."
@@ -378,7 +379,7 @@ class TodayViewModel @Inject constructor(
     ): SessionTemplateEntity? {
         // dayIndex maps to weekday: 0=MON, 1=TUE, ... 6=SUN
         val todayIndex = today.dayOfWeek.value - 1 // DayOfWeek.MONDAY = 1
-        return templates.find { it.dayIndex == todayIndex }
+        return scheduled(templates).find { it.dayIndex == todayIndex }
     }
 
     private fun findNextTemplate(
@@ -387,12 +388,21 @@ class TodayViewModel @Inject constructor(
         today: LocalDate,
     ): SessionTemplateEntity? {
         val todayIndex = today.dayOfWeek.value - 1
+        val scheduled = scheduled(templates)
         // Look for the next template after today
-        return templates
+        return scheduled
             .filter { it.dayIndex > todayIndex }
             .minByOrNull { it.dayIndex }
-            ?: templates.minByOrNull { it.dayIndex } // wrap to next week
+            ?: scheduled.minByOrNull { it.dayIndex } // wrap to next week
     }
+
+    /**
+     * Ad-hoc body-map sessions are parked at a negative day index. Without this filter
+     * `minByOrNull` picked one up and the rest-day card announced a one-off as the next
+     * scheduled session.
+     */
+    private fun scheduled(templates: List<SessionTemplateEntity>): List<SessionTemplateEntity> =
+        templates.filter { it.dayIndex >= 0 }
 
     /**
      * The muscles most in need of work this week, worst first.
@@ -442,26 +452,11 @@ class TodayViewModel @Inject constructor(
         return "Same plan as last time — stay focused on form."
     }
 
-    private fun estimateSessionMinutes(slots: List<TemplateSlotEntity>, ceiling: Int): Int {
-        // Rough estimate: ~3 min per set (including rest)
-        val estimated = slots.sumOf { it.targetSets } * 3
-        return estimated.coerceAtMost(ceiling)
-    }
-
-    private fun timeOfDayLabel(): String {
-        val hour = java.time.LocalTime.now().hour
-        return when {
-            hour < 12 -> "MORNING"
-            hour < 17 -> "AFTERNOON"
-            else -> "EVENING"
-        }
-    }
-
     private fun formatKg(kg: Double): String {
         return if (kg == kg.toLong().toDouble()) {
             kg.toLong().toString()
         } else {
-            "%.1f".format(kg)
+            String.format(Locale.getDefault(), "%.1f", kg)
         }
     }
 

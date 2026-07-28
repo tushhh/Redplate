@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import dev.redplate.data.BackupRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -88,6 +89,9 @@ class BackupViewModel @Inject constructor(
 
         viewModelScope.launch {
             val result = runCatching { block() }
+            // runCatching catches Throwable, cancellation included. Swallowing it leaves a
+            // cancelled coroutine running on to report success it never achieved.
+            result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
             refresh()
             _state.update {
                 it.copy(
