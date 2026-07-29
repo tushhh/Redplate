@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -22,6 +22,7 @@ import dev.redplate.plan.ProgramBuilderRoute
 import dev.redplate.plan.WeekPlanRoute
 import dev.redplate.settings.BackupRoute
 import dev.redplate.settings.EquipmentRoute
+import dev.redplate.settings.PlanSettingsRoute
 import dev.redplate.settings.SettingsRoute
 import dev.redplate.today.TodayRoute
 import dev.redplate.ui.theme.RedplateTheme
@@ -37,7 +38,7 @@ import dev.redplate.workout.SetLoggingRoute
 @Composable
 fun MainScaffold() {
     val scaffoldViewModel: MainScaffoldViewModel = hiltViewModel()
-    val hasProfile by scaffoldViewModel.hasProfile.collectAsState()
+    val hasProfile by scaffoldViewModel.hasProfile.collectAsStateWithLifecycle()
 
     if (hasProfile == null) return // Still loading
 
@@ -63,19 +64,25 @@ private fun MainContent() {
         && currentRoute?.startsWith("programBuilder") != true
         && currentRoute != "backup"
         && currentRoute != "equipment"
+        && currentRoute != "plan-settings"
 
     // Derived from the back stack rather than assigned inside each composable{} block.
     // Writing state during composition is what that did before, and it left the
     // highlight stale whenever navigation happened any other way (back gesture included).
     val selectedTab = when {
         currentRoute == null -> RedplateTab.Today
+
+        // Checked before the Plan prefix: "plan-settings" belongs to You, and
+        // startsWith("plan") would otherwise claim it.
+        currentRoute.startsWith("you") ||
+            currentRoute == "backup" ||
+            currentRoute == "equipment" ||
+            currentRoute == "plan-settings" -> RedplateTab.You
+
         currentRoute.startsWith("plan") || currentRoute.startsWith("programBuilder") ->
             RedplateTab.Plan
 
         currentRoute.startsWith("history") -> RedplateTab.History
-        currentRoute.startsWith("you") ||
-            currentRoute == "backup" ||
-            currentRoute == "equipment" -> RedplateTab.You
 
         else -> RedplateTab.Today
     }
@@ -112,6 +119,10 @@ private fun MainContent() {
                         },
                         onEditSession = { templateId ->
                             navController.navigate("programBuilder/$templateId")
+                        },
+                        // Reopens the summary for a session already finished today.
+                        onSeeSummary = { sessionId ->
+                            navController.navigate("sessionSummary/$sessionId")
                         },
                     )
                 }
@@ -219,7 +230,13 @@ private fun MainContent() {
                         // "plates in your gym" row opens the screen that owns them
                         // rather than a plates screen that does not exist.
                         onNavigateToPlates = { navController.navigate("equipment") },
+                        onNavigateToPlan = { navController.navigate("plan-settings") },
                     )
+                }
+
+                // ── Your plan (goal, days, session length, weekdays) ──
+                composable("plan-settings") {
+                    PlanSettingsRoute(onDone = { navController.popBackStack() })
                 }
 
                 // ── Backup screen ──

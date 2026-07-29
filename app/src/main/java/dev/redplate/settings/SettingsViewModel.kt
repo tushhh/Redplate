@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
+import dev.redplate.data.ExerciseDao
+import dev.redplate.data.Goal
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.ProfileDao
+import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +34,8 @@ data class SettingsState(
     val sinceLabel: String = "YOU",
     /** "82.4 KG · 146 SESSIONS · 4 PRS THIS BLOCK" */
     val statsLine: String = "",
+    /** "Build muscle · 4 days · 60 min" — the plan, readable without tapping in. */
+    val planSummary: String = "—",
     val plateSummary: String = "—",
     val useMetric: Boolean = true,
     val equipmentSummary: String = "—",
@@ -49,6 +54,7 @@ data class EquipmentListState(
 class SettingsViewModel @Inject constructor(
     private val profileDao: ProfileDao,
     private val equipmentDao: EquipmentDao,
+    private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
     private val programDao: ProgramDao,
 ) : ViewModel() {
@@ -69,28 +75,31 @@ class SettingsViewModel @Inject constructor(
             val profile = profileDao.get() ?: return@launch
             val equipment = equipmentDao.getAll()
             val available = equipment.filter { it.isAvailable }
-            val sessions = sessionDao.getAllSessions()
+            // Counted and queried, not loaded: this screen should not scale with history.
+            val sessionCount = sessionDao.countSessions()
+            val firstSessionAt = sessionDao.firstSessionStartedAt()
             val meso = programDao.getActiveMesocycle()
             val prCount = countPrsThisBlock(meso?.startedAt)
 
             _state.value = SettingsState(
-                sinceLabel = sessions.minOfOrNull { it.startedAt }
+                sinceLabel = firstSessionAt
                     ?.let { "YOU · SINCE ${monthYear(it)}" }
                     ?: "YOU",
                 statsLine = buildString {
                     append("${formatKg(profile.bodyweightKg)} KG")
-                    append(" · ${sessions.size} SESSION${plural(sessions.size)}")
+                    append(" · $sessionCount SESSION${plural(sessionCount)}")
                     if (meso != null) append(" · $prCount PR${plural(prCount)} THIS BLOCK")
                 },
+                planSummary = describePlan(profile),
                 plateSummary = describePlates(available),
                 useMetric = profile.useMetric,
                 equipmentSummary = "${available.size} item${plural(available.size)}",
                 restSummary = "Set by your plan",
                 deloadPromptsEnabled = _state.value.deloadPromptsEnabled,
-                backupSummary = if (sessions.isEmpty()) {
+                backupSummary = if (sessionCount == 0) {
                     "Nothing logged yet"
                 } else {
-                    "${sessions.size} session${plural(sessions.size)} on this phone"
+                    "$sessionCount session${plural(sessionCount)} on this phone"
                 },
                 isLoading = false,
             )
@@ -103,6 +112,16 @@ class SettingsViewModel @Inject constructor(
                 _equipmentState.value = EquipmentListState(equipment, isLoading = false)
             }
         }
+    }
+
+    private fun describePlan(profile: ProfileEntity): String {
+        val goal = when (profile.goal) {
+            Goal.STRENGTH -> "Get stronger"
+            Goal.HYPERTROPHY -> "Build muscle"
+            Goal.LEAN -> "Lean"
+            Goal.GENERAL -> "Generally fitter"
+        }
+        return "$goal · ${profile.daysPerWeek} days · ${profile.sessionCeilingMinutes} min"
     }
 
     /** "25·20·15·10·5·2.5·1.25" — what the plate stack can round to. */
@@ -121,9 +140,9 @@ class SettingsViewModel @Inject constructor(
      */
     private suspend fun countPrsThisBlock(blockStartedAt: Long?): Int {
         if (blockStartedAt == null) return 0
-        val byExercise = sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup && it.reps in 1..12 }
-            .groupBy { it.exerciseId }
+        val byExercise = exerciseDao.getTrainedExerciseIds().associateWith { exerciseId ->
+            sessionDao.getWorkingSetsForExercise(exerciseId).filter { it.reps in 1..12 }
+        }
 
         var count = 0
         for ((_, sets) in byExercise) {

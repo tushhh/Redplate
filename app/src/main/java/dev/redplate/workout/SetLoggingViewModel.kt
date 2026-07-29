@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseEntity
+import dev.redplate.data.LoadUnit
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.loadUnit
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.PlateMath
+import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
 import dev.redplate.data.WorkoutRepository
@@ -57,6 +60,9 @@ class SetLoggingViewModel @Inject constructor(
     private var restJob: Job? = null
     private var restDeadlineMillis: Long = 0L
     private var restTotalSeconds: Int = 0
+
+    /** When the previous set of this lift was logged, so the next one can record real rest. */
+    private var lastSetCompletedAt: Long? = null
 
     init {
         bootstrap()
@@ -114,6 +120,10 @@ class SetLoggingViewModel @Inject constructor(
                     rir = sl?.targetRir,
                     loadKg = startLoad,
                     isPlateLoaded = eq?.loadingScheme == LoadingScheme.PLATE_LOADED,
+                    // The readout says what the machine says. Bodyweight and banded work
+                    // have no dial to read, so they fall back to kilograms of added load.
+                    loadUnitLabel = (eq?.loadUnit ?: LoadUnit.KILOGRAMS).label,
+                    loadIsWholeNumber = eq?.loadingScheme == LoadingScheme.RESISTANCE_LEVEL,
                 )
             }
             val nextName = nextSlot()?.let { repo.getExercise(it.exerciseId)?.name }
@@ -287,6 +297,53 @@ class SetLoggingViewModel @Inject constructor(
         recomputePlates()
     }
 
+    // ── Typing the load in directly ──
+
+    /**
+     * Opens the keypad on an empty field.
+     *
+     * The steppers walk the increments the equipment is *believed* to have; this records
+     * what was actually on the machine. Those are different jobs, and only the first one
+     * existed — so a stack marked in levels, or any weight the seeded ladder did not
+     * happen to contain, simply could not be logged.
+     */
+    fun startLoadEntry() = _state.update { it.copy(loadEntry = "") }
+
+    fun cancelLoadEntry() = _state.update { it.copy(loadEntry = null) }
+
+    /** [key] is a digit or a decimal point. Anything else is ignored. */
+    fun appendLoadDigit(key: Char) = _state.update { state ->
+        val current = state.loadEntry ?: return@update state
+        val next = when {
+            key.isDigit() -> current + key
+            // One point, and none at all on equipment that only reads whole numbers.
+            key == '.' && !state.loadIsWholeNumber && !current.contains('.') ->
+                if (current.isEmpty()) "0." else "$current."
+
+            else -> current
+        }
+        if (next.length > MAX_LOAD_DIGITS) state else state.copy(loadEntry = next)
+    }
+
+    fun backspaceLoadEntry() = _state.update { state ->
+        val current = state.loadEntry ?: return@update state
+        state.copy(loadEntry = current.dropLast(1))
+    }
+
+    /**
+     * Commits what was typed, exactly as typed.
+     *
+     * Deliberately not snapped to [EquipmentEntity.nearestAchievable]: the user is
+     * reporting a fact about a set they have already done, and an inventory of plates the
+     * app only half knows is not entitled to overrule it.
+     */
+    fun commitLoadEntry() {
+        val state = _state.value
+        val typed = state.loadEntry?.toDoubleOrNull() ?: return
+        _state.update { it.copy(loadEntry = null, loadKg = typed.coerceAtLeast(0.0)) }
+        recomputePlates()
+    }
+
     private fun recomputePlates() {
         val eq = equipment
         if (eq != null && eq.loadingScheme == LoadingScheme.PLATE_LOADED) {
@@ -343,10 +400,14 @@ class SetLoggingViewModel @Inject constructor(
                     rir = s.rir,
                     isWarmup = s.isWarmup,
                     completedAt = now,
-                    restTakenSeconds = null,
+                    // How long the user actually rested before this set, not the
+                    // prescription. This column was always written null, which made it a
+                    // column that recorded nothing.
+                    restTakenSeconds = restTakenBefore(now),
                 )
             )
             if (isPr) prSetIds.update { it + id }
+            lastSetCompletedAt = now
 
             _events.tryEmit(if (isPr) WorkoutEvent.PrHit else WorkoutEvent.SetLogged)
 
@@ -355,6 +416,20 @@ class SetLoggingViewModel @Inject constructor(
 
             startRest()
         }
+    }
+
+    /**
+     * Seconds between the previous set finishing and this one, or null for the first set
+     * of a lift — there is nothing to have rested from.
+     *
+     * Measured from when the last set was logged rather than from the timer, so it stays
+     * honest whether the user waited out the countdown, skipped it, or left the app and
+     * came back.
+     */
+    private fun restTakenBefore(now: Long): Int? {
+        val previous = lastSetCompletedAt ?: return null
+        val seconds = ((now - previous) / 1000L).toInt()
+        return seconds.takeIf { it in 0..MAX_REST_SECONDS }
     }
 
     // ── Rest timer (auto-starts on completion at the prescribed interval) ──
@@ -442,12 +517,20 @@ class SetLoggingViewModel @Inject constructor(
 
     // ── Helpers ──
 
+    /**
+     * Where the readout opens.
+     *
+     * A stored working load is used as it stands. It came either from the progression
+     * engine, which already only produces loads the equipment can make, or from a weight
+     * the user typed in — and re-snapping either of those to an inventory the app is only
+     * guessing at would quietly change a number that was already right.
+     */
     private fun resolveStartLoad(slot: TemplateSlotEntity?, eq: EquipmentEntity?): Double {
-        val desired = slot?.workingLoadKg
-            ?: eq?.barWeightKg
+        slot?.workingLoadKg?.let { return it }
+        val fallback = eq?.barWeightKg
             ?: eq?.availableLoads?.firstOrNull()
-            ?: 20.0
-        return eq?.nearestAchievable(desired) ?: desired
+            ?: if (eq?.loadingScheme == LoadingScheme.RESISTANCE_LEVEL) 1.0 else 20.0
+        return eq?.nearestAchievable(fallback) ?: fallback
     }
 
     private fun supersetLabel(group: Int?): String? =
@@ -463,23 +546,32 @@ class SetLoggingViewModel @Inject constructor(
         else -> "SET $logged LOGGED · LAST ONE"
     }
 
+    /**
+     * Why the weight on screen is the weight on screen.
+     *
+     * This used to say "Same weight as your last set" the moment anything was logged,
+     * including right after the user had changed the load — the one moment it is certainly
+     * untrue. It now reads the load actually showing against the load actually logged.
+     */
     private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
+        val currentLoad = _state.value.loadKg
         val lastWorking = logged.lastOrNull { !it.isWarmup }
         return when {
-            lastWorking != null -> "Same weight as your last set —"
-            previous.isNotEmpty() -> "Based on your last session —"
-            else -> ""
+            lastWorking == null ->
+                if (previous.isNotEmpty()) "Based on your last session —" else ""
+
+            kotlin.math.abs(lastWorking.loadKg - currentLoad) < LOAD_EPSILON ->
+                "Same weight as your last set —"
+
+            currentLoad > lastWorking.loadKg ->
+                "Up from ${formatKg(lastWorking.loadKg)} kg —"
+
+            else -> "Down from ${formatKg(lastWorking.loadKg)} kg —"
         }
     }
 
     private fun buildRestCoachText(remaining: Int, loadKg: Double, nextExercise: String?): String {
-        val restSeconds = slot?.restSeconds ?: DEFAULT_REST_SECONDS
-        val restMinutes = restSeconds / 60
-        val restLabel = if (restMinutes >= 1) {
-            "$restMinutes minute${if (restMinutes > 1) "s" else ""}"
-        } else {
-            "$restSeconds seconds"
-        }
+        val restLabel = ProgramGenerator.formatRest(slot?.restSeconds ?: DEFAULT_REST_SECONDS)
         return when {
             remaining > 0 -> "$restLabel is the prescription. Next set: same ${formatKg(loadKg)} kg."
             nextExercise != null -> "That's this lift done. $nextExercise is up next."
@@ -509,5 +601,11 @@ class SetLoggingViewModel @Inject constructor(
 
         private const val PRIMARY_WEIGHT = 2.0
         private const val SECONDARY_WEIGHT = 1.0
+
+        /** Loads are stored as doubles; this is "the same weight" in kg. */
+        private const val LOAD_EPSILON = 0.001
+
+        /** Enough for "1234.75". Past that the user has mistyped, not lifted. */
+        private const val MAX_LOAD_DIGITS = 7
     }
 }

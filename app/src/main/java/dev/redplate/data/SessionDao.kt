@@ -3,6 +3,9 @@ package dev.redplate.data
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
+/** Projection for the "you train these most" list, so the whole table need not be read. */
+data class ExerciseSetCount(val exerciseId: String, val setCount: Int)
+
 @Dao
 interface SessionDao {
 
@@ -29,6 +32,21 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY id ASC")
     suspend fun getAllSessions(): List<SessionEntity>
 
+    /** Every session logged against one week of one block — the unit a volume snapshot covers. */
+    @Query("SELECT * FROM sessions WHERE mesocycleId = :mesocycleId AND weekNumber = :week")
+    suspend fun getSessionsForBlockWeek(mesocycleId: Long, week: Int): List<SessionEntity>
+
+    @Query("SELECT * FROM sessions WHERE mesocycleId = :mesocycleId ORDER BY startedAt ASC")
+    suspend fun getSessionsForMesocycle(mesocycleId: Long): List<SessionEntity>
+
+    /** Half-open window, matching [TrainingClock.dayBounds]. */
+    @Query("""
+        SELECT * FROM sessions
+        WHERE startedAt >= :since AND startedAt < :until
+        ORDER BY startedAt ASC
+    """)
+    suspend fun getSessionsStartedBetween(since: Long, until: Long): List<SessionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSessions(sessions: List<SessionEntity>)
 
@@ -52,8 +70,59 @@ interface SessionDao {
     @Query("SELECT * FROM set_logs WHERE sessionId = :sessionId ORDER BY setIndex ASC")
     suspend fun getSetsForSession(sessionId: Long): List<SetLogEntity>
 
+    /**
+     * The whole table. Only the JSON and CSV exports have any business calling this —
+     * everything else wants a bounded query, because this grows without limit.
+     */
     @Query("SELECT * FROM set_logs ORDER BY id ASC")
     suspend fun getAllSetLogs(): List<SetLogEntity>
+
+    @Query("SELECT * FROM set_logs WHERE sessionId IN (:sessionIds)")
+    suspend fun getSetsForSessions(sessionIds: List<Long>): List<SetLogEntity>
+
+    /** Half-open window, matching [TrainingClock.dayBounds]. */
+    @Query("""
+        SELECT * FROM set_logs
+        WHERE completedAt >= :since AND completedAt < :until
+        ORDER BY completedAt ASC
+    """)
+    suspend fun getSetLogsBetween(since: Long, until: Long): List<SetLogEntity>
+
+    @Query("""
+        SELECT * FROM set_logs
+        WHERE exerciseId = :exerciseId AND isWarmup = 0
+        ORDER BY completedAt DESC
+        LIMIT 1
+    """)
+    suspend fun getLatestWorkingSet(exerciseId: String): SetLogEntity?
+
+    @Query("""
+        SELECT * FROM set_logs
+        WHERE exerciseId = :exerciseId AND isWarmup = 0
+        ORDER BY completedAt ASC
+    """)
+    suspend fun getWorkingSetsForExercise(exerciseId: String): List<SetLogEntity>
+
+    @Query("SELECT COUNT(*) FROM set_logs WHERE isWarmup = 0")
+    suspend fun countWorkingSets(): Int
+
+    @Query("SELECT COUNT(*) FROM set_logs")
+    suspend fun countSetLogs(): Int
+
+    @Query("SELECT COUNT(*) FROM sessions")
+    suspend fun countSessions(): Int
+
+    @Query("SELECT MAX(startedAt) FROM sessions")
+    suspend fun lastSessionStartedAt(): Long?
+
+    @Query("SELECT MIN(startedAt) FROM sessions")
+    suspend fun firstSessionStartedAt(): Long?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM sessions WHERE templateId = :templateId)")
+    suspend fun hasSessionsForTemplate(templateId: Long): Boolean
+
+    @Query("SELECT exerciseId, COUNT(*) AS setCount FROM set_logs WHERE isWarmup = 0 GROUP BY exerciseId")
+    suspend fun workingSetCountsByExercise(): List<ExerciseSetCount>
 
     @Query("""
         SELECT * FROM set_logs
@@ -68,10 +137,23 @@ interface SessionDao {
     """)
     suspend fun getEstimated1Rm(exerciseId: String): Double?
 
+    /** The bar to beat for a PR *within* a session: everything logged before it. */
+    @Query("""
+        SELECT MAX(loadKg * (1 + reps / 30.0)) FROM set_logs
+        WHERE exerciseId = :exerciseId AND isWarmup = 0 AND reps <= 12
+          AND sessionId != :sessionId
+    """)
+    suspend fun getEstimated1RmExcludingSession(exerciseId: String, sessionId: Long): Double?
+
+    /**
+     * The best set ever logged for a lift, ranked by estimated 1RM — the same Epley
+     * definition [getEstimated1Rm] uses. It used to rank by raw load, so 100 kg x 1 beat
+     * 95 kg x 8 while the PR banner beside it disagreed. One definition of "best".
+     */
     @Query("""
         SELECT * FROM set_logs
-        WHERE exerciseId = :exerciseId AND isWarmup = 0
-        ORDER BY loadKg DESC, reps DESC
+        WHERE exerciseId = :exerciseId AND isWarmup = 0 AND reps <= 12
+        ORDER BY (loadKg * (1 + reps / 30.0)) DESC, completedAt DESC
         LIMIT 1
     """)
     suspend fun getPrSet(exerciseId: String): SetLogEntity?

@@ -38,10 +38,13 @@ calculator and the weight readout, and it is legible from the rack at two metres
 | 10 kg  | Green     | `#00843D` |
 | 5 kg   | White     | `#F2F2F2` |
 | 2.5 kg | Black     | `#1A1A1A` |
+| 1.25 kg| Chrome    | `#C0C0C0` |
 
 The colours are functional, not decorative. Plates are only ever drawn from the pairs you
 actually own, heaviest first, in rack order. If a target weight can't be assembled from your
-plates, the app says so rather than showing a number you can't load.
+plates, the app says so rather than showing a number you can't load — and it searches the
+pairs exhaustively rather than greedily, so an odd set (one pair of 10s, two of 7.5s) still
+reaches every weight it can actually make.
 
 ---
 
@@ -59,7 +62,17 @@ adapts it from your own history.
   Secondary muscles get half credit; a set only counts if it was logged at 0–3 reps in reserve.
 - **Progression rules** — double progression for hypertrophy, load progression for strength
   compounds, RIR autoregulation, all stepping by increments your equipment can physically make.
-- **Explains itself** — every slot can render its own prescription in a sentence. No black boxes.
+  Each rule is a separate decision in `ProgressionEngine`, and what it decides is written back
+  to the slot: the next session actually opens at the load you earned. An effort you didn't
+  report never earns an increase.
+- **Blocks that move** — a week advances when its sessions are done, not when the calendar
+  says so. Sets climb toward your adaptive range, the final week halves them and drops the
+  load, and the next block is seeded from what you lifted.
+- **Explains itself** — every slot can render its own prescription in a sentence, and every
+  load change says what earned it. No black boxes.
+- **Changeable** — goal, days per week, session length, priority muscles and which weekdays
+  you train are all editable afterwards. Rebuilding the plan keeps your history and carries
+  your loads forward.
 
 ### Knows what's in your gym
 
@@ -76,6 +89,16 @@ If your dumbbells jump 10 → 12 → 14 kg, the engine never prescribes 13. If y
 moves in 2.5 kg pins, progression accounts for a jump that might be 15% of the working load.
 Equipment whose contents aren't confirmed is marked unavailable and excluded — **fail closed,
 never guess open**.
+
+Not every machine is marked in kilograms. A stack numbered 1, 2, 3 with no mass printed on it
+is a `RESISTANCE_LEVEL` machine: the readout says `LEVEL 7`, the steppers move one notch at a
+time, and no kilogram figure is invented. Levels are ordinal, so they're never converted and
+never added into tonnage — level 8 is harder than level 6, but it isn't eight kilograms.
+
+**And whatever the app thinks, you can overrule it.** Tap the load readout during a set and
+type what you actually used, on a 64 dp keypad rather than the system keyboard. That value is
+stored exactly as entered — never snapped to a plate inventory or a ladder the app is only
+guessing at. Steppers are for convenience; the keypad is for the truth.
 
 ### Built for a gym floor, not a desk
 
@@ -164,7 +187,13 @@ movement on a staggered loop, which makes a grid readable without reading a sing
 
 Data loss is the only unrecoverable failure in this project, so it gets three independent paths:
 
-1. **Android Auto Backup** — automatic, free, includes the Room database and excludes caches.
+1. **Android Auto Backup** — automatic and free, kept on with real rules rather than the
+   template ones. Only `redplate.db` goes up; the `-wal` and `-shm` sidecars are excluded on
+   purpose. Auto Backup does not pause the app, so a snapshot that catches those three files
+   at different moments restores a database SQLite refuses to open — the torn restore. The
+   write-ahead log is checkpointed into the database file when a session ends, so what gets
+   backed up carries the training that was actually logged. Treat this as the convenience
+   path; the JSON export is the one to rely on.
 2. **JSON export / import** via the Storage Access Framework — full fidelity, rebuilds the
    entire database. Import is **atomic**: the file is fully parsed before anything is touched,
    and the wipe plus every insert run in one transaction, so a bad file leaves your log intact.
@@ -174,7 +203,8 @@ Data loss is the only unrecoverable failure in this project, so it gets three in
 
 The backup screen reports what is actually in the database and tells you the outcome of every
 export and restore, success or failure. A silent failure there is the worst case — it would
-leave you believing a backup exists.
+leave you believing a backup exists. Exports are written with truncation, so overwriting a
+larger backup with a smaller one cannot leave the old file's tail behind.
 
 Room migrations are always real. There is no destructive fallback anywhere in the build.
 
@@ -223,18 +253,30 @@ sideloaded set in the app's external files directory, so the media can be swappe
 ## Build
 
 **Requirements:** Android Studio (current stable), Android SDK 36, JDK 21.
+Compiles against 36, installs on 29 and up.
 
 ```bash
 ./gradlew :app:assembleDebug        # build
-./gradlew :app:test                 # JVM unit tests — plate maths, program structure
+./gradlew :app:test                 # JVM unit tests — plate maths, progression, the clock
 ./gradlew :app:connectedAndroidTest # instrumented — seeding, backup round-trip
+```
+
+A release build is minified and needs a keystore. Put its details in `local.properties`,
+which is not committed; without them the release build is simply unsigned rather than
+failing to configure.
+
+```properties
+redplate.keystore=/absolute/path/to/redplate.jks
+redplate.keystorePassword=…
+redplate.keyAlias=redplate
+redplate.keyPassword=…
 ```
 
 Optional, to sideload your own exercise media:
 
 ```bash
 adb push media/ /sdcard/Android/data/dev.redplate/files/exercises/
-# filenames: <exerciseId>_start.jpg / <exerciseId>_end.jpg
+# filenames: <exerciseId>_start.jpg / <exerciseId>_end.jpg — .png and .webp also work
 ```
 
 ---

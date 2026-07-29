@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.SessionDao
+import dev.redplate.data.TrainingClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -61,6 +62,7 @@ data class HistoryState(
 class HistoryViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HistoryState())
@@ -109,12 +111,14 @@ class HistoryViewModel @Inject constructor(
      * genuine improvement rather than only the last.
      */
     private suspend fun loadAllPrs() {
+        dayStartHour = trainingClock.dayStartHour()
         val names = exerciseDao.getAll().associate { it.id to it.name }
         val prs = mutableListOf<Pair<Long, PrEntry>>()
 
-        sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup && it.reps in 1..12 }
-            .groupBy { it.exerciseId }
+        // One query per lift rather than the whole table: the PR list only cares about
+        // exercises that have actually been trained.
+        exerciseDao.getTrainedExerciseIds()
+            .associateWith { sessionDao.getWorkingSetsForExercise(it).filter { s -> s.reps in 1..12 } }
             .forEach { (exerciseId, sets) ->
                 var best = 0.0
                 for (set in sets.sortedBy { it.completedAt }) {
@@ -142,6 +146,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     private suspend fun loadExerciseHistory(exerciseId: String) {
+        dayStartHour = trainingClock.dayStartHour()
         val range = _state.value.timeRange
         val cutoff = when (range) {
             TimeRange.TWELVE_WEEKS -> System.currentTimeMillis() - 12L * 7 * 24 * 3600 * 1000
@@ -149,10 +154,10 @@ class HistoryViewModel @Inject constructor(
             TimeRange.ALL -> 0L
         }
 
-        // Get all working sets for this exercise
-        val allSets = sessionDao.getAllSetLogs()
-            .filter { it.exerciseId == exerciseId && !it.isWarmup && it.completedAt >= cutoff }
-            .sortedBy { it.completedAt }
+        // Working sets for this one lift, from the database rather than by filtering the
+        // whole table in memory.
+        val allSets = sessionDao.getWorkingSetsForExercise(exerciseId)
+            .filter { it.completedAt >= cutoff }
 
         // Build e1RM points — group by session (day)
         var maxE1rm = 0.0
@@ -245,11 +250,17 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Cached per load so the non-suspend label helpers can reach it. History dates have to
+     * agree with Today and the week plan, which means the training day, not the calendar
+     * day — a set logged at 01:00 reads as yesterday's session, because it was.
+     */
+    private var dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR
+
     private fun relativeDay(epochMillis: Long): String {
-        val date = java.time.Instant.ofEpochMilli(epochMillis)
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDate()
-        return when (val days = java.time.temporal.ChronoUnit.DAYS.between(date, java.time.LocalDate.now())) {
+        val date = trainingClock.trainingDate(epochMillis, dayStartHour)
+        val today = trainingClock.trainingDate(System.currentTimeMillis(), dayStartHour)
+        return when (val days = java.time.temporal.ChronoUnit.DAYS.between(date, today)) {
             0L -> "TODAY"
             1L -> "YESTERDAY"
             in 2L..13L -> "$days DAYS AGO"
@@ -259,9 +270,7 @@ class HistoryViewModel @Inject constructor(
     }
 
     private fun dayMonth(epochMillis: Long): String {
-        val date = java.time.Instant.ofEpochMilli(epochMillis)
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDate()
+        val date = trainingClock.trainingDate(epochMillis, dayStartHour)
         return "${date.dayOfMonth} ${date.month.name.take(3)}"
     }
 

@@ -1,14 +1,34 @@
 package dev.redplate.onboarding
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.redplate.coach.CoachCopy
+import dev.redplate.data.SeedState
+import dev.redplate.ui.components.CoachHeadline
+import dev.redplate.ui.components.MonoLabel
+import dev.redplate.ui.components.PrimaryBar
+import dev.redplate.ui.theme.RedplateTheme
+import dev.redplate.ui.theme.RedplateType
 
 /**
  * The intake — designs 2c → 2d → 2e → 3a, and 3b when a plan is asked for.
@@ -22,7 +42,8 @@ fun IntakeFlow(
 ) {
     val navController = rememberNavController()
     val viewModel: IntakeViewModel = hiltViewModel()
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val seedState by viewModel.seedState.collectAsStateWithLifecycle()
 
     NavHost(navController = navController, startDestination = "goal") {
         composable("goal") {
@@ -44,21 +65,32 @@ fun IntakeFlow(
             )
         }
 
+        // The first screen that reads seeded rows. Asking about an inventory that has not
+        // been written yet shows an empty gym and no reason for it, so this waits.
         composable("equipment") {
-            EquipmentScreen(
-                equipment = state.filteredEquipment,
-                totalCount = state.totalEquipmentCount,
-                selectedIds = state.selectedEquipmentIds,
-                selectedCount = state.selectedEquipmentCount,
-                equipmentFilter = state.equipmentFilter,
-                dumbbellStep = state.dumbbellStep,
-                searchQuery = state.equipmentSearch,
-                onToggleEquipment = viewModel::toggleEquipment,
-                onSetFilter = viewModel::setEquipmentFilter,
-                onSetDumbbellStep = viewModel::setDumbbellStep,
-                onSearchChange = viewModel::setEquipmentSearch,
-                onNext = { navController.navigate("planFork") },
-            )
+            when (val seed = seedState) {
+                SeedState.Seeding -> SeedWaitScreen()
+
+                is SeedState.Failed -> SeedFailedScreen(
+                    message = seed.message,
+                    onRetry = viewModel::retrySeed,
+                )
+
+                SeedState.Ready -> EquipmentScreen(
+                    equipment = state.filteredEquipment,
+                    totalCount = state.totalEquipmentCount,
+                    selectedIds = state.selectedEquipmentIds,
+                    selectedCount = state.selectedEquipmentCount,
+                    equipmentFilter = state.equipmentFilter,
+                    dumbbellStep = state.dumbbellStep,
+                    searchQuery = state.equipmentSearch,
+                    onToggleEquipment = viewModel::toggleEquipment,
+                    onSetFilter = viewModel::setEquipmentFilter,
+                    onSetDumbbellStep = viewModel::setDumbbellStep,
+                    onSearchChange = viewModel::setEquipmentSearch,
+                    onNext = { navController.navigate("planFork") },
+                )
+            }
         }
 
         composable("planFork") {
@@ -96,6 +128,80 @@ fun IntakeFlow(
                 onConfirm = { viewModel.finishIntake(onIntakeComplete) },
             )
         }
+    }
+}
+
+/**
+ * The seed takes a moment on a cold first launch. Says what it is doing rather than
+ * showing a spinner over an empty list.
+ */
+@Composable
+private fun SeedWaitScreen() {
+    val colors = RedplateTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground)
+            .statusBarsPadding()
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        MonoLabel(text = "SETTING UP")
+        Spacer(Modifier.height(10.dp))
+        CoachHeadline(text = CoachCopy.Setup.SEEDING_HEADLINE)
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = CoachCopy.Setup.SEEDING_BODY,
+            style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+            color = colors.inkSecondary,
+        )
+    }
+}
+
+/** A failed seed used to be silent: an app with no exercises and nothing to explain it. */
+@Composable
+private fun SeedFailedScreen(message: String, onRetry: () -> Unit) {
+    val colors = RedplateTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .statusBarsPadding()
+                .padding(horizontal = 22.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            MonoLabel(text = "SETUP FAILED")
+            Spacer(Modifier.height(10.dp))
+            CoachHeadline(text = CoachCopy.Setup.SEED_FAILED_HEADLINE)
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = message,
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                color = colors.inkSecondary,
+            )
+        }
+        PrimaryBar(label = CoachCopy.Setup.SEED_RETRY, onClick = onRetry)
+    }
+}
+
+@Preview
+@Composable
+private fun SeedWaitPreview() {
+    RedplateTheme { SeedWaitScreen() }
+}
+
+@Preview
+@Composable
+private fun SeedFailedPreview() {
+    RedplateTheme {
+        SeedFailedScreen(
+message = CoachCopy.Setup.SEED_FAILED_BODY,
+            onRetry = {},
+        )
     }
 }
 

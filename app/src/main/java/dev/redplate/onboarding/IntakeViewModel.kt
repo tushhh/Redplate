@@ -3,17 +3,21 @@ package dev.redplate.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.DatabaseSeeder
 import dev.redplate.data.EquipmentCategory
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.Goal
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.PlanSettings
 import dev.redplate.data.ProfileDao
 import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramGenerator
+import dev.redplate.data.SeedState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,13 +27,25 @@ class IntakeViewModel @Inject constructor(
     private val profileDao: ProfileDao,
     private val equipmentDao: EquipmentDao,
     private val programGenerator: ProgramGenerator,
+    private val seeder: DatabaseSeeder,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(IntakeState())
     val state: StateFlow<IntakeState> = _state.asStateFlow()
 
+    /** The intake's equipment step reads seeded rows, so it has to wait for the seed. */
+    val seedState: StateFlow<SeedState> = seeder.state
+
+    fun retrySeed() {
+        viewModelScope.launch { seeder.retry() }
+    }
+
     init {
         viewModelScope.launch {
+            // Reading the inventory the instant this ViewModel is built raced the first-run
+            // seed and could come back empty, leaving the user an inventory with nothing
+            // in it and no way to tell why.
+            seeder.state.first { it !is SeedState.Seeding }
             val equipment = equipmentDao.getAll()
             _state.update { state ->
                 state.copy(
@@ -106,12 +122,21 @@ class IntakeViewModel @Inject constructor(
 
         viewModelScope.launch {
             val s = _state.value
-            val profile = ProfileEntity(
-                trainingAgeMonths = s.trainingAgeMonths,
+            // The same [PlanSettings] the "Your plan" screen edits, normalised by the same
+            // rules. Intake and Settings write one shape of answer, not two.
+            val plan = PlanSettings(
+                goal = s.goal ?: Goal.HYPERTROPHY,
                 daysPerWeek = s.daysPerWeek,
                 sessionCeilingMinutes = s.sessionMinutes,
-                goal = s.goal ?: Goal.HYPERTROPHY,
-                bodyweightKg = s.bodyweightKg,
+            ).normalised()
+            val profile = plan.applyTo(
+                ProfileEntity(
+                    trainingAgeMonths = s.trainingAgeMonths,
+                    daysPerWeek = plan.daysPerWeek,
+                    sessionCeilingMinutes = plan.sessionCeilingMinutes,
+                    goal = plan.goal,
+                    bodyweightKg = s.bodyweightKg,
+                )
             )
 
             // Equipment first — the generator only picks what the user can actually load.

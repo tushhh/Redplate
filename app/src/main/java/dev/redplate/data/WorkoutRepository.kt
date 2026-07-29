@@ -16,6 +16,9 @@ class WorkoutRepository @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
+    private val volumeRecorder: VolumeRecorder,
+    private val trainingClock: TrainingClock,
+    private val databaseCheckpoint: DatabaseCheckpoint,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -45,18 +48,31 @@ class WorkoutRepository @Inject constructor(
      */
     suspend fun discardUnusedTemplate(templateId: Long) {
         if (templateId <= 0L) return
-        if (sessionDao.getAllSessions().any { it.templateId == templateId }) return
+        if (sessionDao.hasSessionsForTemplate(templateId)) return
         programDao.getTemplateById(templateId)?.let { programDao.deleteTemplate(it) }
     }
 
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
 
-    /** Stamps the finish time. A session without one is still in progress. */
+    /**
+     * Stamps the finish time and refreshes the block week's volume snapshot. A session
+     * without a finish time is still in progress.
+     *
+     * The snapshot write lives here rather than on the summary screen because a session
+     * can be finished without the summary ever being opened, and `volume_snapshots` is
+     * what every volume readout in the app reads from.
+     */
     suspend fun endSession(sessionId: Long, endedAt: Long) {
         val session = sessionDao.getSessionById(sessionId) ?: return
-        if (session.endedAt == null) {
-            sessionDao.updateSession(session.copy(endedAt = endedAt))
+        val finished = if (session.endedAt == null) {
+            session.copy(endedAt = endedAt).also { sessionDao.updateSession(it) }
+        } else {
+            session
         }
+        volumeRecorder.recordForSession(finished)
+
+        // The session is now history, so make it durable in the file Auto Backup takes.
+        databaseCheckpoint.checkpoint()
     }
 
     suspend fun markExerciseIntroduced(exerciseId: String) =
@@ -85,11 +101,20 @@ class WorkoutRepository @Inject constructor(
     suspend fun startTemplatedSession(templateId: Long, now: Long): Long {
         val template = programDao.getTemplateById(templateId)
         val mesocycle = programDao.getActiveMesocycle()
+        val inActiveBlock = mesocycle != null && template?.mesocycleId == mesocycle.id
+        val week = mesocycle?.currentWeek?.takeIf { inActiveBlock }
         return sessionDao.insertSession(
             SessionEntity(
                 templateId = templateId,
                 mesocycleId = template?.mesocycleId,
-                weekNumber = mesocycle?.currentWeek?.takeIf { template?.mesocycleId == mesocycle.id },
+                weekNumber = week,
+                // Was hardcoded to ACCUMULATION, which made a deload week's history
+                // indistinguishable from a hard one.
+                phase = if (mesocycle != null && week != null) {
+                    mesocycle.phaseForWeek(week)
+                } else {
+                    BlockPhase.ACCUMULATION
+                },
                 startedAt = now,
             )
         )
@@ -112,19 +137,17 @@ class WorkoutRepository @Inject constructor(
      * what to train.
      */
     suspend fun weeklyHardSetsPerMuscle(now: Long = System.currentTimeMillis()): Map<MuscleGroup, Double> {
-        val since = now - SEVEN_DAYS_MILLIS
-        val recent = sessionDao.getAllSetLogs()
-            .filter { it.completedAt >= since && it.countsTowardVolume }
+        // Seven training days back, so a session logged at 01:00 falls on the day it
+        // belongs to rather than tipping in or out of the window by an hour.
+        val dayStartHour = trainingClock.dayStartHour()
+        val today = trainingClock.trainingDate(now, dayStartHour)
+        val since = trainingClock.dayBounds(today.minusDays(SEVEN_DAYS - 1), dayStartHour).first
+        val until = trainingClock.dayBounds(today, dayStartHour).last + 1
+
+        val recent = sessionDao.getSetLogsBetween(since, until)
         if (recent.isEmpty()) return emptyMap()
 
-        val exercises = exerciseDao.getAll().associateBy { it.id }
-        val perMuscle = mutableMapOf<MuscleGroup, Double>()
-        for (set in recent) {
-            val exercise = exercises[set.exerciseId] ?: continue
-            perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
-            exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
-        }
-        return perMuscle
+        return VolumeCredit.perMuscle(recent, exerciseDao.getAll().associateBy { it.id })
     }
 
     /** The whole archive, one query — the exercise browser tiers and filters it in memory. */
@@ -139,41 +162,39 @@ class WorkoutRepository @Inject constructor(
      * the user's own history, not a popularity list shipped with the app.
      */
     suspend fun workingSetCountsByExercise(): Map<String, Int> =
-        sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup }
-            .groupingBy { it.exerciseId }
-            .eachCount()
+        sessionDao.workingSetCountsByExercise().associate { it.exerciseId to it.setCount }
 
     /** One-shot list of exercises for a muscle that the available equipment can support. */
-    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> =
-        exerciseDao.getAll()
+    suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> {
+        val available = availableEquipmentIds()
+        return exerciseDao.getAll()
             .filter { it.primaryMuscle == muscle && !it.isExcluded }
-            .filter { isExerciseAvailable(it) }
+            .filter { EquipmentAvailability.canPerform(it, available) }
+    }
 
     /** Stream of all exercises that can be performed with available equipment, for a given muscle. */
     fun observeExercisesByMuscleWithAvailableEquipment(muscle: MuscleGroup): Flow<List<ExerciseEntity>> =
-        exerciseDao.observeByMuscle(muscle).map { exercises ->
-            exercises.filter { isExerciseAvailable(it) }
-        }
+        exerciseDao.observeByMuscle(muscle).map { exercises -> filterPerformable(exercises) }
 
     /** Stream of all exercises that can be performed with available equipment. */
     fun observeExercisesWithAvailableEquipment(): Flow<List<ExerciseEntity>> =
-        exerciseDao.observeAll().map { exercises ->
-            exercises.filter { isExerciseAvailable(it) }
-        }
+        exerciseDao.observeAll().map { exercises -> filterPerformable(exercises) }
 
-    private companion object {
-        const val SEVEN_DAYS_MILLIS = 7L * 24 * 60 * 60 * 1000
+    /**
+     * The equipment set is read once per emission rather than once per exercise. The
+     * previous shape called a `suspend` lookup from inside a `filter` inside a `Flow.map`,
+     * which is one database round-trip per exercise per emission — 800 of them for the
+     * browser's full list.
+     */
+    private suspend fun filterPerformable(exercises: List<ExerciseEntity>): List<ExerciseEntity> {
+        val available = availableEquipmentIds()
+        return exercises.filter { EquipmentAvailability.canPerform(it, available) }
     }
 
-    /** Check if an exercise can be performed with the available equipment in the gym. */
-    private suspend fun isExerciseAvailable(exercise: ExerciseEntity): Boolean {
-        // If exercise requires no equipment, it's always available
-        if (exercise.requiredEquipmentIds.isEmpty()) return true
-        // Check if any required equipment is available
-        return exercise.requiredEquipmentIds.any { eqId ->
-            val eq = equipmentDao.getById(eqId)
-            eq != null && eq.isAvailable
-        }
+    private suspend fun availableEquipmentIds(): Set<String> =
+        EquipmentAvailability.availableIds(equipmentDao.getAll())
+
+    private companion object {
+        const val SEVEN_DAYS = 7L
     }
 }

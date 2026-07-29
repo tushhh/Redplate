@@ -1,6 +1,7 @@
 package dev.redplate
 
 import android.content.Context
+import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,10 +10,12 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class BackupRoundTripTest {
@@ -401,4 +404,62 @@ class BackupRoundTripTest {
 
         assertEquals(3, db.exerciseDao().count())
         assertEquals(profile, db.profileDao().get())
+    }
+
+    /**
+     * Overwriting a larger backup with a smaller one.
+     *
+     * `openOutputStream(uri)` defaults to mode "w", which on many document providers does
+     * not truncate — so the old file's tail stayed behind the new content and the result
+     * was JSON that would not parse. A backup that silently stops being restorable is the
+     * worst failure this project has, so it is checked end to end through a real Uri.
+     */
+    @Test
+    fun overwritingALargerBackupProducesAFileThatStillImports() = runBlocking {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(ctx.cacheDir, "overwrite-test.json")
+        val uri = Uri.fromFile(file)
+
+        // A large export first: everything seeded, plus enough sets to make the file big.
+        seedAll()
+        db.sessionDao().insertSetLogs(
+            (0 until 500).map { index ->
+                SetLogEntity(
+                    id = 1000L + index,
+                    sessionId = 1,
+                    exerciseId = "bench_press",
+                    setIndex = index,
+                    loadKg = 60.0 + index,
+                    reps = 8,
+                    rir = 2,
+                    completedAt = 1_700_000_000_000L + index,
+                )
+            }
+        )
+        repo.exportToUri(uri)
+        val largeLength = file.length()
+
+        // Then a much smaller one over the top of it.
+        db.clearAllTables()
+        db.exerciseDao().insertAll(exercises)
+        repo.exportToUri(uri)
+
+        assertTrue(
+            "The second export ($file, ${file.length()} bytes) should be smaller " +
+                "than the first ($largeLength bytes) — otherwise this proves nothing",
+            file.length() < largeLength,
+        )
+
+        // The real assertion: no trailing bytes, so it is still a parseable backup.
+        val parsed = repo.json.decodeFromString<BackupData>(file.readText())
+        assertEquals(3, parsed.exercises.size)
+        assertEquals(0, parsed.setLogs.size)
+
+        db.clearAllTables()
+        repo.importFromUri(uri)
+
+        assertEquals(3, db.exerciseDao().count())
+        assertEquals(0, db.sessionDao().getAllSetLogs().size)
+
+        file.delete()
     }

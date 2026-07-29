@@ -30,10 +30,35 @@ enum class EquipmentCategory {
 enum class LoadingScheme {
     PLATE_LOADED,     // barbell / plate machine — increment = 2x smallest plate pair
     FIXED_INCREMENT,  // dumbbells, kettlebells — only discrete sizes owned
-    PIN_STACK,        // selectorised machine — fixed stack increments
+    PIN_STACK,        // selectorised machine — fixed stack increments, marked in kg
+    RESISTANCE_LEVEL, // console or selector marked in numbered levels, not mass
     BODYWEIGHT,       // load = bodyweight (+ optional added)
     BANDED            // qualitative resistance
 }
+
+/**
+ * What the number on a piece of equipment actually means.
+ *
+ * Not every machine is marked in kilograms. Plenty of multi-station gyms number their
+ * stacks 1, 2, 3 with no mass printed anywhere, and inventing a kilogram figure for those
+ * — as the seed used to, with a 5–100 kg ladder it made up — puts a number on screen that
+ * does not appear on the machine.
+ *
+ * Levels are ordinal, not physical: level 8 is heavier than level 6, but it is not "8 kg"
+ * and two levels are not a fixed number of kilograms. So they never convert, and they are
+ * never added into tonnage.
+ */
+enum class LoadUnit(val label: String) {
+    KILOGRAMS("KG"),
+    LEVEL("LEVEL"),
+}
+
+/** The unit this equipment's numbers are read in. */
+val EquipmentEntity.loadUnit: LoadUnit
+    get() = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> LoadUnit.LEVEL
+        else -> LoadUnit.KILOGRAMS
+    }
 
 /**
  * What the user is training for. Drives rep ranges, rest and volume distribution.
@@ -52,8 +77,14 @@ enum class ProgressionRule { DOUBLE_PROGRESSION, LOAD_PROGRESSION, RIR_AUTOREGUL
 @Serializable
 enum class Complexity { BEGINNER, INTERMEDIATE, ADVANCED }
 
+/**
+ * Where a session sits in its block. A Redplate block is [MesocycleEntity.lengthWeeks]
+ * long: accumulation until the final week, then a deload. There is no intensification
+ * phase — an `INTENSIFICATION` value existed here, was never written by anything, and was
+ * removed rather than left as a value the app could not produce.
+ */
 @Serializable
-enum class BlockPhase { ACCUMULATION, INTENSIFICATION, DELOAD }
+enum class BlockPhase { ACCUMULATION, DELOAD }
 
 // ---------------------------------------------------------------------------
 // Profile
@@ -71,7 +102,21 @@ data class ProfileEntity(
     val priorityMuscles: List<MuscleGroup> = emptyList(),   // max 2
     val excludedPatterns: List<MovementPattern> = emptyList(),
     val readinessFlagged: Boolean = false,       // from the one-time screening
-    val useMetric: Boolean = true
+    val useMetric: Boolean = true,
+    /**
+     * Which weekdays the user actually trains on, 0 = Monday. Null falls back to the
+     * split's own layout. Validated against [daysPerWeek] before it is written.
+     */
+    val trainingDays: List<Int>? = null,
+    /**
+     * Hour at which a training day begins. A session logged before it belongs to the
+     * previous training day — see [TrainingClock].
+     *
+     * The literal default must match [TrainingClock.DEFAULT_DAY_START_HOUR]; Room needs a
+     * compile-time constant here so the migration's `DEFAULT 4` and the entity agree.
+     */
+    @ColumnInfo(defaultValue = "4")
+    val dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR
 )
 
 // ---------------------------------------------------------------------------
@@ -102,15 +147,49 @@ data class EquipmentEntity(
         LoadingScheme.PLATE_LOADED -> (platePairs.keys.minOrNull() ?: 1.25) * 2
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.zipWithNext { a, b -> b - a }.minOrNull() ?: 2.5
+        /** One notch. Levels are ordinal, so there is no smaller step than the next one. */
+        LoadingScheme.RESISTANCE_LEVEL -> 1.0
         LoadingScheme.BODYWEIGHT -> 1.25
         LoadingScheme.BANDED -> 0.0
     }
 
-    /** Snap a desired load to the nearest load that can actually be assembled. */
+    /**
+     * Snap a desired load to the nearest assemblable one, in either direction.
+     *
+     * Use this when the goal is "the weight closest to what was asked for" — picking a
+     * starting load, or snapping a stepper. Use [largestLoadableAtOrBelow] when overshooting
+     * would be wrong. These two were one function under this name, which rounded to nearest
+     * for stacks and downward for barbells: two contracts, one name.
+     */
     fun nearestAchievable(desiredKg: Double): Double = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> kotlin.math.round(desiredKg).coerceAtLeast(0.0)
+
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.minByOrNull { kotlin.math.abs(it - desiredKg) } ?: desiredKg
-        LoadingScheme.PLATE_LOADED -> PlateMath.closestLoadable(desiredKg, this)
+
+        LoadingScheme.PLATE_LOADED -> {
+            val below = PlateMath.largestLoadableAtOrBelow(desiredKg, this)
+            val above = PlateMath.nextLoadUp(below, this)
+            if (above <= below || desiredKg - below <= above - desiredKg) below else above
+        }
+
+        else -> desiredKg
+    }
+
+    /**
+     * Heaviest assemblable load not above [desiredKg]. Never overshoots — this is what a
+     * deload and any "back off to" prescription mean.
+     */
+    fun largestLoadableAtOrBelow(desiredKg: Double): Double = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> kotlin.math.floor(desiredKg).coerceAtLeast(0.0)
+
+        LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
+            availableLoads.lastOrNull { it <= desiredKg + 1e-6 }
+                ?: availableLoads.firstOrNull()
+                ?: desiredKg
+
+        LoadingScheme.PLATE_LOADED -> PlateMath.largestLoadableAtOrBelow(desiredKg, this)
+
         else -> desiredKg
     }
 }
@@ -165,7 +244,15 @@ data class MesocycleEntity(
     val currentWeek: Int = 1,
     val isActive: Boolean = true,
     val completedAt: Long? = null
-)
+) {
+    /**
+     * A block accumulates until its final week, which is the deload. Sessions used to be
+     * stamped [BlockPhase.ACCUMULATION] unconditionally, so a deload week's history was
+     * indistinguishable from a hard one.
+     */
+    fun phaseForWeek(week: Int): BlockPhase =
+        if (week >= lengthWeeks) BlockPhase.DELOAD else BlockPhase.ACCUMULATION
+}
 
 @Serializable
 @Entity(
@@ -260,7 +347,16 @@ data class SetLogEntity(
 }
 
 @Serializable
-@Entity(tableName = "volume_snapshots", primaryKeys = ["mesocycleId", "weekNumber", "muscle"])
+@Entity(
+    tableName = "volume_snapshots",
+    primaryKeys = ["mesocycleId", "weekNumber", "muscle"],
+    foreignKeys = [ForeignKey(
+        entity = MesocycleEntity::class,
+        parentColumns = ["id"], childColumns = ["mesocycleId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("mesocycleId")],
+)
 data class VolumeSnapshotEntity(
     val mesocycleId: Long,
     val weekNumber: Int,

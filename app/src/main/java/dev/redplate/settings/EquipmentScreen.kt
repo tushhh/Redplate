@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +45,7 @@ fun EquipmentRoute(
     onBack: () -> Unit,
 ) {
     val viewModel: SettingsViewModel = hiltViewModel()
-    val state by viewModel.equipmentState.collectAsState()
+    val state by viewModel.equipmentState.collectAsStateWithLifecycle()
     EquipmentScreen(
         equipment = state.equipment,
         onToggle = viewModel::toggleEquipment,
@@ -194,6 +194,9 @@ private fun describeLoading(eq: EquipmentEntity): String {
             }
         }
 
+        // Numbered levels, no mass printed on the machine — so there is nothing in
+        // kilograms to describe here.
+        LoadingScheme.RESISTANCE_LEVEL -> parts += "RESISTANCE LEVELS"
         LoadingScheme.BODYWEIGHT -> parts += "BODYWEIGHT"
         LoadingScheme.BANDED -> parts += "BANDS"
         LoadingScheme.PLATE_LOADED -> Unit

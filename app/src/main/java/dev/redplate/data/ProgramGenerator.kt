@@ -12,9 +12,10 @@ import javax.inject.Singleton
  * by [explainSlot], because a prescription the user cannot interrogate is a black box.
  *
  * The shape is a constrained pick, not a search: each day is a fixed list of movement
- * intentions ([SlotSpec]), and each intention is filled by the best exercise the user's
- * equipment can satisfy. An intention with nothing to fill it is dropped rather than
- * substituted with something that trains a different muscle.
+ * intentions ([SlotSpec]), and each intention is filled by the first equipment-valid match
+ * from an id-sorted pool — there is no quality ranking, and the KDoc used to claim there
+ * was. An intention with nothing to fill it is dropped rather than substituted with
+ * something that trains a different muscle.
  */
 @Singleton
 class ProgramGenerator @Inject constructor(
@@ -22,6 +23,7 @@ class ProgramGenerator @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
+    private val sessionDao: SessionDao,
     private val volumeDao: VolumeDao,
 ) {
 
@@ -30,15 +32,13 @@ class ProgramGenerator @Inject constructor(
      * Runs in a single transaction: a half-written program is worse than none.
      */
     suspend fun generate(profile: ProfileEntity, now: Long = System.currentTimeMillis()): Long {
-        val available = equipmentDao.getAll().filter { it.isAvailable }.map { it.id }.toSet()
-        val pool = exerciseDao.getAll()
-            .filter { !it.isExcluded }
-            .filter { it.pattern !in profile.excludedPatterns }
-            .filter { ex -> ex.requiredEquipmentIds.all { it in available } }
-            .sortedBy { it.id } // deterministic tie-break before any preference ordering
+        val pool = performablePool(profile, EquipmentAvailability.availableIds(equipmentDao.getAll()))
 
         val split = Split.forDays(profile.daysPerWeek)
         val plan = buildPlan(split, pool, profile)
+        // The user's chosen weekdays win over the split's own layout when they have set
+        // any; the split default is only a starting suggestion.
+        val weekdays = profile.planSettings().weekdayIndices()
 
         return db.withTransaction {
             programDao.getActiveMesocycle()?.let {
@@ -61,7 +61,7 @@ class ProgramGenerator @Inject constructor(
                     SessionTemplateEntity(
                         mesocycleId = mesocycleId,
                         label = day.label,
-                        dayIndex = split.weekdayIndices[index],
+                        dayIndex = weekdays.getOrElse(index) { split.weekdayIndices[index] },
                     )
                 )
                 programDao.insertSlots(
@@ -97,11 +97,11 @@ class ProgramGenerator @Inject constructor(
         profile: ProfileEntity,
         now: Long = System.currentTimeMillis(),
     ): Long {
-        val available = equipmentDao.getAll().filter { it.isAvailable }.map { it.id }.toSet()
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
         val pool = exerciseDao.getAll()
             .filter { !it.isExcluded }
             .filter { it.pattern !in profile.excludedPatterns }
-            .filter { ex -> ex.requiredEquipmentIds.all { it in available } }
+            .filter { EquipmentAvailability.canPerform(it, available) }
             .sortedBy { it.id }
 
         // Compounds first, then isolation, cycling the picked muscles so no single one
@@ -121,16 +121,10 @@ class ProgramGenerator @Inject constructor(
         if (chosen.isEmpty()) error("No exercises available for the selected muscles")
 
         return db.withTransaction {
-            val mesocycleId = programDao.getActiveMesocycle()?.id
-                ?: programDao.insertMesocycle(
-                    MesocycleEntity(
-                        name = FREESTYLE_BLOCK,
-                        goal = profile.goal,
-                        startedAt = now,
-                        lengthWeeks = 1,
-                        isActive = false,
-                    ),
-                )
+            // Find-or-create the parking block. This used to attach to the *active*
+            // mesocycle whenever one existed, so a one-off body-map session became part of
+            // the current program and the rest-day card announced it as the next session.
+            val mesocycleId = freestyleMesocycleId(profile, now)
 
             val templateId = programDao.insertTemplate(
                 SessionTemplateEntity(
@@ -140,14 +134,20 @@ class ProgramGenerator @Inject constructor(
                 ),
             )
 
-            var budget = profile.sessionCeilingMinutes
             val slots = mutableListOf<TemplateSlotEntity>()
+            val planned = mutableListOf<Pair<Int, Int>>()
             for ((exercise, compound) in chosen) {
                 val rx = Prescription.of(profile.goal, compound)
                 val sets = if (compound) 3 else 2
-                val cost = sets * MINUTES_PER_SET
-                if (budget - cost < 0 && slots.isNotEmpty()) break
-                budget -= cost
+
+                // Rest is most of a session's length, so the budget has to count it.
+                val withThis = planned + (sets to rx.restSeconds)
+                if (slots.isNotEmpty() &&
+                    SessionEstimate.minutesOf(withThis) > profile.sessionCeilingMinutes
+                ) {
+                    break
+                }
+                planned += sets to rx.restSeconds
 
                 slots += TemplateSlotEntity(
                     templateId = templateId,
@@ -165,6 +165,153 @@ class ProgramGenerator @Inject constructor(
             templateId
         }
     }
+
+    /**
+     * The inactive block ad-hoc templates are parked on, created once and reused.
+     *
+     * It must never be the active mesocycle: templates on the active block are the
+     * program, and a one-off session is not part of anyone's program. It stays inactive so
+     * `getActiveMesocycle()` can never return it.
+     */
+    private suspend fun freestyleMesocycleId(profile: ProfileEntity, now: Long): Long =
+        programDao.getAllMesocycles()
+            .firstOrNull { it.name == FREESTYLE_BLOCK && !it.isActive }
+            ?.id
+            ?: programDao.insertMesocycle(
+                MesocycleEntity(
+                    name = FREESTYLE_BLOCK,
+                    goal = profile.goal,
+                    startedAt = now,
+                    lengthWeeks = 1,
+                    isActive = false,
+                ),
+            )
+
+    // ── Revising the plan without rebuilding it (2.1b) ──────────────────
+
+    /**
+     * Re-fits an existing block to the profile's session ceiling.
+     *
+     * Changing only how long a session may run affects nothing but [trimToTimeBudget], so
+     * regenerating the whole block for it would throw away a plan the user may have edited
+     * for no reason. This works on the templates in place: over budget, trailing accessories
+     * come off, isolation first; under budget, the intentions the generator would have
+     * programmed for that day go back on. Slots that survive keep their ids and their
+     * working loads.
+     *
+     * Returns how many templates changed.
+     */
+    suspend fun refitToCeiling(profile: ProfileEntity, mesocycleId: Long): Int {
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        val pool = performablePool(profile, available)
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val split = Split.forDays(profile.daysPerWeek)
+
+        // Untrimmed, so the day's dropped intentions are visible and can be restored.
+        val fullPlan = buildPlan(split, pool, profile, ceilingMinutes = null)
+        val templates = programDao.getAllTemplates()
+            .filter { it.mesocycleId == mesocycleId && it.dayIndex >= 0 }
+            .sortedBy { it.id }
+
+        var changed = 0
+        db.withTransaction {
+            templates.forEachIndexed { index, template ->
+                val slots = programDao.getSlots(template.id).toMutableList()
+                var touched = false
+
+                while (slots.size > MIN_EXERCISES &&
+                    SessionEstimate.minutes(slots) > profile.sessionCeilingMinutes
+                ) {
+                    val isolation = slots.indexOfLast {
+                        exercises[it.exerciseId]?.isCompound == false
+                    }
+                    programDao.deleteSlot(slots.removeAt(if (isolation >= 0) isolation else slots.lastIndex))
+                    touched = true
+                }
+
+                val present = slots.mapTo(mutableSetOf()) { it.exerciseId }
+                for (candidate in fullPlan.getOrNull(index)?.slots.orEmpty()) {
+                    if (candidate.exercise.id in present) continue
+                    val addition = candidate.toSlot(template.id, slots.size, profile.goal)
+                    if (SessionEstimate.minutes(slots + addition) > profile.sessionCeilingMinutes) break
+                    slots += addition.copy(id = programDao.insertSlot(addition))
+                    present += candidate.exercise.id
+                    touched = true
+                }
+
+                // Order indices have to stay dense or the running order develops gaps.
+                slots.forEachIndexed { order, slot ->
+                    if (slot.orderIndex != order) programDao.updateSlot(slot.copy(orderIndex = order))
+                }
+                if (touched) changed++
+            }
+        }
+        return changed
+    }
+
+    /**
+     * Moves an existing block's sessions onto the weekdays the profile now names.
+     *
+     * Not a rebuild: the exercises, the sets, the loads and the logged history are all
+     * untouched — the same session simply happens on a Tuesday instead of a Monday.
+     * Templates are matched to weekdays in their current day order, so an Upper/Lower
+     * A-B-A-B rotation keeps its alternation rather than being reshuffled.
+     *
+     * Returns how many sessions actually moved.
+     */
+    suspend fun rescheduleWeekdays(profile: ProfileEntity, mesocycleId: Long): Int {
+        val weekdays = profile.planSettings().weekdayIndices()
+        val templates = programDao.getAllTemplates()
+            .filter { it.mesocycleId == mesocycleId && it.dayIndex >= 0 }
+            .sortedBy { it.dayIndex }
+
+        var moved = 0
+        db.withTransaction {
+            templates.forEachIndexed { index, template ->
+                // Fewer weekdays than sessions should be impossible — the count is
+                // validated against daysPerWeek before it is stored — but a session with
+                // nowhere to go keeps the day it has rather than vanishing from the week.
+                val day = weekdays.getOrNull(index) ?: return@forEachIndexed
+                if (template.dayIndex != day) {
+                    programDao.updateTemplate(template.copy(dayIndex = day))
+                    moved++
+                }
+            }
+        }
+        return moved
+    }
+
+    /**
+     * Fills in working loads from what the user has actually lifted.
+     *
+     * Rebuilding a plan must not put every lift back to an empty bar, so a fresh block
+     * starts each slot at the most recent working set logged for that movement — whatever
+     * block it was logged in. Only empty slots are written unless [overwrite] is set.
+     */
+    suspend fun seedLoadsFromHistory(mesocycleId: Long, overwrite: Boolean = false): Int {
+        val templates = programDao.getAllTemplates().filter { it.mesocycleId == mesocycleId }
+        var seeded = 0
+        db.withTransaction {
+            for (template in templates) {
+                for (slot in programDao.getSlots(template.id)) {
+                    if (slot.workingLoadKg != null && !overwrite) continue
+                    val load = sessionDao.getLatestWorkingSet(slot.exerciseId)?.loadKg ?: continue
+                    programDao.updateSlot(slot.copy(workingLoadKg = load))
+                    seeded++
+                }
+            }
+        }
+        return seeded
+    }
+
+    private suspend fun performablePool(
+        profile: ProfileEntity,
+        available: Set<String>,
+    ): List<ExerciseEntity> = exerciseDao.getAll()
+        .filter { !it.isExcluded }
+        .filter { it.pattern !in profile.excludedPatterns }
+        .filter { EquipmentAvailability.canPerform(it, available) }
+        .sortedBy { it.id } // deterministic tie-break before any preference ordering
 
     // ── Editing a template in place (8c: swap a row, add a row) ─────────
 
@@ -238,10 +385,16 @@ class ProgramGenerator @Inject constructor(
 
     // ── Plan assembly ───────────────────────────────────────────────────
 
+    /**
+     * [ceilingMinutes] of null builds the untrimmed plan — every intention the split calls
+     * for, before the time budget takes any of them away. That is what a raised session
+     * ceiling needs in order to know what it can put back.
+     */
     private fun buildPlan(
         split: Split,
         pool: List<ExerciseEntity>,
         profile: ProfileEntity,
+        ceilingMinutes: Int? = profile.sessionCeilingMinutes,
     ): List<PlannedDay> {
         // Exercises already used this week, so the plan varies across days instead of
         // prescribing the same bench press four times.
@@ -253,9 +406,9 @@ class ProgramGenerator @Inject constructor(
                 val exercise = pick(spec, pool, usedToday, usedThisWeek) ?: return@mapNotNull null
                 usedToday += exercise.id
                 usedThisWeek += exercise.id
-                FilledSlot(spec, exercise, setsFor(spec, profile))
+                FilledSlot(spec, exercise, setsFor(spec, profile), profile.goal)
             }
-            PlannedDay(day.label, trimToTimeBudget(filled, profile.sessionCeilingMinutes))
+            PlannedDay(day.label, ceilingMinutes?.let { trimToTimeBudget(filled, it) } ?: filled)
         }
     }
 
@@ -318,7 +471,9 @@ class ProgramGenerator @Inject constructor(
     }
 
     private fun estimateMinutes(slots: List<FilledSlot>): Int =
-        slots.sumOf { it.sets } * MINUTES_PER_SET
+        SessionEstimate.minutesOf(
+            slots.map { it.sets to Prescription.of(it.goal, it.spec.compound).restSeconds }
+        )
 
     // ── Prescription per goal (COACHING.md §3) ──────────────────────────
 
@@ -387,6 +542,8 @@ class ProgramGenerator @Inject constructor(
         val spec: SlotSpec,
         val exercise: ExerciseEntity,
         val sets: Int,
+        /** Carried so the time estimate can read the rest this slot will be prescribed. */
+        val goal: Goal,
     )
 
     private data class PlannedDay(val label: String, val slots: List<FilledSlot>)
@@ -395,7 +552,6 @@ class ProgramGenerator @Inject constructor(
         /** 4 accumulation weeks plus a deload. */
         const val BLOCK_WEEKS = 5
 
-        private const val MINUTES_PER_SET = 3
         private const val MIN_EXERCISES = 3
         private const val NOVICE_MONTHS = 12
 
@@ -408,11 +564,7 @@ class ProgramGenerator @Inject constructor(
          * always be able to answer "why am I doing this?" without a network call.
          */
         fun explainSlot(slot: TemplateSlotEntity, exerciseName: String, goal: Goal): String {
-            val rest = if (slot.restSeconds >= 60) {
-                "${slot.restSeconds / 60} min"
-            } else {
-                "${slot.restSeconds} s"
-            }
+            val rest = formatRest(slot.restSeconds)
             val why = when (goal) {
                 Goal.STRENGTH -> "heavy, low reps and long rests are what move a max"
                 Goal.HYPERTROPHY -> "moderate reps close to failure is what drives growth"
@@ -421,6 +573,17 @@ class ProgramGenerator @Inject constructor(
             }
             return "$exerciseName: ${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} " +
                 "at ${slot.targetRir} in reserve, $rest rest — $why."
+        }
+
+        /**
+         * Integer division rendered both 105 s and 90 s as "1 min", so two different
+         * prescriptions read identically. Seconds are kept whenever they are not zero.
+         */
+        fun formatRest(seconds: Int): String {
+            if (seconds < 60) return "$seconds s"
+            val minutes = seconds / 60
+            val remainder = seconds % 60
+            return if (remainder == 0) "$minutes min" else "${minutes}m ${remainder}s"
         }
     }
 }
@@ -439,8 +602,13 @@ internal data class DaySpec(val label: String, val slots: List<SlotSpec>)
  * Split structure by days available, per COACHING.md §3. Every muscle is trained at
  * least twice a week at 4+ days; at 2–3 days the full-body rotation does the same job.
  *
- * [weekdayIndices] spreads sessions across the week (0 = Monday) rather than stacking
- * them, so consecutive hard days are the exception, not the default.
+ * [weekdayIndices] is the default layout (0 = Monday), chosen to break up runs of hard days
+ * where the schedule leaves room. At six days a week there is exactly one rest day, so the
+ * best available is two blocks of three rather than six consecutive sessions — which is
+ * what [PPL_6] used to prescribe while the docs claimed otherwise.
+ *
+ * These are defaults, not rules: `ProfileEntity.trainingDays` overrides them whenever the
+ * user has picked their own weekdays.
  */
 internal enum class Split(
     val displayName: String,
@@ -467,9 +635,10 @@ internal enum class Split(
         listOf(Days.upperA, Days.lowerA, Days.push, Days.pull, Days.legs),
     ),
 
+    /** Mon–Wed, rest Thursday, Fri–Sun. One rest day is all six sessions leave room for. */
     PPL_6(
         "Push / Pull / Legs",
-        listOf(0, 1, 2, 3, 4, 5),
+        listOf(0, 1, 2, 4, 5, 6),
         listOf(Days.push, Days.pull, Days.legs, Days.pushB, Days.pullB, Days.legsB),
     );
 
