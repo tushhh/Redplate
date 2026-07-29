@@ -26,6 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -315,7 +317,7 @@ private fun DayCardRow(day: DayCard, onClick: () -> Unit, onMove: () -> Unit = {
                 .clip(RoundedCornerShape(13.dp))
                 .background(colors.surfaceRaised)
                 .clickable(onClick = onMove)
-                .semantics { contentDescription = "Move ${day.sessionName} to another day" },
+                .clearAndSetSemantics { contentDescription = "Move ${day.sessionName} to another day" },
             contentAlignment = Alignment.Center,
         ) {
             Text(

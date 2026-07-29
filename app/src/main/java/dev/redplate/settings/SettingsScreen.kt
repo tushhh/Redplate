@@ -219,7 +219,6 @@ private fun SettingsEmptyPreview() {
         SettingsScreen(
             state = SettingsState(
                 sinceLabel = "YOU",
-                statsLine = "80 KG · 0 SESSIONS",
                 plateSummary = "25·20·15·10·5·2.5·1.25",
                 equipmentSummary = "18 items",
                 restSummary = "Set by your plan",
