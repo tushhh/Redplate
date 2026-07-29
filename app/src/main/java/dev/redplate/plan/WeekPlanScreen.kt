@@ -59,8 +59,28 @@ fun WeekPlanRoute(
     WeekPlanScreen(
         state = state,
         onEditTemplate = onEditTemplate,
-        onAdjustTargets = viewModel::resetTargetsToDefaults,
+        onAdjustTargets = viewModel::beginEditingTargets,
+        onMoveDay = viewModel::beginMove,
     )
+
+    state.movingTemplateId?.let {
+        MoveSessionSheet(
+            sessionName = state.movingSessionName.orEmpty(),
+            days = state.days,
+            onPick = viewModel::moveTo,
+            onDismiss = viewModel::cancelMove,
+        )
+    }
+
+    if (state.isEditingTargets) {
+        VolumeTargetSheet(
+            targets = state.targetEdits,
+            onAdjust = viewModel::adjustTarget,
+            onSave = viewModel::saveTargets,
+            onReset = viewModel::resetTargetsToDefaults,
+            onDismiss = viewModel::cancelEditingTargets,
+        )
+    }
 }
 
 @Composable
@@ -68,6 +88,7 @@ fun WeekPlanScreen(
     state: WeekPlanState,
     onEditTemplate: (Long) -> Unit = {},
     onAdjustTargets: () -> Unit = {},
+    onMoveDay: (Long) -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -113,7 +134,11 @@ fun WeekPlanScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 state.days.forEach { day ->
-                    DayCardRow(day = day, onClick = { day.templateId?.let(onEditTemplate) })
+                    DayCardRow(
+                        day = day,
+                        onClick = { day.templateId?.let(onEditTemplate) },
+                        onMove = { day.templateId?.let(onMoveDay) },
+                    )
                 }
             }
 
@@ -225,7 +250,7 @@ fun WeekPlanScreen(
  * chevron button so it reads as openable without competing with today.
  */
 @Composable
-private fun DayCardRow(day: DayCard, onClick: () -> Unit) {
+private fun DayCardRow(day: DayCard, onClick: () -> Unit, onMove: () -> Unit = {}) {
     val colors = RedplateTheme.colors
     val isToday = day.status == DayStatus.TODAY
     val isRest = day.status == DayStatus.REST
@@ -281,6 +306,25 @@ private fun DayCardRow(day: DayCard, onClick: () -> Unit) {
                 color = if (day.status == DayStatus.DONE) colors.inkSubtle else colors.inkMuted,
             )
         }
+
+        // Moving a day is a first-class action, not a hidden drag. CLAUDE.md §4: no
+        // gesture-only actions, and 44 dp of tappable target beside a 64 dp row.
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(colors.surfaceRaised)
+                .clickable(onClick = onMove)
+                .semantics { contentDescription = "Move ${day.sessionName} to another day" },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "⇄",
+                style = RedplateType.body.copy(fontSize = 16.sp),
+                color = colors.inkSecondary,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
 
         when (day.status) {
             DayStatus.DONE -> Text(

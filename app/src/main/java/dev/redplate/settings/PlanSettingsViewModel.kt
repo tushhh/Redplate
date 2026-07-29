@@ -10,18 +10,25 @@ import dev.redplate.data.MuscleGroup
 import dev.redplate.data.PlanRevision
 import dev.redplate.data.PlanRevisionResult
 import dev.redplate.data.PlanSettings
+import dev.redplate.data.ScheduleEditor
 import dev.redplate.data.TrainingClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class PlanSettingsState(
     val saved: PlanSettings? = null,
     val draft: PlanSettings? = null,
     val isSaving: Boolean = false,
+    /** The training day the block begins on, or null when it simply runs from creation. */
+    val startDate: LocalDate? = null,
+    val today: LocalDate? = null,
+    /** First day of the training week, 0 = Monday. */
+    val weekStartsOn: Int = TrainingClock.DEFAULT_WEEK_STARTS_ON,
     /** Shown after a save, so the screen says what it did rather than just closing. */
     val message: String? = null,
     val isLoading: Boolean = true,
@@ -48,6 +55,8 @@ data class PlanSettingsState(
 @HiltViewModel
 class PlanSettingsViewModel @Inject constructor(
     private val planRevision: PlanRevision,
+    private val scheduleEditor: ScheduleEditor,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PlanSettingsState())
@@ -60,7 +69,48 @@ class PlanSettingsViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             val current = planRevision.preview()
-            _state.value = PlanSettingsState(saved = current, draft = current, isLoading = false)
+            _state.value = PlanSettingsState(
+                saved = current,
+                draft = current,
+                startDate = scheduleEditor.startDate(),
+                today = trainingClock.todayDate(),
+                weekStartsOn = trainingClock.weekStartsOn(),
+                isLoading = false,
+            )
+        }
+    }
+
+    // ── Schedule. Applied immediately: these move a calendar, not a plan. ──
+
+    /**
+     * Sets the day the block begins. Nothing about the training changes, so unlike goal or
+     * days-per-week this does not wait for a confirm and does not rebuild anything.
+     */
+    fun setStartDate(date: LocalDate) {
+        viewModelScope.launch {
+            scheduleEditor.setStartDate(date)
+            _state.update { it.copy(startDate = date, message = CoachCopy.Plan.startsOn(date)) }
+        }
+    }
+
+    fun startToday() {
+        viewModelScope.launch {
+            scheduleEditor.startNow()
+            val today = trainingClock.todayDate()
+            _state.update { it.copy(startDate = today, message = CoachCopy.Plan.STARTS_TODAY) }
+        }
+    }
+
+    /** First day of the training week, 0 = Monday. */
+    fun setWeekStartsOn(weekdayIndex: Int) {
+        viewModelScope.launch {
+            scheduleEditor.setWeekStartsOn(weekdayIndex)
+            _state.update {
+                it.copy(
+                    weekStartsOn = weekdayIndex,
+                    message = CoachCopy.Plan.weekStartsOn(weekdayIndex),
+                )
+            }
         }
     }
 
@@ -122,13 +172,15 @@ class PlanSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = planRevision.apply(draft)
             val current = planRevision.preview()
-            _state.value = PlanSettingsState(
-                saved = current,
-                draft = current,
-                isSaving = false,
-                message = describe(result),
-                isLoading = false,
-            )
+            _state.update {
+                it.copy(
+                    saved = current,
+                    draft = current,
+                    isSaving = false,
+                    message = describe(result),
+                    isLoading = false,
+                )
+            }
             onApplied()
         }
     }

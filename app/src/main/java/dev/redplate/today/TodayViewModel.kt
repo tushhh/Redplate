@@ -83,6 +83,20 @@ sealed interface TodayState {
     ) : TodayState
 
     /**
+     * The block is built but its start date has not arrived.
+     *
+     * A plan used to be assumed to begin the instant it was generated, so building one on
+     * a Tuesday meant week 1 was already two days old. Choosing a start date is the point;
+     * honouring it before that date is what makes the choice real.
+     */
+    data class NotStartedYet(
+        val eyebrow: String,
+        val headline: String,
+        val coachBody: String,
+        val firstSessionLabel: String?,
+    ) : TodayState
+
+    /**
      * Today's session is done.
      *
      * Finishing a workout and reopening Today used to show the same "Let's go" card as
@@ -189,6 +203,15 @@ class TodayViewModel @Inject constructor(
         val dayName = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()).uppercase()
         val eyebrow = "$dayName · WEEK ${meso.currentWeek} OF ${meso.lengthWeeks}"
 
+        // A block with a start date in the future has not begun. Saying so beats counting
+        // weeks that have not happened.
+        val beginsOn = meso.beginsAt.takeIf { it > 0L }
+            ?.let { trainingClock.trainingDate(it, dayStartHour) }
+        if (beginsOn != null && today < beginsOn) {
+            _state.value = notStartedState(meso, templates, beginsOn, today, eyebrow)
+            return
+        }
+
         val todaysSessions = sessionsOn(today, dayStartHour)
 
         // Determine which template is today based on rotation
@@ -288,6 +311,38 @@ class TodayViewModel @Inject constructor(
             },
             isFirstSession = isFirst,
             resumeSessionId = resumableSessionId,
+        )
+    }
+
+    private suspend fun notStartedState(
+        meso: MesocycleEntity,
+        templates: List<SessionTemplateEntity>,
+        beginsOn: LocalDate,
+        today: LocalDate,
+        eyebrow: String,
+    ): TodayState.NotStartedYet {
+        val first = scheduled(templates).minByOrNull {
+            Math.floorMod(it.dayIndex - trainingClock.weekdayIndex(beginsOn), 7)
+        }
+        val days = java.time.temporal.ChronoUnit.DAYS.between(today, beginsOn).toInt()
+        val dayName = beginsOn.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+
+        return TodayState.NotStartedYet(
+            eyebrow = eyebrow,
+            headline = when (days) {
+                1 -> "${meso.name} starts tomorrow."
+                else -> "${meso.name} starts $dayName."
+            },
+            coachBody = when {
+                first != null && days == 1 ->
+                    "First session is ${first.label}. Rest up — you start tomorrow."
+
+                first != null ->
+                    "First session is ${first.label}, in $days days. Nothing to do until then."
+
+                else -> "Your plan is built and waiting."
+            },
+            firstSessionLabel = first?.label,
         )
     }
 

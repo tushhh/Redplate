@@ -106,5 +106,22 @@ object Migrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    /**
+     * 4 → 5 puts the schedule under the user's control.
+     *
+     * - `profile.weekStartsOn` — first day of the training week, 0 = Monday. The week was
+     *   hardcoded Monday-to-Sunday, so a block begun on a Thursday spent its first week as
+     *   four days and the plan grid could never match how the user actually trains.
+     * - `mesocycles.beginsAt` — the training day the block is scheduled to start, as epoch
+     *   millis. Distinct from `startedAt`, which is when the block was generated. 0 means
+     *   "already begun", which is right for every block that exists today.
+     */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `profile` ADD COLUMN `weekStartsOn` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `mesocycles` ADD COLUMN `beginsAt` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 }

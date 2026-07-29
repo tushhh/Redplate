@@ -43,7 +43,6 @@ import dev.redplate.ui.theme.RedplateType
 fun SettingsRoute(
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
-    onNavigateToPlates: () -> Unit = {},
     onNavigateToPlan: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = hiltViewModel()
@@ -54,7 +53,6 @@ fun SettingsRoute(
         onSetDeloadPrompts = viewModel::setDeloadPrompts,
         onNavigateToBackup = onNavigateToBackup,
         onNavigateToEquipment = onNavigateToEquipment,
-        onNavigateToPlates = onNavigateToPlates,
         onNavigateToPlan = onNavigateToPlan,
     )
 }
@@ -66,7 +64,6 @@ fun SettingsScreen(
     onSetDeloadPrompts: (Boolean) -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
-    onNavigateToPlates: () -> Unit = {},
     onNavigateToPlan: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
@@ -82,37 +79,21 @@ fun SettingsScreen(
         Spacer(Modifier.height(22.dp))
         MonoLabel(text = state.sinceLabel)
         Spacer(Modifier.height(10.dp))
+        Text(
+            text = state.headline,
+            style = RedplateType.headline.copy(fontSize = 30.sp, lineHeight = 33.sp),
+            color = colors.ink,
+        )
+        Spacer(Modifier.height(14.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(colors.surfaceRaised),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = state.initial,
-                    style = RedplateType.title.copy(fontSize = 24.sp),
-                    color = colors.inkSecondary,
-                )
-            }
-            Spacer(Modifier.size(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = state.name,
-                    style = RedplateType.headline.copy(fontSize = 26.sp, lineHeight = 29.sp),
-                    color = colors.ink,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = state.statsLine,
-                    style = RedplateType.mono.copy(fontSize = 10.5.sp),
-                    color = colors.inkMuted,
-                )
-            }
+        // Three numbers instead of an avatar with an initial in it. This page is about
+        // what has been logged and what the engine is working from, not about a profile.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile("Sessions", state.sessionCountLabel, Modifier.weight(1f))
+            StatTile("PRs this block", state.prCountLabel, Modifier.weight(1f))
+            StatTile("Bodyweight", state.bodyweightLabel, Modifier.weight(1f))
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         SectionLabel(text = "Your plan")
         Spacer(Modifier.height(8.dp))
@@ -127,11 +108,13 @@ fun SettingsScreen(
         SectionLabel(text = "Gets the numbers wrong if wrong")
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // One row, not two. "Plates in your gym" and "Equipment" both opened the same
+            // screen and described the same inventory from two directions.
             ConsequenceRow(
-                label = "Plates in your gym",
-                detail = "Sets what the stack can round to",
-                value = state.plateSummary,
-                onClick = onNavigateToPlates,
+                label = "Weights and equipment",
+                detail = state.plateSummary,
+                value = state.equipmentSummary,
+                onClick = onNavigateToEquipment,
             )
             ConsequenceRow(
                 label = "Units",
@@ -145,12 +128,6 @@ fun SettingsScreen(
                         segmentSize = 44.dp,
                     )
                 },
-            )
-            ConsequenceRow(
-                label = "Equipment",
-                detail = "Filters every suggestion and swap",
-                value = state.equipmentSummary,
-                onClick = onNavigateToEquipment,
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -187,14 +164,42 @@ fun SettingsScreen(
     }
 }
 
+/** One number and what it is. Reads as instrumentation, which is what this page is. */
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    val colors = RedplateTheme.colors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = value,
+            style = RedplateType.figure.copy(fontSize = 24.sp, lineHeight = 26.sp),
+            color = colors.ink,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label.uppercase(),
+            style = RedplateType.mono.copy(fontSize = 9.sp),
+            color = colors.inkMuted,
+        )
+    }
+}
+
 @Preview(name = "9a · You", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun SettingsPreview() {
     RedplateTheme {
         SettingsScreen(
             state = SettingsState(
-                sinceLabel = "YOU · SINCE MARCH 2026",
-                statsLine = "82.4 KG · 146 SESSIONS · 4 PRS THIS BLOCK",
+                sinceLabel = "TRAINING SINCE MARCH 2026",
+                headline = "146 sessions and counting.",
+                sessionCountLabel = "146",
+                prCountLabel = "4",
+                bodyweightLabel = "82.4 kg",
+                planSummary = "Build muscle · 4 days · 60 min",
                 plateSummary = "25·20·15·10·5·2.5·1.25",
                 useMetric = true,
                 equipmentSummary = "18 items",

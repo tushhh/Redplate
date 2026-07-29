@@ -116,7 +116,15 @@ data class ProfileEntity(
      * compile-time constant here so the migration's `DEFAULT 4` and the entity agree.
      */
     @ColumnInfo(defaultValue = "4")
-    val dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR
+    val dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR,
+    /**
+     * First day of the training week, 0 = Monday.
+     *
+     * The week used to be hardcoded Monday-to-Sunday, so a block begun on a Thursday spent
+     * its first "week" as four days. This is the user's week, not the calendar's.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val weekStartsOn: Int = TrainingClock.DEFAULT_WEEK_STARTS_ON
 )
 
 // ---------------------------------------------------------------------------
@@ -243,7 +251,16 @@ data class MesocycleEntity(
     val lengthWeeks: Int = 5,                    // 4 accumulation + 1 deload
     val currentWeek: Int = 1,
     val isActive: Boolean = true,
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    /**
+     * The training date the block is scheduled to begin, as epoch millis.
+     *
+     * Distinct from [startedAt], which is when the block was *created*. A user can build a
+     * plan on Tuesday and start it on Sunday, and until then Today should say the block
+     * has not begun rather than pretending Tuesday was day one.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val beginsAt: Long = 0L
 ) {
     /**
      * A block accumulates until its final week, which is the deload. Sessions used to be

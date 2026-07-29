@@ -134,6 +134,18 @@ fun TodayScreen(
             onSeeFullWeek = onSeeFullWeek,
         )
 
+        // Reuses the rest-day layout: both are "nothing to do today", and giving them one
+        // shape keeps the tab from feeling like three different screens.
+        is TodayState.NotStartedYet -> RestDayScreen(
+            state = TodayState.RestDay(
+                eyebrow = state.eyebrow,
+                headline = state.headline,
+                coachBody = state.coachBody,
+                nextSessionLabel = state.firstSessionLabel,
+            ),
+            onSeeFullWeek = onSeeFullWeek,
+        )
+
         is TodayState.RestDay -> RestDayScreen(state = state, onSeeFullWeek = onSeeFullWeek)
     }
 }
