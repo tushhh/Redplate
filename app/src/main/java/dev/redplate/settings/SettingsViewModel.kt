@@ -29,11 +29,12 @@ import javax.inject.Inject
  * current value visible without tapping in.
  */
 data class SettingsState(
-    val initial: String = "R",
-    val name: String = "You",
     val sinceLabel: String = "YOU",
-    /** "82.4 KG · 146 SESSIONS · 4 PRS THIS BLOCK" */
-    val statsLine: String = "",
+    /** "Four months in." — what the header says, derived from what has been logged. */
+    val headline: String = "Your setup.",
+    val sessionCountLabel: String = "0",
+    val prCountLabel: String = "0",
+    val bodyweightLabel: String = "—",
     /** "Build muscle · 4 days · 60 min" — the plan, readable without tapping in. */
     val planSummary: String = "—",
     val plateSummary: String = "—",
@@ -83,13 +84,12 @@ class SettingsViewModel @Inject constructor(
 
             _state.value = SettingsState(
                 sinceLabel = firstSessionAt
-                    ?.let { "YOU · SINCE ${monthYear(it)}" }
-                    ?: "YOU",
-                statsLine = buildString {
-                    append("${formatKg(profile.bodyweightKg)} KG")
-                    append(" · $sessionCount SESSION${plural(sessionCount)}")
-                    if (meso != null) append(" · $prCount PR${plural(prCount)} THIS BLOCK")
-                },
+                    ?.let { "TRAINING SINCE ${monthYear(it)}" }
+                    ?: "YOUR SETUP",
+                headline = buildHeadline(sessionCount),
+                sessionCountLabel = sessionCount.toString(),
+                prCountLabel = if (meso == null) "—" else prCount.toString(),
+                bodyweightLabel = "${formatKg(profile.bodyweightKg)} kg",
                 planSummary = describePlan(profile),
                 plateSummary = describePlates(available),
                 useMetric = profile.useMetric,
@@ -112,6 +112,14 @@ class SettingsViewModel @Inject constructor(
                 _equipmentState.value = EquipmentListState(equipment, isLoading = false)
             }
         }
+    }
+
+    /** Says something true about how much history there is, rather than a stock greeting. */
+    private fun buildHeadline(sessions: Int): String = when {
+        sessions == 0 -> "Nothing logged yet."
+        sessions == 1 -> "One session in."
+        sessions < 10 -> "$sessions sessions in."
+        else -> "$sessions sessions and counting."
     }
 
     private fun describePlan(profile: ProfileEntity): String {
@@ -179,7 +187,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun plural(n: Int) = if (n == 1) "" else "S"
+    private fun plural(n: Int) = if (n == 1) "" else "s"
 
     private fun monthYear(epochMillis: Long): String =
         Instant.ofEpochMilli(epochMillis)

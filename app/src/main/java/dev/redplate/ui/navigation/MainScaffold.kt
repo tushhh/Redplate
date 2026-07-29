@@ -225,11 +225,9 @@ private fun MainContent() {
                 composable("you") {
                     SettingsRoute(
                         onNavigateToBackup = { navController.navigate("backup") },
+                        // Plates are part of the equipment inventory, so one row opens the
+                        // one screen that owns both.
                         onNavigateToEquipment = { navController.navigate("equipment") },
-                        // Plate pairs are part of the equipment inventory, so the
-                        // "plates in your gym" row opens the screen that owns them
-                        // rather than a plates screen that does not exist.
-                        onNavigateToPlates = { navController.navigate("equipment") },
                         onNavigateToPlan = { navController.navigate("plan-settings") },
                     )
                 }

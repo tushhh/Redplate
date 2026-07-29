@@ -327,7 +327,6 @@ a professional.
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | The contract — non-negotiables, architecture, design system, ergonomics |
 | [`COACHING.md`](COACHING.md) | The engine — intake, equipment model, program generation, progression |
-| [`SCREENS.md`](SCREENS.md) | What each screen is, so screens don't default to flat lists |
 
 If a change conflicts with `CLAUDE.md`, the contract wins — say so before writing the code.
 

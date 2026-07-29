@@ -12,6 +12,8 @@ import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
 import dev.redplate.data.SessionEntity
 import dev.redplate.data.SessionTemplateEntity
+import dev.redplate.data.ScheduleEdit
+import dev.redplate.data.ScheduleEditor
 import dev.redplate.data.SessionEstimate
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TrainingClock
@@ -35,6 +37,8 @@ data class DayCard(
     val status: DayStatus,
     /** "18 SETS · 9.1 T" when done, "20 SETS · 58 MIN · TODAY" today, else "N SETS · PLANNED". */
     val detailLine: String = "",
+    /** 0 = Monday. What a move targets, and what tells a rest day where it sits. */
+    val weekdayIndex: Int = 0,
 )
 
 enum class DayStatus { DONE, TODAY, PLANNED, REST }
@@ -60,6 +64,19 @@ data class WeekPlanState(
     /** What happens to the block next — deload stated up front, never sprung. */
     val blockNote: String = "",
     val isLoading: Boolean = true,
+
+    // ── Rescheduling ────────────────────────────────────────────────
+    /** Non-null while the user is picking a new day for a session. */
+    val movingTemplateId: Long? = null,
+    val movingSessionName: String? = null,
+
+    // ── Volume targets ──────────────────────────────────────────────
+    val isEditingTargets: Boolean = false,
+    /** Working copy of each muscle's weekly cap, uncommitted until saved. */
+    val targetEdits: Map<MuscleGroup, Int> = emptyMap(),
+
+    /** One-shot confirmation of the last edit. Cleared once shown. */
+    val message: String? = null,
 )
 
 @HiltViewModel
@@ -69,6 +86,7 @@ class WeekPlanViewModel @Inject constructor(
     private val volumeDao: VolumeDao,
     private val exerciseDao: ExerciseDao,
     private val trainingClock: TrainingClock,
+    private val scheduleEditor: ScheduleEditor,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WeekPlanState())
@@ -95,7 +113,8 @@ class WeekPlanViewModel @Inject constructor(
         // Only the window the screen actually draws: this week plus the four the average
         // is taken over. This used to load the entire set-log table on every resume.
         val dayStartHour = trainingClock.dayStartHour()
-        val weekStart = trainingClock.weekStart(trainingClock.todayDate())
+        val weekStartsOn = trainingClock.weekStartsOn()
+        val weekStart = trainingClock.weekStart(trainingClock.todayDate(), weekStartsOn)
         val window = trainingClock.weekBounds(weekStart.minusWeeks(PRIOR_WEEKS.toLong()), dayStartHour)
         val until = trainingClock.weekBounds(weekStart, dayStartHour).last + 1
         val recentSets = sessionDao.getSetLogsBetween(window.first, until)
@@ -104,6 +123,7 @@ class WeekPlanViewModel @Inject constructor(
 
         val balance = buildBalance(recentSets, exercises, dayStartHour, weekStart)
 
+        val carried = _state.value
         _state.value = WeekPlanState(
             weekNumber = meso.currentWeek,
             totalWeeks = meso.lengthWeeks,
@@ -114,11 +134,18 @@ class WeekPlanViewModel @Inject constructor(
             } else {
                 BlockPhase.ACCUMULATION
             },
-            days = buildDayCards(templates, recentSets, sessions, dayStartHour, weekStart),
+            days = buildDayCards(templates, recentSets, sessions, dayStartHour, weekStart, weekStartsOn),
             balance = balance,
             balanceCoachLine = buildBalanceCoachLine(balance),
             blockNote = buildBlockNote(meso),
             isLoading = false,
+            // Carried across the reload: a confirmation the user has not read yet, and an
+            // editor they are still in the middle of, are not stale state.
+            movingTemplateId = carried.movingTemplateId,
+            movingSessionName = carried.movingSessionName,
+            isEditingTargets = carried.isEditingTargets,
+            targetEdits = carried.targetEdits,
+            message = carried.message,
         )
     }
 
@@ -130,11 +157,14 @@ class WeekPlanViewModel @Inject constructor(
         sessions: Map<Long, SessionEntity>,
         dayStartHour: Int,
         weekStart: LocalDate,
+        weekStartsOn: Int,
     ): List<DayCard> {
         // Training days, not calendar days: a session logged at 01:00 belongs to the day
         // before, and to last week if that day was a Sunday.
         val today = trainingClock.todayDate()
-        val dayLabels = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+        // The week runs from the user's own first day, not from Monday. Someone who
+        // started training on a Thursday has a Thursday-to-Wednesday week.
+        val order = trainingClock.weekdayOrder(weekStartsOn)
 
         // Tonnage per template for sessions logged this week, so a finished day reports
         // what it actually cost rather than what it was supposed to.
@@ -146,9 +176,10 @@ class WeekPlanViewModel @Inject constructor(
             .groupBy { sessions[it.sessionId]?.templateId }
             .mapValues { (_, sets) -> sets.sumOf { it.loadKg * it.reps } }
 
-        return dayLabels.mapIndexed { index, label ->
+        return order.map { index ->
+            val label = DAY_LABELS[index]
             val template = templates.find { it.dayIndex == index }
-                ?: return@mapIndexed DayCard(label, null, null, 0, DayStatus.REST)
+                ?: return@map DayCard(label, null, null, 0, DayStatus.REST, weekdayIndex = index)
 
             val slots = programDao.getSlots(template.id)
             val sets = slots.sumOf { it.targetSets }
@@ -177,6 +208,7 @@ class WeekPlanViewModel @Inject constructor(
                         "$sets SETS · ${SessionEstimate.minutes(slots)} MIN · TODAY"
                     else -> "$sets SETS · PLANNED"
                 },
+                weekdayIndex = index,
             )
         }
     }
@@ -285,20 +317,130 @@ class WeekPlanViewModel @Inject constructor(
             .ifEmpty { "Every group is inside its cap this week." }
     }
 
+    // ── Moving a session to another day ─────────────────────────────
+
     /**
-     * Restores the default landmarks. "Adjust targets" is a real action rather than a
-     * dead button; per-muscle tuning is a screen that does not exist yet, so this does
-     * the one thing that is unambiguous and reversible.
+     * Opens the day picker for one session. The schedule is the user's to arrange; the
+     * split's layout is a suggestion it opens with, not a cage.
      */
+    fun beginMove(templateId: Long) {
+        val day = _state.value.days.firstOrNull { it.templateId == templateId } ?: return
+        _state.value = _state.value.copy(
+            movingTemplateId = templateId,
+            movingSessionName = day.sessionName,
+        )
+    }
+
+    fun cancelMove() {
+        _state.value = _state.value.copy(movingTemplateId = null, movingSessionName = null)
+    }
+
+    fun moveTo(weekdayIndex: Int) {
+        val templateId = _state.value.movingTemplateId ?: return
+        viewModelScope.launch {
+            val result = scheduleEditor.moveSession(templateId, weekdayIndex)
+            _state.value = _state.value.copy(
+                movingTemplateId = null,
+                movingSessionName = null,
+                message = describeMove(result),
+            )
+            load()
+        }
+    }
+
+    private fun describeMove(edit: ScheduleEdit): String? = when (edit) {
+        is ScheduleEdit.Moved -> "${edit.sessionLabel} moved to ${DAY_NAMES[edit.toWeekdayIndex]}."
+        is ScheduleEdit.Swapped -> "${edit.first} and ${edit.second} swapped days."
+        is ScheduleEdit.DayTaken -> "${edit.occupiedBy} is already on that day."
+        ScheduleEdit.NoActiveBlock -> "There's no active block to reschedule."
+        is ScheduleEdit.StartDateSet -> null
+    }
+
+    fun consumeMessage() {
+        _state.value = _state.value.copy(message = null)
+    }
+
+    // ── Volume targets ──────────────────────────────────────────────
+
+    /** Opens the editor with the landmarks as they stand. */
+    fun beginEditingTargets() {
+        viewModelScope.launch {
+            val stored = volumeDao.getAllLandmarks().associateBy { it.muscle }
+            _state.value = _state.value.copy(
+                targetEdits = CHART_MUSCLES.associateWith { muscle ->
+                    (stored[muscle] ?: VolumeLandmarks.forMuscle(muscle)).mrv
+                },
+                isEditingTargets = true,
+            )
+        }
+    }
+
+    fun cancelEditingTargets() {
+        _state.value = _state.value.copy(isEditingTargets = false, targetEdits = emptyMap())
+    }
+
+    fun adjustTarget(muscle: MuscleGroup, delta: Int) {
+        val current = _state.value.targetEdits[muscle] ?: return
+        _state.value = _state.value.copy(
+            targetEdits = _state.value.targetEdits +
+                (muscle to (current + delta).coerceIn(MIN_TARGET, MAX_TARGET)),
+        )
+    }
+
+    /**
+     * Writes the edited caps, marking each row [VolumeLandmarkEntity.userAdjusted] so
+     * regenerating a program never stamps back over a number the user chose themselves.
+     */
+    fun saveTargets() {
+        val edits = _state.value.targetEdits
+        if (edits.isEmpty()) return
+        viewModelScope.launch {
+            val stored = volumeDao.getAllLandmarks().associateBy { it.muscle }
+            volumeDao.upsertLandmarks(
+                edits.map { (muscle, mrv) ->
+                    val base = stored[muscle] ?: VolumeLandmarks.forMuscle(muscle)
+                    base.copy(
+                        mrv = mrv,
+                        // The adaptive ceiling cannot sit above the recoverable maximum.
+                        mavHigh = base.mavHigh.coerceAtMost(mrv),
+                        userAdjusted = true,
+                    )
+                }
+            )
+            _state.value = _state.value.copy(
+                isEditingTargets = false,
+                targetEdits = emptyMap(),
+                message = "Targets saved. They won't be overwritten when a block is rebuilt.",
+            )
+            load()
+        }
+    }
+
+    /** Back to the values from COACHING.md §3, clearing the user-adjusted flag. */
     fun resetTargetsToDefaults() {
         viewModelScope.launch {
             volumeDao.upsertLandmarks(VolumeLandmarks.DEFAULTS)
+            _state.value = _state.value.copy(
+                isEditingTargets = false,
+                targetEdits = emptyMap(),
+                message = "Targets back to the defaults.",
+            )
             load()
         }
     }
 
     private companion object {
         const val PRIOR_WEEKS = 4
+
+        /** Indexed 0 = Monday, matching SessionTemplateEntity.dayIndex. */
+        val DAY_LABELS = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+        val DAY_NAMES = listOf(
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        )
+
+        /** A cap below this is not a training week; above it is not a recoverable one. */
+        const val MIN_TARGET = 2
+        const val MAX_TARGET = 40
 
         /** The eleven groups the chart draws, in the design's order. */
         val CHART_MUSCLES = listOf(

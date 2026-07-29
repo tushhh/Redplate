@@ -142,5 +142,27 @@ object CoachCopy {
         }
 
         const val NO_PROFILE_TO_CHANGE = "There's no profile to change yet."
+
+        const val STARTS_TODAY = "Your block starts today."
+
+        fun startsOn(date: java.time.LocalDate): String {
+            val day = date.dayOfWeek.getDisplayName(
+                java.time.format.TextStyle.FULL,
+                java.util.Locale.getDefault(),
+            )
+            return "Your block starts $day ${date.dayOfMonth} " +
+                date.month.getDisplayName(
+                    java.time.format.TextStyle.FULL,
+                    java.util.Locale.getDefault(),
+                ) + "."
+        }
+
+        fun weekStartsOn(weekdayIndex: Int): String {
+            val day = java.time.DayOfWeek.of(weekdayIndex + 1).getDisplayName(
+                java.time.format.TextStyle.FULL,
+                java.util.Locale.getDefault(),
+            )
+            return "Your week now runs from $day."
+        }
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,12 +25,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 import dev.redplate.coach.CoachCopy
 import dev.redplate.data.Goal
 import dev.redplate.data.MovementPattern
@@ -59,6 +65,9 @@ fun PlanSettingsRoute(onDone: () -> Unit) {
         onToggleExcluded = viewModel::toggleExcludedPattern,
         onToggleTrainingDay = viewModel::toggleTrainingDay,
         onClearTrainingDays = viewModel::clearTrainingDays,
+        onSetStartDate = viewModel::setStartDate,
+        onStartToday = viewModel::startToday,
+        onSetWeekStartsOn = viewModel::setWeekStartsOn,
         onDiscard = viewModel::discardChanges,
         onConfirm = { viewModel.confirm(onDone) },
     )
@@ -82,6 +91,9 @@ fun PlanSettingsScreen(
     onToggleExcluded: (MovementPattern) -> Unit = {},
     onToggleTrainingDay: (Int) -> Unit = {},
     onClearTrainingDays: () -> Unit = {},
+    onSetStartDate: (LocalDate) -> Unit = {},
+    onStartToday: () -> Unit = {},
+    onSetWeekStartsOn: (Int) -> Unit = {},
     onDiscard: () -> Unit = {},
     onConfirm: () -> Unit = {},
 ) {
@@ -153,6 +165,31 @@ fun PlanSettingsScreen(
             )
             Spacer(Modifier.height(6.dp))
             Caption("Minutes, rest included. Sessions are re-fitted, not rebuilt.")
+            Spacer(Modifier.height(22.dp))
+
+            SectionLabel(text = "When your block starts")
+            Spacer(Modifier.height(8.dp))
+            StartDatePicker(
+                startDate = state.startDate,
+                today = state.today ?: LocalDate.now(),
+                onPick = onSetStartDate,
+                onStartToday = onStartToday,
+            )
+            Spacer(Modifier.height(6.dp))
+            Caption(
+                state.startDate?.let { "Week 1 begins ${describeDate(it)}." }
+                    ?: "Running from the day the plan was built. Pick a day to start it on.",
+            )
+            Spacer(Modifier.height(22.dp))
+
+            SectionLabel(text = "First day of your week")
+            Spacer(Modifier.height(8.dp))
+            WeekStartPicker(selected = state.weekStartsOn, onSelect = onSetWeekStartsOn)
+            Spacer(Modifier.height(6.dp))
+            Caption(
+                "Where the week rolls over. Train Thursday to Wednesday and the plan should " +
+                    "say so, rather than splitting your week across two Mondays.",
+            )
             Spacer(Modifier.height(22.dp))
 
             SectionLabel(text = "Which days you train")
@@ -413,6 +450,96 @@ private fun <T> ToggleGrid(
             }
         }
     }
+}
+
+/**
+ * Picks the day the block begins, from today out to a fortnight.
+ *
+ * A block used to be assumed to have started the moment it was generated, which made
+ * "when do I begin?" a question the app answered for you — usually with the Monday of
+ * whatever week you happened to install it. Two weeks of choices is enough to cover
+ * "tomorrow", "next Monday" and "after this trip" without becoming a calendar widget.
+ */
+@Composable
+private fun StartDatePicker(
+    startDate: LocalDate?,
+    today: LocalDate,
+    onPick: (LocalDate) -> Unit,
+    onStartToday: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+    val options = (0..13).map { today.plusDays(it.toLong()) }
+
+    Column {
+        SecondaryButton(label = "Start today", onClick = onStartToday)
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { date ->
+                val selected = date == startDate
+                Column(
+                    modifier = Modifier
+                        .width(64.dp)
+                        .height(72.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (selected) colors.live else colors.surface)
+                        .clickable { onPick(date) }
+                        .semantics { contentDescription = "Start on ${describeDate(date)}" },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = date.dayOfWeek
+                            .getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                            .uppercase(),
+                        style = RedplateType.mono.copy(fontSize = 9.5.sp),
+                        color = if (selected) colors.inkOnLight else colors.inkMuted,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = date.dayOfMonth.toString(),
+                        style = RedplateType.figure.copy(fontSize = 20.sp),
+                        color = if (selected) colors.inkOnLight else colors.ink,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Which weekday the training week rolls over on. */
+@Composable
+private fun WeekStartPicker(selected: Int, onSelect: (Int) -> Unit) {
+    val colors = RedplateTheme.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        WEEKDAY_LABELS.forEachIndexed { index, label ->
+            val on = index == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (on) colors.ink else colors.surface)
+                    .clickable { onSelect(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = RedplateType.mono.copy(fontSize = 10.sp),
+                    color = if (on) colors.inkOnLight else colors.inkSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+private fun describeDate(date: LocalDate): String {
+    val day = date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val month = date.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    return "$day ${date.dayOfMonth} $month"
 }
 
 // ── Labels ──────────────────────────────────────────────────────────
