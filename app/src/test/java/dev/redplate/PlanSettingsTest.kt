@@ -96,10 +96,53 @@ class PlanSettingsTest {
     }
 
     @Test
-    fun `the day start hour touches neither`() {
+    fun `the day start hour touches nothing about the block`() {
         val later = base.copy(dayStartHour = 8)
         assertFalse(later.needsRebuild(base))
         assertFalse(later.needsRefit(base))
+        assertFalse(later.needsReschedule(base))
+    }
+
+    /**
+     * The bug this guards: a weekday-only change fell through to "nothing to do", so the
+     * profile recorded the new days and every session stayed scheduled where it was.
+     */
+    @Test
+    fun `choosing different weekdays reschedules without rebuilding`() {
+        val moved = base.copy(trainingDays = listOf(1, 2, 4, 5))
+        assertTrue(moved.needsReschedule(base))
+        assertFalse("The exercises do not change, so nothing needs regenerating", moved.needsRebuild(base))
+        assertFalse(moved.needsRefit(base))
+    }
+
+    /** Clearing a custom selection moves the sessions back to the split's layout. */
+    @Test
+    fun `resetting to the split's days is also a reschedule`() {
+        val custom = base.copy(trainingDays = listOf(1, 2, 4, 5))
+        assertTrue(base.needsReschedule(custom))
+    }
+
+    @Test
+    fun `picking the same days the split already uses is not a reschedule`() {
+        val explicit = base.copy(trainingDays = Split.forDays(base.daysPerWeek).weekdayIndices)
+        assertFalse(explicit.needsReschedule(base))
+    }
+
+    /** A weekday move and a longer session can arrive in the same save. */
+    @Test
+    fun `weekdays and session length can both change at once`() {
+        val both = base.copy(trainingDays = listOf(1, 2, 4, 5), sessionCeilingMinutes = 90)
+        assertTrue(both.needsReschedule(base))
+        assertTrue(both.needsRefit(base))
+        assertFalse(both.needsRebuild(base))
+    }
+
+    /** A rebuild regenerates the days from scratch, so it must not also be a reschedule. */
+    @Test
+    fun `a rebuild is not also reported as a reschedule`() {
+        val moreDays = base.copy(daysPerWeek = 5)
+        assertTrue(moreDays.needsRebuild(base))
+        assertFalse(moreDays.needsReschedule(base))
     }
 
     @Test

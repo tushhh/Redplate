@@ -121,9 +121,24 @@ object CoachCopy {
 
         const val ALREADY_FITTED = "Saved. Every session already fitted."
 
-        fun refitted(count: Int) = when (count) {
-            1 -> "Saved. One session was re-fitted to the new length."
-            else -> "Saved. $count sessions were re-fitted to the new length."
+        /**
+         * Says what moved and what was re-shaped, because "saved" on its own is what let
+         * a weekday change look like it had worked when nothing had been rescheduled.
+         */
+        fun adjusted(daysMoved: Int, templatesRefitted: Int): String {
+            val moved = when (daysMoved) {
+                0 -> null
+                1 -> "one session moved to the day you picked"
+                else -> "$daysMoved sessions moved to the days you picked"
+            }
+            val refitted = when (templatesRefitted) {
+                0 -> null
+                1 -> "one session was re-fitted to the new length"
+                else -> "$templatesRefitted sessions were re-fitted to the new length"
+            }
+            val clauses = listOfNotNull(moved, refitted)
+            if (clauses.isEmpty()) return ALREADY_FITTED
+            return "Saved. ${clauses.joinToString(" and ").replaceFirstChar { it.uppercaseChar() }}."
         }
 
         const val NO_PROFILE_TO_CHANGE = "There's no profile to change yet."

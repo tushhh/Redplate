@@ -138,10 +138,8 @@ class PlanSettingsViewModel @Inject constructor(
 
         PlanRevisionResult.SettingsOnly -> CoachCopy.Plan.SETTINGS_ONLY
 
-        is PlanRevisionResult.Refitted -> when (result.templatesChanged) {
-            0 -> CoachCopy.Plan.ALREADY_FITTED
-            else -> CoachCopy.Plan.refitted(result.templatesChanged)
-        }
+        is PlanRevisionResult.Adjusted ->
+            CoachCopy.Plan.adjusted(result.daysMoved, result.templatesRefitted)
 
         is PlanRevisionResult.Rebuilt -> CoachCopy.Plan.REBUILT
     }

@@ -250,6 +250,38 @@ class ProgramGenerator @Inject constructor(
     }
 
     /**
+     * Moves an existing block's sessions onto the weekdays the profile now names.
+     *
+     * Not a rebuild: the exercises, the sets, the loads and the logged history are all
+     * untouched — the same session simply happens on a Tuesday instead of a Monday.
+     * Templates are matched to weekdays in their current day order, so an Upper/Lower
+     * A-B-A-B rotation keeps its alternation rather than being reshuffled.
+     *
+     * Returns how many sessions actually moved.
+     */
+    suspend fun rescheduleWeekdays(profile: ProfileEntity, mesocycleId: Long): Int {
+        val weekdays = profile.planSettings().weekdayIndices()
+        val templates = programDao.getAllTemplates()
+            .filter { it.mesocycleId == mesocycleId && it.dayIndex >= 0 }
+            .sortedBy { it.dayIndex }
+
+        var moved = 0
+        db.withTransaction {
+            templates.forEachIndexed { index, template ->
+                // Fewer weekdays than sessions should be impossible — the count is
+                // validated against daysPerWeek before it is stored — but a session with
+                // nowhere to go keeps the day it has rather than vanishing from the week.
+                val day = weekdays.getOrNull(index) ?: return@forEachIndexed
+                if (template.dayIndex != day) {
+                    programDao.updateTemplate(template.copy(dayIndex = day))
+                    moved++
+                }
+            }
+        }
+        return moved
+    }
+
+    /**
      * Fills in working loads from what the user has actually lifted.
      *
      * Rebuilding a plan must not put every lift back to an empty bar, so a fresh block

@@ -76,6 +76,17 @@ data class PlanSettings(
     fun needsRefit(previous: PlanSettings): Boolean =
         !needsRebuild(previous) && sessionCeilingMinutes != previous.sessionCeilingMinutes
 
+    /**
+     * The weekdays moved, but the plan itself did not.
+     *
+     * Which day a session lands on is not a reason to regenerate anything — the exercises
+     * are the same, they just happen on a Tuesday now. Compared through [weekdayIndices]
+     * rather than on [trainingDays] directly, so clearing a custom selection back to the
+     * split's own layout counts as a move too.
+     */
+    fun needsReschedule(previous: PlanSettings): Boolean =
+        !needsRebuild(previous) && weekdayIndices() != previous.weekdayIndices()
+
     /** Which weekdays a session lands on, falling back to the split's own layout. */
     fun weekdayIndices(): List<Int> =
         trainingDays ?: Split.forDays(daysPerWeek).weekdayIndices
@@ -105,8 +116,11 @@ sealed interface PlanRevisionResult {
     /** Nothing about the block changed — only settings that do not touch it. */
     data object SettingsOnly : PlanRevisionResult
 
-    /** The block kept its identity and its history; sessions were re-fitted to the ceiling. */
-    data class Refitted(val templatesChanged: Int) : PlanRevisionResult
+    /**
+     * The block kept its identity, its slots and its history; sessions moved days and/or
+     * were re-fitted to a new ceiling. Both counts can be non-zero from one save.
+     */
+    data class Adjusted(val daysMoved: Int, val templatesRefitted: Int) : PlanRevisionResult
 
     /** A new block, seeded from the achieved loads. The old one is kept, deactivated. */
     data class Rebuilt(val mesocycleId: Long) : PlanRevisionResult
@@ -140,17 +154,31 @@ class PlanRevision @Inject constructor(
         val updated = profileDao.get() ?: return PlanRevisionResult.NoProfile
         val active = programDao.getActiveMesocycle()
 
-        return when {
-            active == null || next.needsRebuild(previous) -> {
-                val mesocycleId = programGenerator.generate(updated, now)
-                // Achieved loads carry across: a rebuilt plan must not put every lift back
-                // on an empty bar.
-                programGenerator.seedLoadsFromHistory(mesocycleId)
-                PlanRevisionResult.Rebuilt(mesocycleId)
-            }
+        if (active == null || next.needsRebuild(previous)) {
+            val mesocycleId = programGenerator.generate(updated, now)
+            // Achieved loads carry across: a rebuilt plan must not put every lift back
+            // on an empty bar.
+            programGenerator.seedLoadsFromHistory(mesocycleId)
+            return PlanRevisionResult.Rebuilt(mesocycleId)
+        }
 
-            next.needsRefit(previous) ->
-                PlanRevisionResult.Refitted(programGenerator.refitToCeiling(updated, active.id))
+        // Both can apply from one save, so neither is an `else` to the other. Changing
+        // only the weekdays used to fall through to "nothing to do", which wrote the new
+        // days to the profile and left every template scheduled where it already was.
+        val daysMoved = if (next.needsReschedule(previous)) {
+            programGenerator.rescheduleWeekdays(updated, active.id)
+        } else {
+            0
+        }
+        val refitted = if (next.needsRefit(previous)) {
+            programGenerator.refitToCeiling(updated, active.id)
+        } else {
+            0
+        }
+
+        return when {
+            next.needsReschedule(previous) || next.needsRefit(previous) ->
+                PlanRevisionResult.Adjusted(daysMoved, refitted)
 
             else -> PlanRevisionResult.SettingsOnly
         }
