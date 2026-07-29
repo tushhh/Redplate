@@ -72,9 +72,9 @@ class SessionSummaryViewModel @Inject constructor(
         _state.value = SessionSummaryState(
             eyebrow = buildEyebrow(templateLabel, outcome.durationMinutes, outcome.workingSets),
             headline = buildHeadline(prs, outcome.workingSets),
-            coachBody = buildCoachBody(working, prs),
+            coachBody = buildCoachBody(working, prs) + tonnageFootnote(outcome.excludedFromTonnage),
             totalSets = outcome.workingSets,
-            totalTonnage = formatTonnage(outcome.tonnageKg),
+            totalTonnage = formatTonnage(outcome.tonnageKg, outcome.excludedFromTonnage),
             prCount = prs,
             progressionChanges = applyProgression(session, working, slots),
             volumeRows = volumeRows,
@@ -218,9 +218,28 @@ class SessionSummaryViewModel @Inject constructor(
         }
     }
 
-    private fun formatTonnage(kg: Double): String = when {
-        kg >= 1000 -> "${String.format(Locale.getDefault(), "%.1f", kg / 1000)} t"
-        else -> "${kg.roundToInt()} kg"
+    private fun tonnageFootnote(excluded: Int): String = when (excluded) {
+        0 -> ""
+        1 -> "\n\n* One set was logged in resistance levels, which aren't kilograms, so it " +
+            "isn't in the total lifted."
+        else -> "\n\n* $excluded sets were logged in resistance levels, which aren't " +
+            "kilograms, so they aren't in the total lifted."
+    }
+
+    /**
+     * Tonnage counts only what was lifted in kilograms.
+     *
+     * A resistance level is ordinal — level 8 is harder than level 6, but it is not eight
+     * kilograms — so those sets are left out rather than added to a barbell total. The
+     * asterisk is there because a number that quietly excludes half a session is worse
+     * than one that says it does.
+     */
+    private fun formatTonnage(kg: Double, excluded: Int): String {
+        val figure = when {
+            kg >= 1000 -> "${String.format(Locale.getDefault(), "%.1f", kg / 1000)} t"
+            else -> "${kg.roundToInt()} kg"
+        }
+        return if (excluded > 0) "$figure*" else figure
     }
 
     companion object {

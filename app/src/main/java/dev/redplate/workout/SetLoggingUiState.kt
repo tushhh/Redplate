@@ -1,5 +1,6 @@
 package dev.redplate.workout
 
+import dev.redplate.data.LoadUnit
 import dev.redplate.data.MuscleGroup
 import dev.redplate.data.PlateMath
 
@@ -56,6 +57,21 @@ data class SetLoggingUiState(
     val isPlateLoaded: Boolean = false,
     val plateLoad: PlateMath.PlateLoad? = null,
     val isExactLoad: Boolean = true,          // false when plates can't hit the target exactly
+    /**
+     * What the equipment's numbers are read in — "KG", or "LEVEL" for a machine marked in
+     * resistance rather than mass. The readout used to say KG unconditionally, which is a
+     * lie on any machine that prints no weight.
+     */
+    val loadUnitLabel: String = LoadUnit.KILOGRAMS.label,
+    /** Whole numbers only, so the keypad hides the decimal point on a level-marked stack. */
+    val loadIsWholeNumber: Boolean = false,
+
+    // ── Direct load entry ──
+    /**
+     * Digits typed into the keypad, or null when it is closed. Held as text rather than a
+     * number so a half-typed "10." is representable and nothing is rounded until Done.
+     */
+    val loadEntry: String? = null,
 
     // ── Editable inputs (control zone) ──
     val reps: Int = 0,
@@ -73,7 +89,22 @@ data class SetLoggingUiState(
     val restPrimaryAction: RestAction = RestAction.NEXT_SET,
 ) {
     val canCompleteSet: Boolean get() = !isLoading && reps >= 1
+
+    val isEnteringLoad: Boolean get() = loadEntry != null
+
+    /** What the big readout shows: what is being typed, or the load as it stands. */
+    val loadDisplay: String
+        get() = loadEntry ?: formatLoad(loadKg)
+
+    /** Blocks Done on an empty or malformed entry rather than committing a zero. */
+    val canCommitLoadEntry: Boolean
+        get() = loadEntry?.toDoubleOrNull()?.let { it >= 0.0 } == true
 }
+
+/** Trailing ".0" is noise on a readout that has to be legible from two metres. */
+fun formatLoad(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString()
+    else String.format(java.util.Locale.getDefault(), "%.2f", value).trimEnd('0').trimEnd('.', ',')
 
 /**
  * What the rest screen's one primary button does. The label and the behaviour are

@@ -30,10 +30,35 @@ enum class EquipmentCategory {
 enum class LoadingScheme {
     PLATE_LOADED,     // barbell / plate machine — increment = 2x smallest plate pair
     FIXED_INCREMENT,  // dumbbells, kettlebells — only discrete sizes owned
-    PIN_STACK,        // selectorised machine — fixed stack increments
+    PIN_STACK,        // selectorised machine — fixed stack increments, marked in kg
+    RESISTANCE_LEVEL, // console or selector marked in numbered levels, not mass
     BODYWEIGHT,       // load = bodyweight (+ optional added)
     BANDED            // qualitative resistance
 }
+
+/**
+ * What the number on a piece of equipment actually means.
+ *
+ * Not every machine is marked in kilograms. Plenty of multi-station gyms number their
+ * stacks 1, 2, 3 with no mass printed anywhere, and inventing a kilogram figure for those
+ * — as the seed used to, with a 5–100 kg ladder it made up — puts a number on screen that
+ * does not appear on the machine.
+ *
+ * Levels are ordinal, not physical: level 8 is heavier than level 6, but it is not "8 kg"
+ * and two levels are not a fixed number of kilograms. So they never convert, and they are
+ * never added into tonnage.
+ */
+enum class LoadUnit(val label: String) {
+    KILOGRAMS("KG"),
+    LEVEL("LEVEL"),
+}
+
+/** The unit this equipment's numbers are read in. */
+val EquipmentEntity.loadUnit: LoadUnit
+    get() = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> LoadUnit.LEVEL
+        else -> LoadUnit.KILOGRAMS
+    }
 
 /**
  * What the user is training for. Drives rep ranges, rest and volume distribution.
@@ -122,6 +147,8 @@ data class EquipmentEntity(
         LoadingScheme.PLATE_LOADED -> (platePairs.keys.minOrNull() ?: 1.25) * 2
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.zipWithNext { a, b -> b - a }.minOrNull() ?: 2.5
+        /** One notch. Levels are ordinal, so there is no smaller step than the next one. */
+        LoadingScheme.RESISTANCE_LEVEL -> 1.0
         LoadingScheme.BODYWEIGHT -> 1.25
         LoadingScheme.BANDED -> 0.0
     }
@@ -135,6 +162,8 @@ data class EquipmentEntity(
      * for stacks and downward for barbells: two contracts, one name.
      */
     fun nearestAchievable(desiredKg: Double): Double = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> kotlin.math.round(desiredKg).coerceAtLeast(0.0)
+
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.minByOrNull { kotlin.math.abs(it - desiredKg) } ?: desiredKg
 
@@ -152,6 +181,8 @@ data class EquipmentEntity(
      * deload and any "back off to" prescription mean.
      */
     fun largestLoadableAtOrBelow(desiredKg: Double): Double = when (loadingScheme) {
+        LoadingScheme.RESISTANCE_LEVEL -> kotlin.math.floor(desiredKg).coerceAtLeast(0.0)
+
         LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
             availableLoads.lastOrNull { it <= desiredKg + 1e-6 }
                 ?: availableLoads.firstOrNull()

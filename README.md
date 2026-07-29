@@ -90,6 +90,16 @@ moves in 2.5 kg pins, progression accounts for a jump that might be 15% of the w
 Equipment whose contents aren't confirmed is marked unavailable and excluded — **fail closed,
 never guess open**.
 
+Not every machine is marked in kilograms. A stack numbered 1, 2, 3 with no mass printed on it
+is a `RESISTANCE_LEVEL` machine: the readout says `LEVEL 7`, the steppers move one notch at a
+time, and no kilogram figure is invented. Levels are ordinal, so they're never converted and
+never added into tonnage — level 8 is harder than level 6, but it isn't eight kilograms.
+
+**And whatever the app thinks, you can overrule it.** Tap the load readout during a set and
+type what you actually used, on a 64 dp keypad rather than the system keyboard. That value is
+stored exactly as entered — never snapped to a plate inventory or a ladder the app is only
+guessing at. Steppers are for convenience; the keypad is for the truth.
+
 ### Built for a gym floor, not a desk
 
 The ergonomics are hard rules, not preferences ([`CLAUDE.md`](CLAUDE.md) §4):

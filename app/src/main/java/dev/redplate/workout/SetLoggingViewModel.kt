@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseEntity
+import dev.redplate.data.LoadUnit
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.loadUnit
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.PlateMath
 import dev.redplate.data.ProgramGenerator
@@ -118,6 +120,10 @@ class SetLoggingViewModel @Inject constructor(
                     rir = sl?.targetRir,
                     loadKg = startLoad,
                     isPlateLoaded = eq?.loadingScheme == LoadingScheme.PLATE_LOADED,
+                    // The readout says what the machine says. Bodyweight and banded work
+                    // have no dial to read, so they fall back to kilograms of added load.
+                    loadUnitLabel = (eq?.loadUnit ?: LoadUnit.KILOGRAMS).label,
+                    loadIsWholeNumber = eq?.loadingScheme == LoadingScheme.RESISTANCE_LEVEL,
                 )
             }
             val nextName = nextSlot()?.let { repo.getExercise(it.exerciseId)?.name }
@@ -288,6 +294,53 @@ class SetLoggingViewModel @Inject constructor(
 
     private fun setLoad(kg: Double) {
         _state.update { it.copy(loadKg = kg) }
+        recomputePlates()
+    }
+
+    // ── Typing the load in directly ──
+
+    /**
+     * Opens the keypad on an empty field.
+     *
+     * The steppers walk the increments the equipment is *believed* to have; this records
+     * what was actually on the machine. Those are different jobs, and only the first one
+     * existed — so a stack marked in levels, or any weight the seeded ladder did not
+     * happen to contain, simply could not be logged.
+     */
+    fun startLoadEntry() = _state.update { it.copy(loadEntry = "") }
+
+    fun cancelLoadEntry() = _state.update { it.copy(loadEntry = null) }
+
+    /** [key] is a digit or a decimal point. Anything else is ignored. */
+    fun appendLoadDigit(key: Char) = _state.update { state ->
+        val current = state.loadEntry ?: return@update state
+        val next = when {
+            key.isDigit() -> current + key
+            // One point, and none at all on equipment that only reads whole numbers.
+            key == '.' && !state.loadIsWholeNumber && !current.contains('.') ->
+                if (current.isEmpty()) "0." else "$current."
+
+            else -> current
+        }
+        if (next.length > MAX_LOAD_DIGITS) state else state.copy(loadEntry = next)
+    }
+
+    fun backspaceLoadEntry() = _state.update { state ->
+        val current = state.loadEntry ?: return@update state
+        state.copy(loadEntry = current.dropLast(1))
+    }
+
+    /**
+     * Commits what was typed, exactly as typed.
+     *
+     * Deliberately not snapped to [EquipmentEntity.nearestAchievable]: the user is
+     * reporting a fact about a set they have already done, and an inventory of plates the
+     * app only half knows is not entitled to overrule it.
+     */
+    fun commitLoadEntry() {
+        val state = _state.value
+        val typed = state.loadEntry?.toDoubleOrNull() ?: return
+        _state.update { it.copy(loadEntry = null, loadKg = typed.coerceAtLeast(0.0)) }
         recomputePlates()
     }
 
@@ -464,12 +517,20 @@ class SetLoggingViewModel @Inject constructor(
 
     // ── Helpers ──
 
+    /**
+     * Where the readout opens.
+     *
+     * A stored working load is used as it stands. It came either from the progression
+     * engine, which already only produces loads the equipment can make, or from a weight
+     * the user typed in — and re-snapping either of those to an inventory the app is only
+     * guessing at would quietly change a number that was already right.
+     */
     private fun resolveStartLoad(slot: TemplateSlotEntity?, eq: EquipmentEntity?): Double {
-        val desired = slot?.workingLoadKg
-            ?: eq?.barWeightKg
+        slot?.workingLoadKg?.let { return it }
+        val fallback = eq?.barWeightKg
             ?: eq?.availableLoads?.firstOrNull()
-            ?: 20.0
-        return eq?.nearestAchievable(desired) ?: desired
+            ?: if (eq?.loadingScheme == LoadingScheme.RESISTANCE_LEVEL) 1.0 else 20.0
+        return eq?.nearestAchievable(fallback) ?: fallback
     }
 
     private fun supersetLabel(group: Int?): String? =
@@ -543,5 +604,8 @@ class SetLoggingViewModel @Inject constructor(
 
         /** Loads are stored as doubles; this is "the same weight" in kg. */
         private const val LOAD_EPSILON = 0.001
+
+        /** Enough for "1234.75". Past that the user has mistyped, not lifted. */
+        private const val MAX_LOAD_DIGITS = 7
     }
 }

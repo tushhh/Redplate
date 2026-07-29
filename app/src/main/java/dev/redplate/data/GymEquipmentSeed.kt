@@ -35,7 +35,9 @@ object GymEquipmentSeed {
         pinStack("chest_press_machine", "Chest Press Machine"),
         pinStack("shoulder_press_machine", "Shoulder Press Machine"),
         pinStack("leg_curl_machine", "Leg Curl Machine"),
-        pinStack("four_station_multigym", "4-Station Multi-Gym"),
+        // Marked in numbered resistance levels, not kilograms — so the app records the
+        // number that is actually printed on the machine rather than inventing a mass.
+        resistanceLevel("four_station_multigym", "4-Station Multi-Gym"),
 
         // --- Fixtures (#12,13,22,23,24) — no load of their own, gate specific variants ---
         fixture("deadlift_platform", "Deadlift Platform", EquipmentCategory.OTHER),
@@ -124,6 +126,17 @@ object GymEquipmentSeed {
         category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PIN_STACK,
         /* ASSUMPTION: 2.5kg stack increments, 5-100kg. Adjust per-machine if you check the pins. */
         availableLoads = generateSequence(5.0) { it + 2.5 }.takeWhile { it <= 100.0 }.toList()
+    )
+
+    /**
+     * A stack the user reads as a level, not a weight. No [EquipmentEntity.availableLoads]
+     * on purpose: there is no ladder to snap to, and the previous invented 5–100 kg one was
+     * worse than none — it put a kilogram figure on screen that appears nowhere on the
+     * machine, and refused to record the level the user actually set.
+     */
+    private fun resistanceLevel(id: String, name: String) = EquipmentEntity(
+        id = id, displayName = name,
+        category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
     )
 
     private fun fixture(id: String, name: String, category: EquipmentCategory) = EquipmentEntity(

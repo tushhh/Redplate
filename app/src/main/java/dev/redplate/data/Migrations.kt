@@ -77,5 +77,34 @@ object Migrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    /**
+     * 3 → 4 changes data, not structure: the 4-station multi-gym becomes a
+     * `RESISTANCE_LEVEL` machine and loses its invented weight ladder.
+     *
+     * The seed shipped it as a pin stack with `availableLoads` generated from 5 to 100 kg
+     * in 2.5 kg steps, under a comment admitting the figures were an assumption. The
+     * machine is marked in numbered levels and prints no mass at all, so the app was
+     * showing a kilogram number that exists nowhere in the gym and snapping the user onto
+     * it. Clearing the ladder is what lets the level actually be recorded.
+     *
+     * Logged sets are untouched. A set recorded as "37.5" under the old ladder stays 37.5;
+     * it is history, and rewriting history to fit a corrected model is how a training log
+     * stops being trustworthy. New sets record levels.
+     *
+     * No table, column or index changes, so the exported schema for 4 is identical to 3
+     * apart from the version — the same situation as 1 → 2.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                UPDATE `equipment`
+                SET `loadingScheme` = 'RESISTANCE_LEVEL', `availableLoads` = '[]'
+                WHERE `id` = 'four_station_multigym'
+                """.trimIndent()
+            )
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

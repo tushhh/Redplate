@@ -194,6 +194,9 @@ private fun describeLoading(eq: EquipmentEntity): String {
             }
         }
 
+        // Numbered levels, no mass printed on the machine — so there is nothing in
+        // kilograms to describe here.
+        LoadingScheme.RESISTANCE_LEVEL -> parts += "RESISTANCE LEVELS"
         LoadingScheme.BODYWEIGHT -> parts += "BODYWEIGHT"
         LoadingScheme.BANDED -> parts += "BANDS"
         LoadingScheme.PLATE_LOADED -> Unit

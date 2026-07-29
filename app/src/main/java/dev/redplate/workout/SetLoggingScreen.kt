@@ -95,6 +95,7 @@ fun SetLoggingRoute(
         onOpenGuidance = { showGuidance = true },
         onLoadDown = viewModel::loadDown,
         onLoadUp = viewModel::loadUp,
+        onEditLoad = viewModel::startLoadEntry,
         onRepsDown = viewModel::repsDown,
         onRepsUp = viewModel::repsUp,
         onSetDifficulty = viewModel::setDifficulty,
@@ -144,6 +145,21 @@ fun SetLoggingRoute(
         )
     }
 
+    // Driven by ViewModel state rather than local `remember`, because what is half-typed
+    // is part of the set being logged and has to survive a rotation or a process death.
+    state.loadEntry?.let { entry ->
+        LoadEntrySheet(
+            entry = entry,
+            unitLabel = state.loadUnitLabel,
+            allowsDecimal = !state.loadIsWholeNumber,
+            canCommit = state.canCommitLoadEntry,
+            onDigit = viewModel::appendLoadDigit,
+            onBackspace = viewModel::backspaceLoadEntry,
+            onCommit = viewModel::commitLoadEntry,
+            onDismiss = viewModel::cancelLoadEntry,
+        )
+    }
+
     if (showSwap) {
         SwapSheet(
             exerciseName = state.exerciseName,
@@ -169,6 +185,7 @@ fun SetLoggingScreen(
     onOpenGuidance: () -> Unit,
     onLoadDown: () -> Unit,
     onLoadUp: () -> Unit,
+    onEditLoad: () -> Unit,
     onRepsDown: () -> Unit,
     onRepsUp: () -> Unit,
     onSetDifficulty: (Difficulty?) -> Unit,
@@ -203,6 +220,7 @@ fun SetLoggingScreen(
                 onOpenGuidance = onOpenGuidance,
                 onLoadDown = onLoadDown,
                 onLoadUp = onLoadUp,
+                onEditLoad = onEditLoad,
                 onRepsDown = onRepsDown,
                 onRepsUp = onRepsUp,
                 onSetDifficulty = onSetDifficulty,
@@ -228,6 +246,7 @@ private fun InputScreen(
     onOpenGuidance: () -> Unit,
     onLoadDown: () -> Unit,
     onLoadUp: () -> Unit,
+    onEditLoad: () -> Unit,
     onRepsDown: () -> Unit,
     onRepsUp: () -> Unit,
     onSetDifficulty: (Difficulty?) -> Unit,
@@ -283,11 +302,19 @@ private fun InputScreen(
                 Spacer(Modifier.height(2.dp))
             }
 
+            // Tapping the readout types the value in directly. The steppers walk what the
+            // app believes the equipment can make; this records what it actually was.
             Row(
                 verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "Working weight ${formatKg(state.loadKg)} kilograms"
-                },
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onEditLoad)
+                    .padding(vertical = 2.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription =
+                            "Working load ${formatKg(state.loadKg)} ${state.loadUnitLabel}. " +
+                                "Tap to type a different value."
+                    },
             ) {
                 Text(
                     text = formatKg(state.loadKg),
@@ -296,7 +323,7 @@ private fun InputScreen(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "KG",
+                    text = state.loadUnitLabel,
                     style = RedplateType.mono.copy(fontSize = 14.sp),
                     color = colors.inkMuted,
                     modifier = Modifier.padding(bottom = 9.dp),
@@ -305,7 +332,7 @@ private fun InputScreen(
 
             if (!state.isExactLoad) {
                 Text(
-                    text = "Closest the plates allow.",
+                    text = "Closest the plates allow. Tap to enter what you used.",
                     style = RedplateType.mono.copy(fontSize = 10.sp),
                     color = colors.inkMuted,
                 )
@@ -335,6 +362,7 @@ private fun InputScreen(
                 onUp = onRepsUp,
                 onLoadDown = onLoadDown,
                 onLoadUp = onLoadUp,
+                unitLabel = state.loadUnitLabel,
             )
             Spacer(Modifier.height(10.dp))
             DifficultyChips(
@@ -554,6 +582,7 @@ private fun RepCounter(
     onUp: () -> Unit,
     onLoadDown: () -> Unit,
     onLoadUp: () -> Unit,
+    unitLabel: String,
 ) {
     val colors = RedplateTheme.colors
     Row(
@@ -580,8 +609,11 @@ private fun RepCounter(
             )
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LoadNudge("− kg", "Decrease weight", onLoadDown)
-                LoadNudge("+ kg", "Increase weight", onLoadUp)
+                // Labelled in the equipment's own unit — "+ level" on a machine that
+                // prints levels, not a kilogram figure that appears nowhere on it.
+                val unit = unitLabel.lowercase()
+                LoadNudge("− $unit", "Decrease load", onLoadDown)
+                LoadNudge("+ $unit", "Increase load", onLoadUp)
             }
         }
 
@@ -727,7 +759,7 @@ private fun PreviewScreen(state: SetLoggingUiState) {
         SetLoggingScreen(
             state = state,
             onBack = {}, onOpenGuidance = {},
-            onLoadDown = {}, onLoadUp = {},
+            onLoadDown = {}, onLoadUp = {}, onEditLoad = {},
             onRepsDown = {}, onRepsUp = {},
             onSetDifficulty = {}, onCompleteSet = {},
             onRestPrimary = {}, onSubRest = {}, onAddRest = {}, onAddShortRest = {},

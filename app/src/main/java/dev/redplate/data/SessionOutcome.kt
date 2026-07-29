@@ -12,6 +12,8 @@ data class SessionOutcome(
     val workingSets: Int,
     val durationMinutes: Int,
     val tonnageKg: Double,
+    /** Sets logged in resistance levels, which are not kilograms and cannot be summed. */
+    val excludedFromTonnage: Int = 0,
     val prCount: Int,
 ) {
     val isEmpty: Boolean get() = workingSets == 0
@@ -26,19 +28,44 @@ data class SessionOutcome(
 @Singleton
 class SessionOutcomeReader @Inject constructor(
     private val sessionDao: SessionDao,
+    private val exerciseDao: ExerciseDao,
+    private val equipmentDao: EquipmentDao,
 ) {
 
     suspend fun read(session: SessionEntity): SessionOutcome {
         val working = sessionDao.getSetsForSession(session.id).filter { !it.isWarmup }
+        val inKilograms = massBasedSets(working)
         return SessionOutcome(
             workingSets = working.size,
             durationMinutes = session.endedAt
                 ?.let { TimeUnit.MILLISECONDS.toMinutes(it - session.startedAt) }
                 ?.toInt()
                 ?: 0,
-            tonnageKg = working.sumOf { it.loadKg * it.reps },
+            tonnageKg = inKilograms.sumOf { it.loadKg * it.reps },
+            excludedFromTonnage = working.size - inKilograms.size,
             prCount = countPrs(session.id, working),
         )
+    }
+
+    /**
+     * Only sets whose equipment is marked in kilograms count toward tonnage.
+     *
+     * A resistance level is ordinal: level 8 is harder than level 6, but it is not eight
+     * kilograms, and adding it to a barbell total produces a number that means nothing.
+     * PRs are unaffected — those compare a lift against its own history, where the unit is
+     * consistent by construction.
+     */
+    private suspend fun massBasedSets(working: List<SetLogEntity>): List<SetLogEntity> {
+        if (working.isEmpty()) return working
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val equipment = equipmentDao.getAll().associateBy { it.id }
+        return working.filter { set ->
+            val exercise = exercises[set.exerciseId] ?: return@filter true
+            exercise.requiredEquipmentIds
+                .firstNotNullOfOrNull { equipment[it] }
+                ?.let { it.loadUnit == LoadUnit.KILOGRAMS }
+                ?: true
+        }
     }
 
     /**

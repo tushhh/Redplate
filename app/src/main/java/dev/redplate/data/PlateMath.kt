@@ -142,6 +142,9 @@ object PlateMath {
      */
     fun nextLoadUp(currentKg: Double, equipment: EquipmentEntity): Double {
         return when (equipment.loadingScheme) {
+            // Levels are whole numbers with no ceiling the app can know about.
+            LoadingScheme.RESISTANCE_LEVEL -> kotlin.math.floor(currentKg) + 1.0
+
             LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
                 equipment.availableLoads.firstOrNull { it > currentKg + EPSILON } ?: currentKg
             LoadingScheme.PLATE_LOADED -> {
@@ -159,6 +162,9 @@ object PlateMath {
 
     fun nextLoadDown(currentKg: Double, equipment: EquipmentEntity): Double {
         return when (equipment.loadingScheme) {
+            LoadingScheme.RESISTANCE_LEVEL ->
+                (kotlin.math.ceil(currentKg) - 1.0).coerceAtLeast(0.0)
+
             LoadingScheme.FIXED_INCREMENT, LoadingScheme.PIN_STACK ->
                 equipment.availableLoads.lastOrNull { it < currentKg - EPSILON } ?: currentKg
             LoadingScheme.PLATE_LOADED ->
