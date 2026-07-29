@@ -8,16 +8,14 @@ import dev.redplate.data.ExerciseDao
 import dev.redplate.data.MuscleGroup
 import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
+import dev.redplate.data.TrainingClock
+import dev.redplate.data.VolumeCredit
 import dev.redplate.data.TemplateSlotEntity
 import dev.redplate.data.VolumeLandmarks
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -52,6 +50,7 @@ class ProgramBuilderViewModel @Inject constructor(
     private val programDao: ProgramDao,
     private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
+    private val trainingClock: TrainingClock,
 ) : ViewModel() {
 
     private val templateId: Long = savedStateHandle["templateId"] ?: 0L
@@ -105,21 +104,16 @@ class ProgramBuilderViewModel @Inject constructor(
         if (changed.isEmpty()) return emptyList()
 
         val exercises = exerciseDao.getAll().associateBy { it.id }
-        val weekStart = LocalDate.now().with(DayOfWeek.MONDAY)
 
-        val logged = mutableMapOf<MuscleGroup, Double>()
-        sessionDao.getAllSetLogs()
-            .filter {
-                it.countsTowardVolume &&
-                    Instant.ofEpochMilli(it.completedAt)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate() >= weekStart
-            }
-            .forEach { set ->
-                val exercise = exercises[set.exerciseId] ?: return@forEach
-                logged.merge(exercise.primaryMuscle, 1.0, Double::plus)
-                exercise.secondaryMuscles.forEach { logged.merge(it, 0.5, Double::plus) }
-            }
+        // This week's training only, queried by range rather than by loading every set
+        // ever logged and filtering it in Kotlin.
+        val dayStartHour = trainingClock.dayStartHour()
+        val weekStart = trainingClock.weekStart(trainingClock.todayDate())
+        val bounds = trainingClock.weekBounds(weekStart, dayStartHour)
+        val logged = VolumeCredit.perMuscle(
+            sessionDao.getSetLogsBetween(bounds.first, bounds.last + 1),
+            exercises,
+        ).toMutableMap()
 
         val added = mutableMapOf<MuscleGroup, Double>()
         changed.forEach { row ->

@@ -115,6 +115,9 @@ interface SessionDao {
     @Query("SELECT MAX(startedAt) FROM sessions")
     suspend fun lastSessionStartedAt(): Long?
 
+    @Query("SELECT MIN(startedAt) FROM sessions")
+    suspend fun firstSessionStartedAt(): Long?
+
     @Query("SELECT EXISTS(SELECT 1 FROM sessions WHERE templateId = :templateId)")
     suspend fun hasSessionsForTemplate(templateId: Long): Boolean
 

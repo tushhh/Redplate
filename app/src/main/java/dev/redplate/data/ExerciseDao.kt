@@ -45,6 +45,10 @@ interface ExerciseDao {
     @Query("SELECT COUNT(*) FROM exercises")
     suspend fun count(): Int
 
+    /** Ids with at least one working set against them — the only lifts a PR list can hold. */
+    @Query("SELECT DISTINCT exerciseId FROM set_logs WHERE isWarmup = 0")
+    suspend fun getTrainedExerciseIds(): List<String>
+
     @Query("UPDATE exercises SET isExcluded = :excluded WHERE id = :id")
     suspend fun setExcluded(id: String, excluded: Boolean)
 

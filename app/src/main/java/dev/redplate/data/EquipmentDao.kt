@@ -21,6 +21,9 @@ interface EquipmentDao {
     @Query("SELECT * FROM equipment ORDER BY displayName ASC")
     suspend fun getAll(): List<EquipmentEntity>
 
+    @Query("SELECT COUNT(*) FROM equipment")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM equipment ORDER BY displayName ASC")
     fun observeAll(): Flow<List<EquipmentEntity>>
 

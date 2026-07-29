@@ -47,7 +47,7 @@ class WorkoutRepository @Inject constructor(
      */
     suspend fun discardUnusedTemplate(templateId: Long) {
         if (templateId <= 0L) return
-        if (sessionDao.getAllSessions().any { it.templateId == templateId }) return
+        if (sessionDao.hasSessionsForTemplate(templateId)) return
         programDao.getTemplateById(templateId)?.let { programDao.deleteTemplate(it) }
     }
 
@@ -158,10 +158,7 @@ class WorkoutRepository @Inject constructor(
      * the user's own history, not a popularity list shipped with the app.
      */
     suspend fun workingSetCountsByExercise(): Map<String, Int> =
-        sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup }
-            .groupingBy { it.exerciseId }
-            .eachCount()
+        sessionDao.workingSetCountsByExercise().associate { it.exerciseId to it.setCount }
 
     /** One-shot list of exercises for a muscle that the available equipment can support. */
     suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> {

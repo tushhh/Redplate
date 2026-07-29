@@ -115,9 +115,10 @@ class HistoryViewModel @Inject constructor(
         val names = exerciseDao.getAll().associate { it.id to it.name }
         val prs = mutableListOf<Pair<Long, PrEntry>>()
 
-        sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup && it.reps in 1..12 }
-            .groupBy { it.exerciseId }
+        // One query per lift rather than the whole table: the PR list only cares about
+        // exercises that have actually been trained.
+        exerciseDao.getTrainedExerciseIds()
+            .associateWith { sessionDao.getWorkingSetsForExercise(it).filter { s -> s.reps in 1..12 } }
             .forEach { (exerciseId, sets) ->
                 var best = 0.0
                 for (set in sets.sortedBy { it.completedAt }) {
@@ -153,10 +154,10 @@ class HistoryViewModel @Inject constructor(
             TimeRange.ALL -> 0L
         }
 
-        // Get all working sets for this exercise
-        val allSets = sessionDao.getAllSetLogs()
-            .filter { it.exerciseId == exerciseId && !it.isWarmup && it.completedAt >= cutoff }
-            .sortedBy { it.completedAt }
+        // Working sets for this one lift, from the database rather than by filtering the
+        // whole table in memory.
+        val allSets = sessionDao.getWorkingSetsForExercise(exerciseId)
+            .filter { it.completedAt >= cutoff }
 
         // Build e1RM points — group by session (day)
         var maxE1rm = 0.0

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
+import dev.redplate.data.ExerciseDao
 import dev.redplate.data.Goal
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.ProfileDao
@@ -53,6 +54,7 @@ data class EquipmentListState(
 class SettingsViewModel @Inject constructor(
     private val profileDao: ProfileDao,
     private val equipmentDao: EquipmentDao,
+    private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
     private val programDao: ProgramDao,
 ) : ViewModel() {
@@ -73,17 +75,19 @@ class SettingsViewModel @Inject constructor(
             val profile = profileDao.get() ?: return@launch
             val equipment = equipmentDao.getAll()
             val available = equipment.filter { it.isAvailable }
-            val sessions = sessionDao.getAllSessions()
+            // Counted and queried, not loaded: this screen should not scale with history.
+            val sessionCount = sessionDao.countSessions()
+            val firstSessionAt = sessionDao.firstSessionStartedAt()
             val meso = programDao.getActiveMesocycle()
             val prCount = countPrsThisBlock(meso?.startedAt)
 
             _state.value = SettingsState(
-                sinceLabel = sessions.minOfOrNull { it.startedAt }
+                sinceLabel = firstSessionAt
                     ?.let { "YOU · SINCE ${monthYear(it)}" }
                     ?: "YOU",
                 statsLine = buildString {
                     append("${formatKg(profile.bodyweightKg)} KG")
-                    append(" · ${sessions.size} SESSION${plural(sessions.size)}")
+                    append(" · $sessionCount SESSION${plural(sessionCount)}")
                     if (meso != null) append(" · $prCount PR${plural(prCount)} THIS BLOCK")
                 },
                 planSummary = describePlan(profile),
@@ -92,10 +96,10 @@ class SettingsViewModel @Inject constructor(
                 equipmentSummary = "${available.size} item${plural(available.size)}",
                 restSummary = "Set by your plan",
                 deloadPromptsEnabled = _state.value.deloadPromptsEnabled,
-                backupSummary = if (sessions.isEmpty()) {
+                backupSummary = if (sessionCount == 0) {
                     "Nothing logged yet"
                 } else {
-                    "${sessions.size} session${plural(sessions.size)} on this phone"
+                    "$sessionCount session${plural(sessionCount)} on this phone"
                 },
                 isLoading = false,
             )
@@ -136,9 +140,9 @@ class SettingsViewModel @Inject constructor(
      */
     private suspend fun countPrsThisBlock(blockStartedAt: Long?): Int {
         if (blockStartedAt == null) return 0
-        val byExercise = sessionDao.getAllSetLogs()
-            .filter { !it.isWarmup && it.reps in 1..12 }
-            .groupBy { it.exerciseId }
+        val byExercise = exerciseDao.getTrainedExerciseIds().associateWith { exerciseId ->
+            sessionDao.getWorkingSetsForExercise(exerciseId).filter { it.reps in 1..12 }
+        }
 
         var count = 0
         for ((_, sets) in byExercise) {

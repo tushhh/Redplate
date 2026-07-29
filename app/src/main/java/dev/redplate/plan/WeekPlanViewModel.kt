@@ -91,11 +91,18 @@ class WeekPlanViewModel @Inject constructor(
 
         val templates = programDao.getAllTemplates().filter { it.mesocycleId == meso.id }
         val exercises = exerciseDao.getAll().associateBy { it.id }
-        val allSets = sessionDao.getAllSetLogs()
-        val sessions = sessionDao.getAllSessions().associateBy { it.id }
 
+        // Only the window the screen actually draws: this week plus the four the average
+        // is taken over. This used to load the entire set-log table on every resume.
         val dayStartHour = trainingClock.dayStartHour()
-        val balance = buildBalance(allSets, exercises, dayStartHour)
+        val weekStart = trainingClock.weekStart(trainingClock.todayDate())
+        val window = trainingClock.weekBounds(weekStart.minusWeeks(PRIOR_WEEKS.toLong()), dayStartHour)
+        val until = trainingClock.weekBounds(weekStart, dayStartHour).last + 1
+        val recentSets = sessionDao.getSetLogsBetween(window.first, until)
+        val sessions = sessionDao.getSessionsStartedBetween(window.first, until)
+            .associateBy { it.id }
+
+        val balance = buildBalance(recentSets, exercises, dayStartHour, weekStart)
 
         _state.value = WeekPlanState(
             weekNumber = meso.currentWeek,
@@ -107,7 +114,7 @@ class WeekPlanViewModel @Inject constructor(
             } else {
                 BlockPhase.ACCUMULATION
             },
-            days = buildDayCards(templates, allSets, sessions, dayStartHour),
+            days = buildDayCards(templates, recentSets, sessions, dayStartHour, weekStart),
             balance = balance,
             balanceCoachLine = buildBalanceCoachLine(balance),
             blockNote = buildBlockNote(meso),
@@ -122,11 +129,11 @@ class WeekPlanViewModel @Inject constructor(
         allSets: List<SetLogEntity>,
         sessions: Map<Long, SessionEntity>,
         dayStartHour: Int,
+        weekStart: LocalDate,
     ): List<DayCard> {
         // Training days, not calendar days: a session logged at 01:00 belongs to the day
         // before, and to last week if that day was a Sunday.
         val today = trainingClock.todayDate()
-        val weekStart = trainingClock.weekStart(today)
         val dayLabels = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
         // Tonnage per template for sessions logged this week, so a finished day reports
@@ -205,12 +212,12 @@ class WeekPlanViewModel @Inject constructor(
      * tick. Secondaries count half and only 0–3 RIR sets count, so this agrees with
      * Today's footer and the session summary by construction rather than by coincidence.
      */
-    private suspend fun buildBalance(
+    private fun buildBalance(
         allSets: List<SetLogEntity>,
         exercises: Map<String, ExerciseEntity>,
         dayStartHour: Int,
+        weekStart: LocalDate,
     ): List<VolumeTarget> {
-        val weekStart = trainingClock.weekStart(trainingClock.todayDate())
         val credited = allSets.filter { it.countsTowardVolume }
         fun dateOf(set: SetLogEntity) = trainingClock.trainingDate(set.completedAt, dayStartHour)
 

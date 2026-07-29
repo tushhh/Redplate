@@ -189,24 +189,23 @@ class BackupRepository @Inject constructor(
      * only ever rendered as "about 1.4 MB".
      */
     suspend fun approximateJsonBytes(): Long {
-        val sets = db.sessionDao().getAllSetLogs().size.toLong()
-        val sessions = db.sessionDao().getAllSessions().size.toLong()
+        // Counted, not loaded: reading every row to call .size on the result is how a
+        // settings screen ends up scaling with the size of the training history.
+        val sets = db.sessionDao().countSetLogs().toLong()
+        val sessions = db.sessionDao().countSessions().toLong()
         val exercises = db.exerciseDao().count().toLong()
-        val equipment = db.equipmentDao().getAll().size.toLong()
+        val equipment = db.equipmentDao().count().toLong()
         return sets * BYTES_PER_SET +
             sessions * BYTES_PER_SESSION +
             exercises * BYTES_PER_EXERCISE +
             equipment * BYTES_PER_EQUIPMENT
     }
 
-    suspend fun status(): BackupStatus {
-        val sessions = db.sessionDao().getAllSessions()
-        return BackupStatus(
-            sessionCount = sessions.size,
-            setCount = db.sessionDao().getAllSetLogs().count { !it.isWarmup },
-            lastSessionAt = sessions.maxOfOrNull { it.startedAt },
-        )
-    }
+    suspend fun status(): BackupStatus = BackupStatus(
+        sessionCount = db.sessionDao().countSessions(),
+        setCount = db.sessionDao().countWorkingSets(),
+        lastSessionAt = db.sessionDao().lastSessionStartedAt(),
+    )
 
     private companion object {
         /**
