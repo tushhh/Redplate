@@ -1,6 +1,7 @@
 package dev.redplate.data
 
 import androidx.room.withTransaction
+import dev.redplate.coach.CoachCopy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,10 +52,7 @@ class DatabaseSeeder @Inject constructor(
             onSuccess = { SeedState.Ready },
             onFailure = { cause ->
                 SeedState.Failed(
-                    message = "The exercise library didn't load, so there's nothing to " +
-                        "build a plan from yet. Try again — if it keeps failing, " +
-                        "reinstalling rebuilds the library and leaves your training " +
-                        "history alone.",
+                    message = CoachCopy.Setup.SEED_FAILED_BODY,
                     cause = cause,
                 )
             },

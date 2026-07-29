@@ -3,6 +3,7 @@ package dev.redplate.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.coach.CoachCopy
 import dev.redplate.data.Goal
 import dev.redplate.data.MovementPattern
 import dev.redplate.data.MuscleGroup
@@ -133,19 +134,16 @@ class PlanSettingsViewModel @Inject constructor(
     }
 
     private fun describe(result: PlanRevisionResult): String = when (result) {
-        PlanRevisionResult.NoProfile -> "There's no profile to change yet."
+        PlanRevisionResult.NoProfile -> CoachCopy.Plan.NO_PROFILE_TO_CHANGE
 
-        PlanRevisionResult.SettingsOnly -> "Saved. Your block is unchanged."
+        PlanRevisionResult.SettingsOnly -> CoachCopy.Plan.SETTINGS_ONLY
 
         is PlanRevisionResult.Refitted -> when (result.templatesChanged) {
-            0 -> "Saved. Every session already fitted."
-            1 -> "Saved. One session was re-fitted to the new length."
-            else -> "Saved. ${result.templatesChanged} sessions were re-fitted to the new length."
+            0 -> CoachCopy.Plan.ALREADY_FITTED
+            else -> CoachCopy.Plan.refitted(result.templatesChanged)
         }
 
-        is PlanRevisionResult.Rebuilt ->
-            "Rebuilt. Your logged sessions and PRs are untouched, and every lift kept the " +
-                "weight you last used."
+        is PlanRevisionResult.Rebuilt -> CoachCopy.Plan.REBUILT
     }
 
     private fun edit(block: (PlanSettings) -> PlanSettings) = _state.update { state ->

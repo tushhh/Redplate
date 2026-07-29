@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.coach.CoachCopy
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.MuscleGroup
@@ -190,32 +191,30 @@ class SessionSummaryViewModel @Inject constructor(
     }
 
     private fun buildHeadline(prs: Int, sets: Int): String = when {
-        sets == 0 -> "Nothing logged this time."
-        prs > 0 -> "Logged, and $prs of those were bests."
-        else -> "Logged. That's the work done."
+        sets == 0 -> CoachCopy.Summary.NOTHING_LOGGED_HEADLINE
+        prs > 0 -> CoachCopy.Summary.bestsHeadline(prs)
+        else -> CoachCopy.Summary.LOGGED_HEADLINE
     }
 
     private fun buildCoachBody(working: List<SetLogEntity>, prs: Int): String = when {
         working.isEmpty() ->
-            "No sets went in, so nothing changes. Start the session again when you're ready."
+            CoachCopy.Summary.NOTHING_LOGGED_BODY
 
         prs > 0 ->
-            "New bests are the signal to keep the weight climbing. Next session starts from " +
-                "these numbers, not the old ones."
+            CoachCopy.Summary.PR_BODY
 
         else ->
-            "Consistency is what moves the numbers. This session is now part of what the " +
-                "next prescription is built from."
+            CoachCopy.Summary.CONSISTENCY_BODY
     }
 
     private fun buildVolumeCoachLine(rows: List<VolumeRow>): String {
-        if (rows.isEmpty()) return "Log a set at 3 reps in reserve or harder and it counts here."
+        if (rows.isEmpty()) return CoachCopy.Summary.NO_VOLUME_YET
         val lowest = rows.minByOrNull { it.current.toFloat() / it.target.coerceAtLeast(1) }
-            ?: return "Volume is on track."
+            ?: return CoachCopy.Today.VOLUME_ON_TRACK
         return if (lowest.current < lowest.target) {
-            "${lowest.label} is still short of target this week — later sessions cover it."
+            CoachCopy.Summary.volumeShort(lowest.label)
         } else {
-            "Every muscle you trained today is at or above target for the week."
+            CoachCopy.Summary.VOLUME_MET
         }
     }
 

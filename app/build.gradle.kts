@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -16,7 +18,9 @@ android {
 
     defaultConfig {
         applicationId = "dev.redplate"
-        minSdk = 36
+        // Nothing in this app needs Android 16. It targets one phone, but there is no
+        // reason a debug build should refuse to install anywhere else.
+        minSdk = 29
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -24,10 +28,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Keystore details live in local.properties, which is not committed. Without them the
+    // release build simply goes unsigned rather than failing the whole configuration.
+    val keystoreProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    val keystorePath = keystoreProperties.getProperty("redplate.keystore")
+
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keystoreProperties.getProperty("redplate.keystorePassword")
+                keyAlias = keystoreProperties.getProperty("redplate.keyAlias")
+                keyPassword = keystoreProperties.getProperty("redplate.keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            optimization {
-                enable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            if (keystorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }

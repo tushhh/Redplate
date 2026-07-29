@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.redplate.coach.CoachCopy
 import dev.redplate.data.Goal
 import dev.redplate.data.MovementPattern
 import dev.redplate.data.MuscleGroup
@@ -102,12 +103,11 @@ fun PlanSettingsScreen(
             Spacer(Modifier.height(22.dp))
             MonoLabel(text = "YOUR PLAN")
             Spacer(Modifier.height(10.dp))
-            CoachHeadline(text = "Change your mind.")
+            CoachHeadline(text = CoachCopy.Plan.HEADLINE)
             Spacer(Modifier.height(5.dp))
             Text(
                 text = state.message
-                    ?: "These are the answers your program is built from. Nothing changes " +
-                    "until you confirm at the bottom.",
+                    ?: CoachCopy.Plan.INTRO,
                 style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = if (state.message != null) colors.live else colors.inkSecondary,
             )
@@ -115,7 +115,7 @@ fun PlanSettingsScreen(
 
             if (draft == null) {
                 Text(
-                    text = "Finish setting up and your plan settings appear here.",
+                    text = CoachCopy.Plan.NO_PROFILE,
                     style = RedplateType.body.copy(fontSize = 15.sp),
                     color = colors.inkSecondary,
                 )
@@ -252,9 +252,7 @@ private fun RebuildWarning() {
         MonoLabel(text = "THIS REBUILDS YOUR BLOCK")
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Changing this rebuilds the rest of your block. Your logged sessions and " +
-                "PRs are kept — the plan ahead of you changes. Every lift starts at the " +
-                "weight you last used it for.",
+text = CoachCopy.Plan.REBUILD_WARNING,
             style = RedplateType.body.copy(fontSize = 14.5.sp, lineHeight = 22.sp),
             color = colors.inkSecondary,
         )

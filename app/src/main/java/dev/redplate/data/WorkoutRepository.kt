@@ -18,6 +18,7 @@ class WorkoutRepository @Inject constructor(
     private val programDao: ProgramDao,
     private val volumeRecorder: VolumeRecorder,
     private val trainingClock: TrainingClock,
+    private val databaseCheckpoint: DatabaseCheckpoint,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -69,6 +70,9 @@ class WorkoutRepository @Inject constructor(
             session
         }
         volumeRecorder.recordForSession(finished)
+
+        // The session is now history, so make it durable in the file Auto Backup takes.
+        databaseCheckpoint.checkpoint()
     }
 
     suspend fun markExerciseIntroduced(exerciseId: String) =

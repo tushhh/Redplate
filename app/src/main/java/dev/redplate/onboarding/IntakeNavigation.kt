@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.redplate.coach.CoachCopy
 import dev.redplate.data.SeedState
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
@@ -147,11 +148,10 @@ private fun SeedWaitScreen() {
     ) {
         MonoLabel(text = "SETTING UP")
         Spacer(Modifier.height(10.dp))
-        CoachHeadline(text = "Building your exercise library.")
+        CoachHeadline(text = CoachCopy.Setup.SEEDING_HEADLINE)
         Spacer(Modifier.height(5.dp))
         Text(
-            text = "A few hundred movements, written to the phone once. This only happens " +
-                "on the first launch.",
+            text = CoachCopy.Setup.SEEDING_BODY,
             style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
             color = colors.inkSecondary,
         )
@@ -176,7 +176,7 @@ private fun SeedFailedScreen(message: String, onRetry: () -> Unit) {
         ) {
             MonoLabel(text = "SETUP FAILED")
             Spacer(Modifier.height(10.dp))
-            CoachHeadline(text = "The exercise library didn't load.")
+            CoachHeadline(text = CoachCopy.Setup.SEED_FAILED_HEADLINE)
             Spacer(Modifier.height(5.dp))
             Text(
                 text = message,
@@ -184,7 +184,7 @@ private fun SeedFailedScreen(message: String, onRetry: () -> Unit) {
                 color = colors.inkSecondary,
             )
         }
-        PrimaryBar(label = "Try again", onClick = onRetry)
+        PrimaryBar(label = CoachCopy.Setup.SEED_RETRY, onClick = onRetry)
     }
 }
 
@@ -199,9 +199,7 @@ private fun SeedWaitPreview() {
 private fun SeedFailedPreview() {
     RedplateTheme {
         SeedFailedScreen(
-            message = "The exercise library didn't load, so there's nothing to build a " +
-                "plan from yet. Try again — if it keeps failing, reinstalling rebuilds " +
-                "the library and leaves your training history alone.",
+message = CoachCopy.Setup.SEED_FAILED_BODY,
             onRetry = {},
         )
     }

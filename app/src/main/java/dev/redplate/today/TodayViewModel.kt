@@ -3,6 +3,7 @@ package dev.redplate.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.coach.CoachCopy
 import dev.redplate.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -248,7 +249,7 @@ class TodayViewModel @Inject constructor(
         val volumeRows = buildVolumeRows(meso.id, meso.currentWeek)
 
         val volumeCoachLine = if (isFirst) {
-            "Fills in as you log. Trends need three sessions."
+            CoachCopy.Today.FIRST_SESSION_VOLUME
         } else {
             buildVolumeCoachLine(volumeRows)
         }
@@ -256,12 +257,12 @@ class TodayViewModel @Inject constructor(
         _state.value = TodayState.TrainingDay(
             eyebrow = eyebrow,
             headline = if (isFirst) {
-                "First one. Go light on purpose."
+                CoachCopy.Today.FIRST_SESSION_HEADLINE
             } else {
                 "${todayTemplate.label}. About ${SessionEstimate.spokenMinutes(estimatedMinutes)} minutes."
             },
             coachBody = if (isFirst) {
-                "Pick a weight you could manage two more reps with. Today sets the baseline — every number after this is built off it."
+                CoachCopy.Today.FIRST_SESSION_BODY
             } else {
                 buildCoachBody(slots)
             },
@@ -310,10 +311,10 @@ class TodayViewModel @Inject constructor(
             val outcome = outcomeReader.read(logged)
             return TodayState.Completed(
                 eyebrow = eyebrow,
-                headline = "Not a scheduled day. Trained anyway.",
+                headline = CoachCopy.Today.UNSCHEDULED_SESSION_HEADLINE,
                 summaryLine = summaryLine(outcome),
                 volumeRows = buildVolumeRows(meso.id, meso.currentWeek),
-                volumeCoachLine = "That work counts toward the week either way.",
+                volumeCoachLine = CoachCopy.Today.UNSCHEDULED_SESSION_VOLUME,
                 nextSessionLabel = nextSessionLabel(nextTemplate, today),
                 sessionId = logged.id,
                 templateId = logged.templateId ?: 0L,
@@ -322,11 +323,11 @@ class TodayViewModel @Inject constructor(
 
         return TodayState.RestDay(
             eyebrow = eyebrow,
-            headline = "Rest day. You've earned it.",
+            headline = CoachCopy.Today.REST_DAY_HEADLINE,
             coachBody = if (nextTemplate != null) {
-                "Next session is ${nextTemplate.label}."
+                CoachCopy.Today.nextSession(nextTemplate.label)
             } else {
-                "No more sessions scheduled this week."
+                CoachCopy.Today.REST_DAY_NOTHING_LEFT
             },
             nextSessionLabel = nextTemplate?.label,
         )
@@ -586,9 +587,9 @@ class TodayViewModel @Inject constructor(
     private fun buildVolumeCoachLine(rows: List<VolumeRow>): String {
         val lowest = rows.minByOrNull { it.current.toFloat() / it.target.coerceAtLeast(1) }
         return if (lowest != null && lowest.current < lowest.target) {
-            "${lowest.label} is light this week — later sessions cover it."
+            CoachCopy.Today.volumeShort(lowest.label)
         } else {
-            "Volume is on track this week."
+            CoachCopy.Today.VOLUME_ON_TRACK
         }
     }
 
@@ -596,12 +597,12 @@ class TodayViewModel @Inject constructor(
         // Find a slot with a load change to highlight
         val slot = slots.firstOrNull { it.workingLoadKg != null }
         if (slot != null) {
-            val load = slot.workingLoadKg ?: return "Same plan as last time — stay focused on form."
+            val load = slot.workingLoadKg ?: return CoachCopy.Today.SAME_PLAN
             val exercise = exerciseDao.getById(slot.exerciseId)
             val name = exercise?.name ?: "First exercise"
             return "${name} is at ${formatKg(load)} kg."
         }
-        return "Same plan as last time — stay focused on form."
+        return CoachCopy.Today.SAME_PLAN
     }
 
     private fun formatKg(kg: Double): String {
