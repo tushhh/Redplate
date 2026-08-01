@@ -65,9 +65,15 @@ adapts it from your own history.
   Each rule is a separate decision in `ProgressionEngine`, and what it decides is written back
   to the slot: the next session actually opens at the load you earned. An effort you didn't
   report never earns an increase.
+- **Weekly strength assessment** — at each week boundary the app reads the whole week back:
+  an estimated max per lift built from load, reps *and* the reps you reported in reserve, and
+  a verdict on whether the prescription was right. A lift you cleared at three in reserve all
+  week is re-derived from that max rather than nudged one notch; a lift you fought for all week
+  comes back down. Bounded to 10% a week and snapped to weights your equipment can make.
 - **Blocks that move** — a week advances when its sessions are done, not when the calendar
-  says so. Sets climb toward your adaptive range, the final week halves them and drops the
-  load, and the next block is seeded from what you lifted.
+  says so. Sets climb toward your adaptive range but never on a lift that already overreached,
+  the final week halves them and drops the load, and the next block is seeded from what you
+  lifted.
 - **Explains itself** — every slot can render its own prescription in a sentence, and every
   load change says what earned it. No black boxes.
 - **Changeable** — goal, days per week, session length, priority muscles and which weekdays

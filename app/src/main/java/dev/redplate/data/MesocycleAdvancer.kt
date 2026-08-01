@@ -9,8 +9,18 @@ import javax.inject.Singleton
 sealed interface BlockAdvance {
     data object Unchanged : BlockAdvance
 
-    /** Moved into an accumulation week and added a set wherever there was headroom. */
-    data class Accumulated(val week: Int, val setsAdded: Int) : BlockAdvance
+    /**
+     * Moved into an accumulation week: the week just finished was assessed, loads that the
+     * evidence says were wrong were recalibrated, and a set was added wherever the muscle
+     * had headroom and the lift had earned it.
+     */
+    data class Accumulated(
+        val week: Int,
+        val setsAdded: Int,
+        val calibrations: List<LoadCalibration> = emptyList(),
+        /** The plain-language summary stored on the block, or null when nothing changed. */
+        val note: String? = null,
+    ) : BlockAdvance
 
     /** Reached the end of the block: sets halved, loads dropped. */
     data class Deloaded(val week: Int) : BlockAdvance
@@ -73,7 +83,7 @@ class MesocycleAdvancer @Inject constructor(
                 BlockAdvance.Deloaded(next)
             }
 
-            else -> BlockAdvance.Accumulated(next, accumulate(mesocycle, templates, next))
+            else -> accumulate(mesocycle, templates, next)
         }
     }
 
@@ -118,20 +128,33 @@ class MesocycleAdvancer @Inject constructor(
     // ── What advancing does to the plan ─────────────────────────────────
 
     /**
-     * One more set per slot, capped at the top of the muscle's adaptive range. Week 1 opens
-     * at MEV by design, so the block climbs into that range rather than starting inside it;
-     * the cap is what stops it climbing past what can be recovered from.
+     * Assesses the week that just finished, then writes next week's prescription from it.
      *
-     * Returns how many slots actually gained a set.
+     * Two things happen per slot, and they are deliberately separate levers:
+     *
+     * - **Load** comes from [StrengthAssessment]. A lift the user cleared at three in
+     *   reserve every set for a week is not one notch too light; it was set before there
+     *   was any evidence, and the per-session engine's 2.5 kg step would take a month to
+     *   catch up. A lift that had to be fought for all week comes down. A lift that landed
+     *   where it was meant to is left alone — it is already in the per-session engine's
+     *   hands, and a second opinion would just be two rules arguing over one number.
+     * - **Sets** climb by one per slot, capped at the top of the muscle's adaptive range,
+     *   which is what makes the block accumulate. A lift assessed as overreached does not
+     *   get one: it is already costing more than it was meant to, and adding volume on top
+     *   of a load the user is struggling to hold is how a block ends early.
+     *
+     * Week 1 opens at MEV by design, so the block climbs into the adaptive range rather
+     * than starting inside it, and this is the first week the app has any evidence at all.
      */
     private suspend fun accumulate(
         mesocycle: MesocycleEntity,
         templates: List<SessionTemplateEntity>,
         week: Int,
-    ): Int {
+    ): BlockAdvance.Accumulated {
         val exercises = exerciseDao.getAll().associateBy { it.id }
         val landmarks = volumeDao.getAllLandmarks().associateBy { it.muscle }
         val slots = templates.flatMap { programDao.getSlots(it.id) }
+        val setsByExercise = loggedSets(mesocycle.id, mesocycle.currentWeek)
 
         // Prescribed sets per muscle across the whole block week, credited the same way
         // logged volume is, so the ceiling is measured in the units it was written in.
@@ -145,24 +168,117 @@ class MesocycleAdvancer @Inject constructor(
         }
 
         var added = 0
+        var note: String? = null
+        val calibrations = mutableListOf<LoadCalibration>()
+
         db.withTransaction {
             for (slot in slots) {
                 val exercise = exercises[slot.exerciseId] ?: continue
-                if (slot.targetSets >= MAX_SETS_PER_SLOT) continue
+                val logged = setsByExercise[slot.exerciseId].orEmpty()
+                val assessment = StrengthAssessment.assess(slot.exerciseId, logged, slot)
 
-                val muscle = exercise.primaryMuscle
-                val ceiling = (landmarks[muscle] ?: VolumeLandmarks.forMuscle(muscle)).mavHigh
-                val current = planned[muscle] ?: 0.0
-                if (current + VolumeCredit.PRIMARY_CREDIT > ceiling) continue
+                val calibration = StrengthAssessment.calibrate(
+                    assessment = assessment,
+                    slot = slot,
+                    equipment = loadSourceFor(exercise),
+                )
 
-                programDao.updateSlot(slot.copy(targetSets = slot.targetSets + 1))
-                planned[muscle] = current + VolumeCredit.PRIMARY_CREDIT
-                added++
+                val earnsASet = assessment.response != LiftResponse.OVERREACHED &&
+                    slot.targetSets < MAX_SETS_PER_SLOT &&
+                    hasHeadroom(exercise.primaryMuscle, planned, landmarks)
+
+                if (calibration == null && !earnsASet) continue
+
+                programDao.updateSlot(
+                    slot.copy(
+                        targetSets = if (earnsASet) slot.targetSets + 1 else slot.targetSets,
+                        workingLoadKg = calibration?.toKg ?: slot.workingLoadKg,
+                    )
+                )
+                if (earnsASet) {
+                    planned.merge(exercise.primaryMuscle, VolumeCredit.PRIMARY_CREDIT, Double::plus)
+                    added++
+                }
+                calibration?.let { calibrations += it }
             }
-            programDao.updateMesocycle(mesocycle.copy(currentWeek = week))
+
+            note = summarise(week, calibrations, added, exercises)
+            programDao.updateMesocycle(mesocycle.copy(currentWeek = week, assessmentNote = note))
         }
-        return added
+        return BlockAdvance.Accumulated(
+            week = week,
+            setsAdded = added,
+            calibrations = calibrations,
+            note = note,
+        )
     }
+
+    /** Every working set logged in one block week, grouped by lift. */
+    private suspend fun loggedSets(mesocycleId: Long, week: Int): Map<String, List<SetLogEntity>> {
+        val sessions = sessionDao.getSessionsForBlockWeek(mesocycleId, week)
+        if (sessions.isEmpty()) return emptyMap()
+        return sessionDao.getSetsForSessions(sessions.map { it.id })
+            .filter { !it.isWarmup }
+            .groupBy { it.exerciseId }
+    }
+
+    private fun hasHeadroom(
+        muscle: MuscleGroup,
+        planned: Map<MuscleGroup, Double>,
+        landmarks: Map<MuscleGroup, VolumeLandmarkEntity>,
+    ): Boolean {
+        val ceiling = (landmarks[muscle] ?: VolumeLandmarks.forMuscle(muscle)).mavHigh
+        return (planned[muscle] ?: 0.0) + VolumeCredit.PRIMARY_CREDIT <= ceiling
+    }
+
+    /**
+     * The one line the user gets to read about why next week looks different.
+     *
+     * COACHING.md §3 and CLAUDE.md §5: no black boxes. A load that moved because of an
+     * assessment the user cannot see is exactly the vendor-tuned recommendation this app
+     * exists to not be.
+     */
+    private fun summarise(
+        week: Int,
+        calibrations: List<LoadCalibration>,
+        setsAdded: Int,
+        exercises: Map<String, ExerciseEntity>,
+    ): String? {
+        if (calibrations.isEmpty() && setsAdded == 0) return null
+
+        fun name(id: String) = exercises[id]?.name ?: id
+        val up = calibrations.filter { it.isIncrease }
+        val down = calibrations.filterNot { it.isIncrease }
+
+        val parts = mutableListOf<String>()
+        if (up.isNotEmpty()) {
+            parts += "Last week says " + list(up.map { name(it.exerciseId) }) +
+                (if (up.size == 1) " was" else " were") + " under-loaded, so " +
+                up.joinToString("; ") {
+                    "${name(it.exerciseId)} goes ${format(it.fromKg)} → ${format(it.toKg)}"
+                } + "."
+        }
+        if (down.isNotEmpty()) {
+            parts += down.joinToString("; ") {
+                "${name(it.exerciseId)} comes back to ${format(it.toKg)}"
+            } + " — " + (if (down.size == 1) "it was" else "they were") +
+                " costing more than the prescription asked for."
+        }
+        if (setsAdded > 0) {
+            parts += "Week $week adds $setsAdded set${if (setsAdded == 1) "" else "s"} " +
+                "where the muscle had room left."
+        }
+        return parts.joinToString(" ")
+    }
+
+    private fun list(names: List<String>): String = when (names.size) {
+        1 -> names[0]
+        2 -> "${names[0]} and ${names[1]}"
+        else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
+    }
+
+    private fun format(kg: Double): String =
+        if (kg % 1.0 == 0.0) "${kg.toInt()}" else String.format(java.util.Locale.ROOT, "%.1f", kg)
 
     /**
      * A deload is a real change to the plan, not a label: sets halve and every working load
@@ -242,10 +358,21 @@ class MesocycleAdvancer @Inject constructor(
         }
     }
 
-    private suspend fun equipmentFor(exercise: ExerciseEntity): EquipmentEntity? =
-        exercise.requiredEquipmentIds
-            .firstNotNullOfOrNull { equipmentDao.getById(it) }
+    /**
+     * The thing that supplies the load, not the station the lift happens at.
+     *
+     * A barbell squat names both the half rack and the barbell, and the rack weighs
+     * nothing — reading the first entry would deload a squat in the rack's imaginary
+     * increments and estimate a max from a fixture.
+     */
+    private suspend fun loadSourceFor(exercise: ExerciseEntity): EquipmentEntity? {
+        val named = exercise.requiredEquipmentIds.mapNotNull { equipmentDao.getById(it) }
+        return (named.firstOrNull { it.carriesLoad } ?: named.firstOrNull())
             ?.takeIf { it.isAvailable }
+    }
+
+    private suspend fun equipmentFor(exercise: ExerciseEntity): EquipmentEntity? =
+        loadSourceFor(exercise)
 
     companion object {
         /** A started week that has not finished in this long has run out; move the block on. */

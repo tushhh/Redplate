@@ -264,8 +264,26 @@ object Migrations {
         }
     }
 
+    /**
+     * 7 → 8 gives a block somewhere to record what it concluded from the week just
+     * trained.
+     *
+     * [MesocycleAdvancer] now assesses each finished week and rewrites loads from it. A
+     * recommendation the user cannot interrogate is the black box this app exists to avoid
+     * (CLAUDE.md §5), so the reasoning is stored alongside the change it caused rather than
+     * being recomputed later from a plan that has already moved on.
+     *
+     * Nullable with no default: an existing block has no assessed week behind it, and
+     * inventing one would be worse than saying nothing.
+     */
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `mesocycles` ADD COLUMN `assessmentNote` TEXT")
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-        MIGRATION_6_7,
+        MIGRATION_6_7, MIGRATION_7_8,
     )
 }

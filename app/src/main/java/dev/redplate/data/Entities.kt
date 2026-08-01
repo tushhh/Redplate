@@ -295,7 +295,16 @@ data class MesocycleEntity(
      * has not begun rather than pretending Tuesday was day one.
      */
     @ColumnInfo(defaultValue = "0")
-    val beginsAt: Long = 0L
+    val beginsAt: Long = 0L,
+    /**
+     * Why this week's prescription differs from last week's, in plain language.
+     *
+     * Written by [MesocycleAdvancer] when it assesses the week just finished. Stored
+     * rather than computed on demand because it describes a decision that has already
+     * been taken and written into the slots — recomputing it later from the current plan
+     * would describe the wrong week.
+     */
+    val assessmentNote: String? = null
 ) {
     /**
      * A block accumulates until its final week, which is the deload. Sessions used to be
