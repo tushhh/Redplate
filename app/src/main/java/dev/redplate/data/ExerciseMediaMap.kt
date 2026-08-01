@@ -20,7 +20,6 @@ object ExerciseMediaMap {
         "cable_crossover_high"        to "Cable_Crossover",
         "cable_crossover_low"         to "Low_Cable_Crossover",
         "cable_face_pull"             to "Face_Pull",
-        "cable_row_standing"          to "Seated_One-arm_Cable_Pulley_Rows",
         "cable_straight_arm_pulldown" to "Straight-Arm_Pulldown",
         "cable_tricep_pushdown"       to "Triceps_Pushdown",
         "cable_overhead_ext"          to "Cable_Rope_Overhead_Triceps_Extension",
@@ -52,16 +51,12 @@ object ExerciseMediaMap {
         "barbell_close_grip_bench"    to "Close-Grip_Barbell_Bench_Press",
         "barbell_ohp"                 to "Barbell_Shoulder_Press",
         "barbell_reverse_lunge"       to "Barbell_Lunge",
-        "bulgarian_split_squat_bb"    to "Barbell_Side_Split_Squat",
         "pull_up"                     to "Pullups",
         "chin_up"                     to "Chin-Up",
         "hanging_leg_raise"           to "Hanging_Leg_Raise",
         "barbell_calf_raise"          to "Standing_Barbell_Calf_Raise",
-        "incline_barbell_bench"       to "Barbell_Incline_Bench_Press_-_Medium_Grip",
         "leg_press"                   to "Leg_Press",
-        "leg_press_wide"              to "Narrow_Stance_Leg_Press",
         "leg_press_calf_raise"        to "Calf_Press_On_The_Leg_Press_Machine",
-        "machine_hip_thrust"          to "Barbell_Hip_Thrust",
         "smith_hack_squat"            to "Smith_Machine_Squat",
         "smith_rdl"                   to "Smith_Machine_Stiff-Legged_Deadlift",
         "smith_calf_raise"            to "Smith_Machine_Calf_Raise",
@@ -85,18 +80,47 @@ object ExerciseMediaMap {
         "db_bulgarian_split_squat"    to "Split_Squat_with_Dumbbells",
         "barbell_curl"                to "Barbell_Curl",
         "barbell_skullcrusher"        to "EZ-Bar_Skullcrusher",
-        "barbell_upright_row"         to "Upright_Row_-_With_Bands",
         "barbell_shrug"               to "Barbell_Shrug",
         "decline_bench_press"         to "Decline_Barbell_Bench_Press",
         "decline_sit_up"              to "Decline_Crunch",
         "bench_tricep_dip"            to "Bench_Dips",
         "bench_step_up"               to "Dumbbell_Step_Ups",
         "hyperextension"              to "Hyperextensions_Back_Extensions",
-        "glute_focused_extension"     to "Hyperextensions_With_No_Hyperextension_Bench",
         "sled_push"                   to "Sled_Push",
         "push_up"                     to "Pushups",
         "plank"                       to "Plank",
         "bodyweight_squat"            to "Bodyweight_Squat",
+    )
+
+    /**
+     * Entries deliberately absent, and why — so nobody "helpfully" adds them back.
+     *
+     * Each of these had a still that showed a different movement, a different machine, or
+     * the exact opposite of the exercise. A picture that contradicts the name is worse than
+     * no picture: the user copies the picture. `adb push`-ing a correct still keyed by the
+     * exercise id restores any of them without a rebuild (see [MediaResolver]).
+     *
+     * - `cable_row_standing` — the still is a *seated* one-arm row on a low-row machine.
+     * - `leg_press_wide` — the only leg-press-stance still is `Narrow_Stance_Leg_Press`,
+     *   which is the opposite stance to the one the exercise is named for.
+     * - `barbell_upright_row` — the still is `Upright_Row_-_With_Bands`. No barbell, and
+     *   this gym's bands are marked unavailable.
+     * - `glute_focused_extension` — the still is literally
+     *   `Hyperextensions_With_No_Hyperextension_Bench`, and the exercise requires the bench.
+     * - `bulgarian_split_squat_bb` — the still is a *side* split squat, a lateral movement.
+     * - `incline_barbell_bench` — now a plate-loaded machine press; the still is a barbell
+     *   on an incline bench, which is different hardware.
+     * - `machine_hip_thrust` — the still is a barbell across the hips on a bench, not the
+     *   Glute Drive machine the exercise is performed on.
+     */
+    val DELIBERATELY_UNMAPPED: Set<String> = setOf(
+        "cable_row_standing",
+        "leg_press_wide",
+        "barbell_upright_row",
+        "glute_focused_extension",
+        "bulgarian_split_squat_bb",
+        "incline_barbell_bench",
+        "machine_hip_thrust",
     )
 
     fun stemFor(exerciseId: String): String? = ASSET_STEMS[exerciseId]

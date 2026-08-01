@@ -98,11 +98,9 @@ class ProgramGenerator @Inject constructor(
         now: Long = System.currentTimeMillis(),
     ): Long {
         val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
-        val pool = exerciseDao.getAll()
-            .filter { !it.isExcluded }
-            .filter { it.pattern !in profile.excludedPatterns }
-            .filter { EquipmentAvailability.canPerform(it, available) }
-            .sortedBy { it.id }
+        // Same pool the programmed days use, so a body-map session cannot prescribe
+        // something the generator would refuse to.
+        val pool = performablePool(profile, available)
 
         // Compounds first, then isolation, cycling the picked muscles so no single one
         // takes the whole session.
@@ -307,11 +305,22 @@ class ProgramGenerator @Inject constructor(
     private suspend fun performablePool(
         profile: ProfileEntity,
         available: Set<String>,
-    ): List<ExerciseEntity> = exerciseDao.getAll()
-        .filter { !it.isExcluded }
-        .filter { it.pattern !in profile.excludedPatterns }
-        .filter { EquipmentAvailability.canPerform(it, available) }
-        .sortedBy { it.id } // deterministic tie-break before any preference ordering
+    ): List<ExerciseEntity> {
+        val cardio = equipmentDao.getAll()
+            .filter { it.category == EquipmentCategory.CARDIO_MACHINE }
+            .mapTo(mutableSetOf()) { it.id }
+
+        return exerciseDao.getAll()
+            .filter { !it.isExcluded }
+            .filter { it.pattern !in profile.excludedPatterns }
+            .filter { EquipmentAvailability.canPerform(it, available) }
+            // Cardio is not a strength slot. Rowing is a horizontal pull and the rower is a
+            // horizontal-pull machine, so nothing stopped the generator filling Upper A's
+            // back compound with "Rowing (Full Body), 3 × 6–10 at 2 in reserve" — a
+            // prescription that cannot be followed on a Concept2.
+            .filterNot { exercise -> exercise.requiredEquipmentIds.any { it in cardio } }
+            .sortedBy { it.id } // deterministic tie-break before any preference ordering
+    }
 
     // ── Editing a template in place (8c: swap a row, add a row) ─────────
 
