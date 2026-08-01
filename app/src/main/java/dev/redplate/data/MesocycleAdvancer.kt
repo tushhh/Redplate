@@ -293,7 +293,7 @@ class MesocycleAdvancer @Inject constructor(
         db.withTransaction {
             for (template in templates) {
                 for (slot in programDao.getSlots(template.id)) {
-                    val equipment = exercises[slot.exerciseId]?.let { equipmentFor(it) }
+                    val equipment = exercises[slot.exerciseId]?.let { loadSourceFor(it) }
                     val deloadedLoad = slot.workingLoadKg?.let { load ->
                         equipment?.let { PlateMath.deload(load, DELOAD_FRACTION, it) }
                             ?: (load * (1 - DELOAD_FRACTION))
@@ -381,8 +381,6 @@ class MesocycleAdvancer @Inject constructor(
             ?.takeIf { it.isAvailable }
     }
 
-    private suspend fun equipmentFor(exercise: ExerciseEntity): EquipmentEntity? =
-        loadSourceFor(exercise)
 
     companion object {
         /** A started week that has not finished in this long has run out; move the block on. */

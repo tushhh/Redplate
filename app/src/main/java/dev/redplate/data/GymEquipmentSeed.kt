@@ -120,6 +120,15 @@ object GymEquipmentSeed {
             isAvailable = false
         ),
 
+        // FAIL CLOSED — landmine work needs a landmine sleeve or a corner to jam a bar in,
+        // and the floor plan shows neither. Landmine press and row named only the barbell,
+        // so the app was free to prescribe them on hardware that may not exist.
+        EquipmentEntity(
+            id = "landmine_attachment", displayName = "Landmine Attachment",
+            category = EquipmentCategory.BARBELL, loadingScheme = LoadingScheme.BODYWEIGHT,
+            isAvailable = false
+        ),
+
         // FAIL CLOSED — floor plan shows the target, not the ball. See GYM.md item 5.
         EquipmentEntity(
             id = "wall_ball", displayName = "Wall Ball",

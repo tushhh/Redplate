@@ -282,8 +282,108 @@ object Migrations {
         }
     }
 
+    /**
+     * 8 → 9 corrects exercises whose name, machine or picture described three different
+     * movements.
+     *
+     * The seed was assembled by pattern-matching names against a floor plan, and nothing
+     * ever checked that the three agreed. "Standing Cable Row" was illustrated with a
+     * *seated* one-arm row on a low-row machine; "Wide-Stance Leg Press" with a
+     * narrow-stance one; "Incline Barbell Bench Press" was assigned to a plate-loaded
+     * chest press machine you cannot put a barbell on. A user copies the picture, so a
+     * picture that contradicts the name is worse than no picture at all.
+     *
+     * Names and equipment are rewritten here. Set logs are untouched: the ids do not
+     * change, so every rep already logged still belongs to the lift it was logged under.
+     */
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO `equipment`
+                    (`id`, `displayName`, `category`, `loadingScheme`, `availableLoads`,
+                     `barWeightKg`, `platePairs`, `isAvailable`, `perLimb`, `isAssistance`)
+                VALUES ('landmine_attachment', 'Landmine Attachment', 'BARBELL', 'BODYWEIGHT',
+                        '[]', NULL, '{}', 0, 0, 0)
+                """.trimIndent()
+            )
+
+            fun rename(id: String, name: String) =
+                db.execSQL("UPDATE `exercises` SET `name` = '${name.replace("'", "''")}' WHERE `id` = '$id'")
+
+            fun requires(id: String, equipmentIds: List<String>) {
+                val json = equipmentIds.joinToString(",", "[", "]") { "\"$it\"" }
+                db.execSQL("UPDATE `exercises` SET `requiredEquipmentIds` = '$json' WHERE `id` = '$id'")
+            }
+
+            // Name did not match the movement in the bundled still.
+            rename("cable_lateral_raise", "Seated Cable Lateral Raise")
+            rename("smith_hack_squat", "Smith Machine Squat")
+            rename("barbell_reverse_lunge", "Barbell Lunge")
+            rename("decline_sit_up", "Decline Crunch")
+            // Neither still shows a rear foot elevated, so neither is a Bulgarian.
+            rename("bulgarian_split_squat_bb", "Barbell Split Squat")
+            rename("db_bulgarian_split_squat", "Dumbbell Split Squat")
+            // #15 is a plate-loaded machine. A barbell does not go on it.
+            rename("incline_barbell_bench", "Incline Chest Press (Machine)")
+            rename("bench_step_up", "Dumbbell Step-Up")
+            rename("db_rear_delt_fly", "Seated Bent-Over Rear Delt Raise")
+
+            // Equipment the lift actually needs and never named.
+            requires("bench_step_up", listOf("dumbbells", "flat_incline_bench"))
+            requires("barbell_skullcrusher", listOf("barbell", "flat_incline_bench"))
+            requires("db_rear_delt_fly", listOf("dumbbells", "flat_incline_bench"))
+            // A split squat does not elevate the rear foot, so it needs no bench.
+            requires("db_bulgarian_split_squat", listOf("dumbbells"))
+            // Landmine work needs a landmine, which this gym has not confirmed owning.
+            requires("landmine_press", listOf("barbell", "landmine_attachment"))
+            requires("landmine_row", listOf("barbell", "landmine_attachment"))
+
+            // Hip abduction is glute medius. The quads do nothing.
+            db.execSQL("UPDATE `exercises` SET `secondaryMuscles` = '[]' WHERE `id` = 'machine_hip_abduction'")
+        }
+    }
+
+    /**
+     * 9 → 10 drops three lifts that were doing another lift's job.
+     *
+     * - `cable_row_standing` — the gym has a dedicated Low Row station, which is what
+     *   `seated_cable_row` is on. A standing row at the dual pulley is the same movement
+     *   done worse, and its picture was of the low row anyway.
+     * - `assisted_pull_up` — same station, same pattern, same muscles as
+     *   `assisted_chin_up`. The machine is labelled "dip/chin"; one entry is enough.
+     * - `bulgarian_split_squat_bb` — once its still turned out to be a *side* split squat,
+     *   the exercise became "Barbell Split Squat" on the same rack and barbell as
+     *   "Barbell Lunge", with no picture of its own to tell them apart.
+     *
+     * Removal is conditional, and that is the point. A lift with sets logged against it, or
+     * one sitting in somebody's plan, is not deleted — it is marked excluded, so it leaves
+     * the pool but every rep already recorded still resolves to a name. Deleting it would
+     * turn training history into orphaned rows, which is the one unrecoverable failure in
+     * this project.
+     */
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val removed = listOf("cable_row_standing", "assisted_pull_up", "bulgarian_split_squat_bb")
+            val list = removed.joinToString(",") { "'$it'" }
+
+            // Out of the generator's pool and out of the picker either way.
+            db.execSQL("UPDATE `exercises` SET `isExcluded` = 1 WHERE `id` IN ($list)")
+
+            // Gone entirely only where nothing points at it.
+            db.execSQL(
+                """
+                DELETE FROM `exercises`
+                WHERE `id` IN ($list)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `set_logs`)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `template_slots`)
+                """.trimIndent()
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-        MIGRATION_6_7, MIGRATION_7_8,
+        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
     )
 }
