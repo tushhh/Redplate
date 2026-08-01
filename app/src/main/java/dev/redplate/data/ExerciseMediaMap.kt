@@ -100,25 +100,21 @@ object ExerciseMediaMap {
      * no picture: the user copies the picture. `adb push`-ing a correct still keyed by the
      * exercise id restores any of them without a rebuild (see [MediaResolver]).
      *
-     * - `cable_row_standing` — the still is a *seated* one-arm row on a low-row machine.
      * - `leg_press_wide` — the only leg-press-stance still is `Narrow_Stance_Leg_Press`,
      *   which is the opposite stance to the one the exercise is named for.
      * - `barbell_upright_row` — the still is `Upright_Row_-_With_Bands`. No barbell, and
      *   this gym's bands are marked unavailable.
      * - `glute_focused_extension` — the still is literally
      *   `Hyperextensions_With_No_Hyperextension_Bench`, and the exercise requires the bench.
-     * - `bulgarian_split_squat_bb` — the still is a *side* split squat, a lateral movement.
      * - `incline_barbell_bench` — now a plate-loaded machine press; the still is a barbell
      *   on an incline bench, which is different hardware.
      * - `machine_hip_thrust` — the still is a barbell across the hips on a bench, not the
      *   Glute Drive machine the exercise is performed on.
      */
     val DELIBERATELY_UNMAPPED: Set<String> = setOf(
-        "cable_row_standing",
         "leg_press_wide",
         "barbell_upright_row",
         "glute_focused_extension",
-        "bulgarian_split_squat_bb",
         "incline_barbell_bench",
         "machine_hip_thrust",
     )

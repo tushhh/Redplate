@@ -21,7 +21,6 @@ object CuratedExerciseSeed {
         add(exercise("cable_crossover_high", "Cable Crossover (High-to-Low)", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS), "dual_adjustable_pulley", MovementPattern.HORIZONTAL_PUSH, compound = false, fatigue = 2))
         add(exercise("cable_crossover_low", "Cable Crossover (Low-to-High)", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS), "dual_adjustable_pulley", MovementPattern.HORIZONTAL_PUSH, compound = false, fatigue = 2))
         add(exercise("cable_face_pull", "Cable Face Pull", MuscleGroup.REAR_DELTS, listOf(MuscleGroup.TRAPS, MuscleGroup.UPPER_BACK), "dual_adjustable_pulley", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 2))
-        add(exercise("cable_row_standing", "Standing Cable Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "dual_adjustable_pulley", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
         add(exercise("cable_straight_arm_pulldown", "Straight-Arm Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.TRICEPS), "dual_adjustable_pulley", MovementPattern.VERTICAL_PULL, compound = false, fatigue = 2))
         add(exercise("cable_tricep_pushdown", "Tricep Rope Pushdown", MuscleGroup.TRICEPS, listOf(MuscleGroup.FRONT_DELTS), "dual_adjustable_pulley", MovementPattern.ISOLATION, compound = false, fatigue = 2))
         add(exercise("cable_overhead_ext", "Overhead Cable Tricep Extension", MuscleGroup.TRICEPS, listOf(MuscleGroup.FRONT_DELTS), "dual_adjustable_pulley", MovementPattern.ISOLATION, compound = false, fatigue = 2))
@@ -62,7 +61,6 @@ object CuratedExerciseSeed {
         // progress means the number coming *down*. See EquipmentEntity.isAssistance.
         add(exercise("assisted_dip", "Assisted Dip", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "multigym_assist_dip_chin", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 3))
         add(exercise("assisted_chin_up", "Assisted Chin-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("assisted_pull_up", "Assisted Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
 
         // ── Deadlift Platform ──
         add(exercise("conventional_deadlift", "Conventional Deadlift", MuscleGroup.LOWER_BACK, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS, MuscleGroup.QUADS, MuscleGroup.TRAPS), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
@@ -78,7 +76,6 @@ object CuratedExerciseSeed {
         add(exercise("barbell_close_grip_bench", "Close-Grip Bench Press", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "flat_incline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("barbell_ohp", "Standing Overhead Press", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRICEPS, MuscleGroup.TRAPS, MuscleGroup.ABS), "power_rack", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("barbell_reverse_lunge", "Barbell Lunge", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
-        add(exercise("bulgarian_split_squat_bb", "Barbell Split Squat", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("pull_up", "Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "power_rack", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 4))
         add(exercise("chin_up", "Chin-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "power_rack", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 4))
         add(exercise("hanging_leg_raise", "Hanging Leg Raise", MuscleGroup.ABS, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.CORE, compound = false, fatigue = 2))

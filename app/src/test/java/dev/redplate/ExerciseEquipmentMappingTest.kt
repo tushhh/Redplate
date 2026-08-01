@@ -49,7 +49,7 @@ class ExerciseEquipmentMappingTest {
     @Test
     fun `every loaded lift resolves to equipment that carries load`() {
         val bodyweight = setOf(
-            "pull_up", "chin_up", "hanging_leg_raise", "bench_tricep_dip", "bench_step_up",
+            "pull_up", "chin_up", "hanging_leg_raise", "bench_tricep_dip",
             "decline_sit_up", "hyperextension", "glute_focused_extension", "push_up",
             "plank", "bodyweight_squat", "stairmill_climbing", "treadmill_incline_walk",
             "rower_full_body",
@@ -185,7 +185,7 @@ class ExerciseEquipmentMappingTest {
 
     @Test
     fun `the assisted variants live on the assistance station`() {
-        for (id in listOf("assisted_dip", "assisted_chin_up", "assisted_pull_up")) {
+        for (id in listOf("assisted_dip", "assisted_chin_up")) {
             val source = loadSourceFor(id)
             assertEquals("$id belongs on the assist station", "multigym_assist_dip_chin", source?.id)
             assertTrue("$id should be marked assisted", source?.isAssistance == true)

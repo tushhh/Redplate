@@ -344,8 +344,46 @@ object Migrations {
         }
     }
 
+    /**
+     * 9 → 10 drops three lifts that were doing another lift's job.
+     *
+     * - `cable_row_standing` — the gym has a dedicated Low Row station, which is what
+     *   `seated_cable_row` is on. A standing row at the dual pulley is the same movement
+     *   done worse, and its picture was of the low row anyway.
+     * - `assisted_pull_up` — same station, same pattern, same muscles as
+     *   `assisted_chin_up`. The machine is labelled "dip/chin"; one entry is enough.
+     * - `bulgarian_split_squat_bb` — once its still turned out to be a *side* split squat,
+     *   the exercise became "Barbell Split Squat" on the same rack and barbell as
+     *   "Barbell Lunge", with no picture of its own to tell them apart.
+     *
+     * Removal is conditional, and that is the point. A lift with sets logged against it, or
+     * one sitting in somebody's plan, is not deleted — it is marked excluded, so it leaves
+     * the pool but every rep already recorded still resolves to a name. Deleting it would
+     * turn training history into orphaned rows, which is the one unrecoverable failure in
+     * this project.
+     */
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val removed = listOf("cable_row_standing", "assisted_pull_up", "bulgarian_split_squat_bb")
+            val list = removed.joinToString(",") { "'$it'" }
+
+            // Out of the generator's pool and out of the picker either way.
+            db.execSQL("UPDATE `exercises` SET `isExcluded` = 1 WHERE `id` IN ($list)")
+
+            // Gone entirely only where nothing points at it.
+            db.execSQL(
+                """
+                DELETE FROM `exercises`
+                WHERE `id` IN ($list)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `set_logs`)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `template_slots`)
+                """.trimIndent()
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
     )
 }
