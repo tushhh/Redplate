@@ -3,6 +3,15 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The rest countdown in the status bar, and the notice when it runs out. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      The end of a rest period is an alarm in the ordinary sense: it has to land at the
+      second, not whenever the system next feels like waking up. USE_EXACT_ALARM is granted
+      on install and needs no prompt. It is Play-Store-restricted to alarm-like apps, which
+      this qualifies as, and this app is sideloaded anyway.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".RedplateApp"
@@ -27,6 +36,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Not exported: the only thing that ever sends this is our own AlarmManager
+          PendingIntent, which names the component explicitly.
+        -->
+        <receiver
+            android:name=".workout.RestAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.redplate.action.REST_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

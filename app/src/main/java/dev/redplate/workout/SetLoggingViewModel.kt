@@ -34,6 +34,7 @@ class SetLoggingViewModel @Inject constructor(
     private val repo: WorkoutRepository,
     savedState: SavedStateHandle,
     val mediaResolver: MediaResolver,
+    private val restNotifier: RestTimerNotifier,
 ) : ViewModel() {
 
     val sessionId: Long = savedState.get<Long>(ARG_SESSION_ID) ?: 0L
@@ -449,6 +450,7 @@ class SetLoggingViewModel @Inject constructor(
         restDeadlineMillis = System.currentTimeMillis() + seconds * 1000L
         restTotalSeconds = seconds
         _state.update { it.copy(rest = RestState.Running(seconds, seconds)) }
+        publishRest()
 
         restJob = viewModelScope.launch {
             while (true) {
@@ -458,6 +460,10 @@ class SetLoggingViewModel @Inject constructor(
                 val remaining = remainingRestSeconds()
                 if (remaining <= 0) {
                     _state.update { it.copy(rest = RestState.Idle) }
+                    // The vibration is the alarm's job, not this loop's — see
+                    // RestTimerNotifier. This only takes down the countdown that has
+                    // just stopped being true.
+                    restNotifier.clearCountdown()
                     _events.tryEmit(WorkoutEvent.RestComplete)
                     break
                 }
@@ -478,6 +484,7 @@ class SetLoggingViewModel @Inject constructor(
         restJob?.cancel()
         restJob = null
         _state.update { it.copy(rest = RestState.Idle) }
+        restNotifier.cancel()
     }
 
     /** ±seconds while resting; grows the total so the progress bar stays honest. */
@@ -487,6 +494,24 @@ class SetLoggingViewModel @Inject constructor(
         restDeadlineMillis = System.currentTimeMillis() + newRemaining * 1000L
         restTotalSeconds = maxOf(restTotalSeconds, newRemaining)
         _state.update { it.copy(rest = RestState.Running(newRemaining, restTotalSeconds)) }
+        // Re-armed against the new deadline, or the notification would keep counting to a
+        // time the app no longer believes in.
+        publishRest()
+    }
+
+    /**
+     * Mirrors the running rest into the status bar and arms the alarm that ends it.
+     *
+     * Called on every change to the deadline rather than only at the start, because a
+     * timer that is right on screen and wrong in the notification is worse than no
+     * notification: the user is trusting whichever one they can see.
+     */
+    private fun publishRest() {
+        restNotifier.start(
+            deadlineMillis = restDeadlineMillis,
+            exerciseName = exercise?.name.orEmpty(),
+            setLabel = _state.value.restSubtitle.ifEmpty { "Rest" },
+        )
     }
 
     /** Moves to the next lift in the running order. No-op on a freestyle session. */
@@ -513,6 +538,14 @@ class SetLoggingViewModel @Inject constructor(
         viewModelScope.launch { repo.markExerciseIntroduced(ex.id) }
     }
 
+    /**
+     * Stops the on-screen tick and nothing else.
+     *
+     * The notification and the alarm are deliberately left running. This fires when the
+     * user navigates away or swipes the app out of recents — which is *leaving the app
+     * mid-rest*, the case the status-bar timer exists for. Cancelling here would mean the
+     * buzz never came for the one user who most needed it.
+     */
     override fun onCleared() {
         super.onCleared()
         restJob?.cancel()
