@@ -81,7 +81,10 @@ fun SetLoggingRoute(
             when (event) {
                 WorkoutEvent.SetLogged -> haptics.setLogged()
                 WorkoutEvent.PrHit -> haptics.prHit()
-                WorkoutEvent.RestComplete -> haptics.restComplete()
+                // Deliberately silent: RestAlarmReceiver owns the end-of-rest buzz, so it
+                // happens whether or not this screen is up. Vibrating here as well would
+                // double it for anyone who happened to be watching.
+                WorkoutEvent.RestComplete -> Unit
             }
         }
     }

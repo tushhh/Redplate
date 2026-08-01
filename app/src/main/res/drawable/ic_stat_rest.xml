@@ -1,0 +1,30 @@
+<!--
+  Status-bar icon for the rest timer. Status-bar icons are drawn as a silhouette — the
+  system keeps the alpha and throws the colour away — so this is a flat white stopwatch
+  on transparent, at the 24dp the platform expects.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+
+    <!-- Crown and stem, so it reads as a timer rather than a plain circle at 18px. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9,1h6v2h-6z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11,3h2v2h-2z" />
+
+    <!-- Dial: a ring, drawn as an outer circle with an inner one cut back out. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,4.5A9,9 0,1 0,12 22.5A9,9 0,1 0,12 4.5ZM12,20.5A7,7 0,1 1,12 6.5A7,7 0,1 1,12 20.5Z" />
+
+    <!-- Hand, pointing at twelve. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.25,8.5h1.5v5.5h-1.5z" />
+</vector>

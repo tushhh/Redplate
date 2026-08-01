@@ -1,6 +1,7 @@
 package dev.redplate.workout
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -28,10 +29,23 @@ class WorkoutHaptics(context: Context) {
         vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
     }
 
-    /** Two firm buzzes — "rest is over, load the bar." */
+    /**
+     * Three long buzzes — "rest is over, load the bar."
+     *
+     * Long and full-amplitude because this one has to carry through a pocket with the
+     * phone across the gym floor, which the old two short taps did not. Played with alarm
+     * usage so Do Not Disturb — on in most gyms — does not swallow the one alert the user
+     * is actually relying on.
+     */
     fun restComplete() {
-        val timings = longArrayOf(0, 130, 90, 130)
-        val amplitudes = intArrayOf(0, 180, 0, 230)
-        vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        val timings = longArrayOf(0, 600, 300, 600, 300, 600)
+        val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
+        vibrator.vibrate(
+            VibrationEffect.createWaveform(timings, amplitudes, -1),
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+        )
     }
 }

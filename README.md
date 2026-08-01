@@ -65,9 +65,15 @@ adapts it from your own history.
   Each rule is a separate decision in `ProgressionEngine`, and what it decides is written back
   to the slot: the next session actually opens at the load you earned. An effort you didn't
   report never earns an increase.
+- **Weekly strength assessment** — at each week boundary the app reads the whole week back:
+  an estimated max per lift built from load, reps *and* the reps you reported in reserve, and
+  a verdict on whether the prescription was right. A lift you cleared at three in reserve all
+  week is re-derived from that max rather than nudged one notch; a lift you fought for all week
+  comes back down. Bounded to 10% a week and snapped to weights your equipment can make.
 - **Blocks that move** — a week advances when its sessions are done, not when the calendar
-  says so. Sets climb toward your adaptive range, the final week halves them and drops the
-  load, and the next block is seeded from what you lifted.
+  says so. Sets climb toward your adaptive range but never on a lift that already overreached,
+  the final week halves them and drops the load, and the next block is seeded from what you
+  lifted.
 - **Explains itself** — every slot can render its own prescription in a sentence, and every
   load change says what earned it. No black boxes.
 - **Changeable** — goal, days per week, session length, priority muscles and which weekdays
@@ -119,9 +125,13 @@ The ergonomics are hard rules, not preferences ([`CLAUDE.md`](CLAUDE.md) §4):
 - **64 dp minimum touch targets**, not Material's 48. You're out of breath with chalk on
   your hands.
 - **No gesture-only actions.** Sweat causes both false and rejected touches.
-- **Rest timer at 112 sp** — readable with the phone on the floor.
+- **Rest timer at 112 sp** — readable with the phone on the floor. It also runs in the
+  status bar, so putting the phone in a pocket between sets doesn't lose it, and the buzz
+  at zero is fired by an exact alarm rather than by the screen — it lands whether or not
+  the app is still running.
 - **Screen stays on** during a session; **haptics** on set logged, PR hit, and rest complete,
-  with distinct patterns, because you often aren't looking at the screen.
+  with distinct patterns, because you often aren't looking at the screen. Rest-complete is
+  three long buzzes at alarm priority, so Do Not Disturb doesn't swallow it.
 - Near-black ground for AMOLED battery and glare, tabular figures so digits don't jitter as
   weight increments.
 
@@ -161,7 +171,8 @@ Today  →  set logging  ⇄  rest  →  next lift  →  …  →  summary
    to RIR. Guidance sits top-right, deliberately out of thumb reach — it's a pre-set decision,
    never an in-set one.
 3. **Complete the set** → haptic → the rest timer starts at the prescribed interval and counts
-   down against a wall-clock deadline, so it stays honest whatever the process does.
+   down against a wall-clock deadline, so it stays honest whatever the process does. The same
+   countdown appears as a notification and an exact alarm, so leaving the app doesn't stop it.
 4. **The rest screen's one button knows what comes next** — another set, the next lift, or
    finish. Label and behaviour come from the same value, so they can't disagree.
 5. **Summary** derives tonnage, PRs and per-muscle volume from what you logged.

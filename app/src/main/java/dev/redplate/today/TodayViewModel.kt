@@ -287,7 +287,9 @@ class TodayViewModel @Inject constructor(
             coachBody = if (isFirst) {
                 CoachCopy.Today.FIRST_SESSION_BODY
             } else {
-                buildCoachBody(slots)
+                // What the block concluded from the week just trained outranks a bare
+                // statement of today's load: it is the reason today's load is what it is.
+                meso.assessmentNote ?: buildCoachBody(slots)
             },
             sessionCard = SessionCard(
                 label = todayTemplate.label,
