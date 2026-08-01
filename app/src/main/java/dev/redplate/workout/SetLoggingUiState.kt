@@ -65,6 +65,13 @@ data class SetLoggingUiState(
     val loadUnitLabel: String = LoadUnit.KILOGRAMS.label,
     /** Whole numbers only, so the keypad hides the decimal point on a level-marked stack. */
     val loadIsWholeNumber: Boolean = false,
+    /**
+     * True when the load describes one implement — a dumbbell in each hand. The readout
+     * says EACH so the number cannot be read as a combined figure.
+     */
+    val loadIsPerLimb: Boolean = false,
+    /** "Half Rack · Barbell" — where the lift is done. */
+    val stationLabel: String? = null,
 
     // ── Direct load entry ──
     /**

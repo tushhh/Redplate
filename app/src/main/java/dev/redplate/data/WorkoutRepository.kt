@@ -78,13 +78,39 @@ class WorkoutRepository @Inject constructor(
     suspend fun markExerciseIntroduced(exerciseId: String) =
         exerciseDao.markIntroduced(exerciseId)
 
-    /** First required equipment that is on hand; falls back to any declared equipment. */
+    /**
+     * The piece that supplies the load — the barbell, not the rack it sits in.
+     *
+     * Chosen by what it is rather than by list order. A lift's equipment now names both
+     * the station and the load source, and picking the first entry would have resolved a
+     * squat to the half rack: a `BODYWEIGHT` fixture with no bar weight and no plates, so
+     * no plate stack and progression stepping in the wrong increment.
+     */
     suspend fun getPrimaryEquipment(exercise: ExerciseEntity): EquipmentEntity? {
-        for (id in exercise.requiredEquipmentIds) {
-            val eq = equipmentDao.getById(id)
-            if (eq != null && eq.isAvailable) return eq
-        }
-        return exercise.requiredEquipmentIds.firstNotNullOfOrNull { equipmentDao.getById(it) }
+        val declared = exercise.requiredEquipmentIds.mapNotNull { equipmentDao.getById(it) }
+        return declared.firstOrNull { it.carriesLoad && it.isAvailable }
+            ?: declared.firstOrNull { it.carriesLoad }
+            ?: declared.firstOrNull { it.isAvailable }
+            ?: declared.firstOrNull()
+    }
+
+    /**
+     * Where the lift happens, in the gym's own words: "Half Rack · Barbell".
+     *
+     * The station comes first because that is what you walk to. Nothing in the app used to
+     * say which machine an exercise was for, so an unfamiliar name in the session card was
+     * a thing you had to already know.
+     */
+    suspend fun describeStation(exercise: ExerciseEntity): String? {
+        val declared = exercise.requiredEquipmentIds.mapNotNull { equipmentDao.getById(it) }
+        if (declared.isEmpty()) return "Bodyweight"
+
+        val station = declared.firstOrNull { !it.carriesLoad }
+        val loadSource = declared.firstOrNull { it.carriesLoad }
+        return listOfNotNull(station?.displayName, loadSource?.displayName)
+            .distinct()
+            .joinToString(" · ")
+            .ifEmpty { null }
     }
 
     /** Best estimated 1RM across prior non-warmup sets — the bar a new set must clear to be a PR. */

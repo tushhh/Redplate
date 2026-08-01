@@ -34,15 +34,17 @@ class SessionOutcomeReader @Inject constructor(
 
     suspend fun read(session: SessionEntity): SessionOutcome {
         val working = sessionDao.getSetsForSession(session.id).filter { !it.isWarmup }
-        val inKilograms = massBasedSets(working)
+        val weighted = massBasedSets(working)
         return SessionOutcome(
             workingSets = working.size,
             durationMinutes = session.endedAt
                 ?.let { TimeUnit.MILLISECONDS.toMinutes(it - session.startedAt) }
                 ?.toInt()
                 ?: 0,
-            tonnageKg = inKilograms.sumOf { it.loadKg * it.reps },
-            excludedFromTonnage = working.size - inKilograms.size,
+            // Per-limb loads count both implements: a set of ten with 30 kg dumbbells is
+            // 600 kg moved, not 300.
+            tonnageKg = weighted.sumOf { (set, limbs) -> set.loadKg * set.reps * limbs },
+            excludedFromTonnage = working.size - weighted.size,
             prCount = countPrs(session.id, working),
         )
     }
@@ -55,16 +57,20 @@ class SessionOutcomeReader @Inject constructor(
      * PRs are unaffected — those compare a lift against its own history, where the unit is
      * consistent by construction.
      */
-    private suspend fun massBasedSets(working: List<SetLogEntity>): List<SetLogEntity> {
-        if (working.isEmpty()) return working
+    private suspend fun massBasedSets(working: List<SetLogEntity>): List<Pair<SetLogEntity, Int>> {
+        if (working.isEmpty()) return emptyList()
         val exercises = exerciseDao.getAll().associateBy { it.id }
         val equipment = equipmentDao.getAll().associateBy { it.id }
-        return working.filter { set ->
-            val exercise = exercises[set.exerciseId] ?: return@filter true
-            exercise.requiredEquipmentIds
-                .firstNotNullOfOrNull { equipment[it] }
-                ?.let { it.loadUnit == LoadUnit.KILOGRAMS }
-                ?: true
+
+        return working.mapNotNull { set ->
+            val exercise = exercises[set.exerciseId] ?: return@mapNotNull set to 1
+            // The load source, not the station: a rack weighs nothing and reads in nothing.
+            val source = exercise.requiredEquipmentIds
+                .mapNotNull { equipment[it] }
+                .firstOrNull { it.carriesLoad }
+                ?: return@mapNotNull set to 1
+
+            if (source.loadUnit != LoadUnit.KILOGRAMS) null else set to source.limbMultiplier
         }
     }
 

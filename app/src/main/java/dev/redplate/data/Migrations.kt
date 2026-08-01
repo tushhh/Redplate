@@ -123,5 +123,66 @@ object Migrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    /**
+     * 5 → 6 adds `equipment.perLimb` and repairs the exercise-to-equipment mapping.
+     *
+     * Every barbell lift in the seed named only the station it happens at — a squat listed
+     * `power_rack`, a deadlift listed `deadlift_platform` — and both of those are
+     * `BODYWEIGHT` fixtures with no bar weight and no plates. So the app resolved the load
+     * source to a thing that weighs nothing: no plate stack on squat or bench, and
+     * progression stepping in the fixture's 1.25 kg rather than the barbell's 2.5.
+     *
+     * Each of those lifts now requires the barbell as well as its station. Existing rows
+     * are rewritten here; logged sets are untouched, because the loads recorded against
+     * them were always real weights.
+     */
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `equipment` ADD COLUMN `perLimb` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE `equipment` SET `perLimb` = 1 WHERE `id` = 'dumbbells'")
+
+            // requiredEquipmentIds is a JSON array of ids, written by Converters.
+            fun remap(ids: List<String>, exercises: List<String>) {
+                val json = ids.joinToString(",", "[", "]") { "\"$it\"" }
+                val list = exercises.joinToString(",") { "'$it'" }
+                db.execSQL(
+                    "UPDATE `exercises` SET `requiredEquipmentIds` = '$json' WHERE `id` IN ($list)"
+                )
+            }
+
+            // Barbell lifts in the half rack. Pull-ups, chin-ups and hanging leg raises
+            // stay rack-only — those genuinely need nothing but the rack.
+            remap(
+                listOf("barbell", "power_rack"),
+                listOf(
+                    "barbell_back_squat", "barbell_front_squat", "barbell_ohp",
+                    "barbell_reverse_lunge", "bulgarian_split_squat_bb", "barbell_calf_raise",
+                ),
+            )
+            // Barbell pressing: the bench is the station, not the rack.
+            remap(
+                listOf("barbell", "flat_incline_bench"),
+                listOf("barbell_flat_bench", "barbell_close_grip_bench"),
+            )
+            remap(
+                listOf("barbell", "deadlift_platform"),
+                listOf(
+                    "conventional_deadlift", "sumo_deadlift", "romanian_deadlift_bb",
+                    "barbell_bent_over_row", "power_clean",
+                ),
+            )
+            remap(listOf("barbell", "decline_bench"), listOf("decline_bench_press"))
+            remap(
+                listOf("dumbbells", "flat_incline_bench"),
+                listOf(
+                    "db_flat_bench", "db_incline_bench", "db_flat_fly", "db_pullover",
+                    "db_single_arm_row", "db_bulgarian_split_squat",
+                ),
+            )
+        }
+    }
+
+    val ALL = arrayOf(
+        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+    )
 }

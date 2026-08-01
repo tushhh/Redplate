@@ -78,6 +78,10 @@ object GymEquipmentSeed {
         EquipmentEntity(
             id = "dumbbells", displayName = "Dumbbells",
             category = EquipmentCategory.DUMBBELL, loadingScheme = LoadingScheme.FIXED_INCREMENT,
+            // The rack is labelled per dumbbell, so that is what gets logged: "30" is a
+            // 30 kg dumbbell in each hand, and the readout says EACH so it cannot be read
+            // as a combined figure.
+            perLimb = true,
             availableLoads = generateSequence(10.0) { it + 2.0 }.takeWhile { it <= 40.0 }.toList()
         ),
 

@@ -150,7 +150,11 @@ fun SetLoggingRoute(
     state.loadEntry?.let { entry ->
         LoadEntrySheet(
             entry = entry,
-            unitLabel = state.loadUnitLabel,
+            unitLabel = if (state.loadIsPerLimb) {
+                "${state.loadUnitLabel} EACH"
+            } else {
+                state.loadUnitLabel
+            },
             allowsDecimal = !state.loadIsWholeNumber,
             canCommit = state.canCommitLoadEntry,
             onDigit = viewModel::appendLoadDigit,
@@ -267,6 +271,7 @@ private fun InputScreen(
             hasGuidance = state.hasGuidance,
             onBack = onBack,
             onOpenGuidance = onOpenGuidance,
+            stationLabel = state.stationLabel,
         )
 
         // Movement window: start and end cross-fading, so the picture shows the
@@ -312,7 +317,8 @@ private fun InputScreen(
                     .padding(vertical = 2.dp)
                     .semantics(mergeDescendants = true) {
                         contentDescription =
-                            "Working load ${formatKg(state.loadKg)} ${state.loadUnitLabel}. " +
+                            "Working load ${formatKg(state.loadKg)} ${state.loadUnitLabel}" +
+                                (if (state.loadIsPerLimb) " in each hand. " else ". ") +
                                 "Tap to type a different value."
                     },
             ) {
@@ -323,7 +329,13 @@ private fun InputScreen(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = state.loadUnitLabel,
+                    // "KG EACH" on a dumbbell rack: the number is one implement, and
+                    // nothing used to say so.
+                    text = if (state.loadIsPerLimb) {
+                        "${state.loadUnitLabel} EACH"
+                    } else {
+                        state.loadUnitLabel
+                    },
                     style = RedplateType.mono.copy(fontSize = 14.sp),
                     color = colors.inkMuted,
                     modifier = Modifier.padding(bottom = 9.dp),
@@ -534,11 +546,17 @@ private fun SetHeader(
     hasGuidance: Boolean,
     onBack: () -> Unit,
     onOpenGuidance: () -> Unit,
+    /** "Half Rack · Barbell". Which machine to walk to — nothing used to say. */
+    stationLabel: String? = null,
 ) {
     val colors = RedplateTheme.colors
+    // The station leads the subtitle: an exercise name you do not recognise is only useful
+    // once you know where in the gym it happens.
+    val fullSubtitle = listOfNotNull(stationLabel?.uppercase(), subtitle.ifEmpty { null })
+        .joinToString("  ·  ")
     ScreenHeader(
         title = exerciseName,
-        subtitle = subtitle.ifEmpty { null },
+        subtitle = fullSubtitle.ifEmpty { null },
         onBack = onBack,
         trailing = if (!hasGuidance) {
             null
