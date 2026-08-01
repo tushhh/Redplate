@@ -306,7 +306,17 @@ class MesocycleAdvancer @Inject constructor(
                     )
                 }
             }
-            programDao.updateMesocycle(mesocycle.copy(currentWeek = week))
+            // The note describes what the plan just did, so a deload has to overwrite the
+            // accumulation week's. Left alone it would sit on Today all deload week saying
+            // "adds 4 sets where the muscle had room left" while the sets were being halved.
+            programDao.updateMesocycle(
+                mesocycle.copy(
+                    currentWeek = week,
+                    assessmentNote = "Deload week. Sets are halved and every load comes down " +
+                        "${(DELOAD_FRACTION * 100).toInt()}% — that is the point of it, not a " +
+                        "setback. Next block picks up from what you lifted, not from here.",
+                )
+            )
         }
     }
 
