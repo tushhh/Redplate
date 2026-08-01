@@ -201,15 +201,36 @@ object ProgressionEngine {
         sets.count { it.reps < repLow } * 2 > sets.size
 
     /**
-     * Steps up to something loadable. When the equipment has nothing heavier — the last
-     * pair of plates is already on the bar — this holds and says so, rather than
-     * prescribing a weight that cannot be assembled.
+     * Makes the exercise harder — normally by stepping up to the next loadable weight.
+     * When the equipment has nothing heavier — the last pair of plates is already on the
+     * bar — this holds and says so, rather than prescribing a weight that cannot be
+     * assembled.
+     *
+     * On an assistance machine "harder" means *less* counterweight, so the number goes down.
+     * Stepping it up would congratulate the user for making the movement easier, and would
+     * keep doing so until the machine was doing all of the work.
      */
     private fun stepUp(
         load: Double,
         equipment: EquipmentEntity?,
         reason: String,
     ): ProgressionOutcome {
+        if (equipment?.isAssistance == true) {
+            val next = PlateMath.nextLoadDown(load, equipment)
+            if (next >= load - EPSILON) {
+                return ProgressionOutcome.Hold(
+                    nextLoadKg = load,
+                    reason = "$reason, and there's no assistance left to take off — " +
+                        "you're doing it unassisted",
+                )
+            }
+            return ProgressionOutcome.Up(
+                fromKg = load,
+                nextLoadKg = next,
+                reason = "$reason, so the assistance comes down",
+            )
+        }
+
         val next = equipment?.let { PlateMath.nextLoadUp(load, it) } ?: (load + MANUAL_STEP_KG)
         if (next <= load + EPSILON) {
             return ProgressionOutcome.Hold(
@@ -220,11 +241,27 @@ object ProgressionEngine {
         return ProgressionOutcome.Up(fromKg = load, nextLoadKg = next, reason = reason)
     }
 
+    /** Makes the exercise easier — which on an assistance machine means more counterweight. */
     private fun stepDown(
         load: Double,
         equipment: EquipmentEntity?,
         reason: String,
     ): ProgressionOutcome {
+        if (equipment?.isAssistance == true) {
+            val next = PlateMath.nextLoadUp(load, equipment)
+            if (next <= load + EPSILON) {
+                return ProgressionOutcome.Hold(
+                    nextLoadKg = load,
+                    reason = "$reason, but the machine is already taking as much as it can",
+                )
+            }
+            return ProgressionOutcome.Down(
+                fromKg = load,
+                nextLoadKg = next,
+                reason = "$reason, so the assistance goes up",
+            )
+        }
+
         val next = equipment?.let { PlateMath.nextLoadDown(load, it) }
             ?: (load - MANUAL_STEP_KG).coerceAtLeast(0.0)
         if (next >= load - EPSILON) {

@@ -95,6 +95,15 @@ is a `RESISTANCE_LEVEL` machine: the readout says `LEVEL 7`, the steppers move o
 time, and no kilogram figure is invented. Levels are ordinal, so they're never converted and
 never added into tonnage — level 8 is harder than level 6, but it isn't eight kilograms.
 
+Each exercise names both the **station** it happens at and whatever **supplies the load** —
+a barbell squat needs the half rack *and* the barbell, not just the rack. The set logging
+header and the exercise browser say which, so an unfamiliar name is still a machine you can
+walk to. Turning the barbell off removes the squat; it does not leave it stranded behind a
+rack that weighs nothing.
+
+Where the number describes one implement rather than the whole load — a dumbbell rack — the
+readout says **`30 KG EACH`**, and tonnage counts both.
+
 **And whatever the app thinks, you can overrule it.** Tap the load readout during a set and
 type what you actually used, on a 64 dp keypad rather than the system keyboard. That value is
 stored exactly as entered — never snapped to a plate inventory or a ladder the app is only

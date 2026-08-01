@@ -53,6 +53,20 @@ enum class LoadUnit(val label: String) {
     LEVEL("LEVEL"),
 }
 
+/**
+ * True when this piece supplies the load, rather than only supporting the lifter.
+ *
+ * A half rack and a bench hold you up; the barbell is what weighs something. Resolving a
+ * lift's equipment to the fixture meant reading increments and bar weight off a thing that
+ * has neither.
+ */
+val EquipmentEntity.carriesLoad: Boolean
+    get() = loadingScheme != LoadingScheme.BODYWEIGHT
+
+/** How many implements one logged load represents. */
+val EquipmentEntity.limbMultiplier: Int
+    get() = if (perLimb) 2 else 1
+
 /** The unit this equipment's numbers are read in. */
 val EquipmentEntity.loadUnit: LoadUnit
     get() = when (loadingScheme) {
@@ -148,7 +162,28 @@ data class EquipmentEntity(
     val barWeightKg: Double? = null,
     /** Pairs available per plate size, e.g. {25.0: 2, 20.0: 4, 1.25: 1} */
     val platePairs: Map<Double, Int> = emptyMap(),
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    /**
+     * True when the number on this equipment describes *one* implement rather than the
+     * whole load — a rack of dumbbells, where "30" means a 30 kg dumbbell in each hand.
+     *
+     * Nothing told the user which convention to use, so the readout now says "30 KG EACH"
+     * and tonnage counts both. Progression is unaffected either way: a lift is compared
+     * against its own history, where the convention is consistent by construction.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val perLimb: Boolean = false,
+    /**
+     * True when the number *removes* effort instead of adding it — an assisted dip/chin
+     * machine, where the counterweight takes part of your bodyweight.
+     *
+     * Everything that reasons about load has to run backwards here. Getting stronger means
+     * needing *less* assistance, so a progression that stepped the number up would be
+     * congratulating you for making the exercise easier and would keep doing it until you
+     * were doing nothing at all.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val isAssistance: Boolean = false
 ) {
     /** Smallest load step this equipment can actually make. Never progress by less than this. */
     fun minIncrement(): Double = when (loadingScheme) {

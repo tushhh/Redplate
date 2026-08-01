@@ -50,30 +50,39 @@ object CuratedExerciseSeed {
         // ── Leg Curl Machine ──
         add(exercise("machine_leg_curl", "Machine Hamstring Curl", MuscleGroup.HAMSTRINGS, listOf(MuscleGroup.CALVES), "leg_curl_machine", MovementPattern.ISOLATION, compound = false, fatigue = 2))
 
-        // ── 4-Station Multi-Gym ──
-        add(exercise("lat_pulldown_wide", "Wide-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "four_station_multigym", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("lat_pulldown_close", "Close-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "four_station_multigym", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("seated_cable_row", "Seated Cable Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "four_station_multigym", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+        // ── 4-Station Multi-Gym · Lat Pulldown ──
+        add(exercise("lat_pulldown_wide", "Wide-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_lat_pulldown", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+        add(exercise("lat_pulldown_close", "Close-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "multigym_lat_pulldown", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+
+        // ── 4-Station Multi-Gym · Low Row ──
+        add(exercise("seated_cable_row", "Seated Cable Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "multigym_low_row", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+
+        // ── 4-Station Multi-Gym · Assisted Dip/Chin ──
+        // Counterweighted: the number is how much of your bodyweight the machine takes, so
+        // progress means the number coming *down*. See EquipmentEntity.isAssistance.
+        add(exercise("assisted_dip", "Assisted Dip", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "multigym_assist_dip_chin", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 3))
+        add(exercise("assisted_chin_up", "Assisted Chin-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+        add(exercise("assisted_pull_up", "Assisted Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
 
         // ── Deadlift Platform ──
-        add(exercise("conventional_deadlift", "Conventional Deadlift", MuscleGroup.LOWER_BACK, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS, MuscleGroup.QUADS, MuscleGroup.TRAPS), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5))
-        add(exercise("sumo_deadlift", "Sumo Deadlift", MuscleGroup.GLUTES, listOf(MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5))
-        add(exercise("romanian_deadlift_bb", "Romanian Deadlift (Barbell)", MuscleGroup.HAMSTRINGS, listOf(MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 4))
-        add(exercise("barbell_bent_over_row", "Barbell Bent-Over Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 4))
-        add(exercise("power_clean", "Power Clean", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRAPS, MuscleGroup.QUADS, MuscleGroup.GLUTES), "deadlift_platform", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 5))
+        add(exercise("conventional_deadlift", "Conventional Deadlift", MuscleGroup.LOWER_BACK, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS, MuscleGroup.QUADS, MuscleGroup.TRAPS), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
+        add(exercise("sumo_deadlift", "Sumo Deadlift", MuscleGroup.GLUTES, listOf(MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
+        add(exercise("romanian_deadlift_bb", "Romanian Deadlift (Barbell)", MuscleGroup.HAMSTRINGS, listOf(MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_bent_over_row", "Barbell Bent-Over Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS, MuscleGroup.LOWER_BACK), "deadlift_platform", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("power_clean", "Power Clean", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRAPS, MuscleGroup.QUADS, MuscleGroup.GLUTES), "deadlift_platform", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
 
         // ── Half Racks ──
-        add(exercise("barbell_back_squat", "Barbell Back Squat", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.SQUAT, compound = true, fatigue = 5))
-        add(exercise("barbell_front_squat", "Barbell Front Squat", MuscleGroup.QUADS, listOf(MuscleGroup.ABS, MuscleGroup.GLUTES, MuscleGroup.UPPER_BACK), "power_rack", MovementPattern.SQUAT, compound = true, fatigue = 5))
-        add(exercise("barbell_flat_bench", "Barbell Flat Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "power_rack", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
-        add(exercise("barbell_close_grip_bench", "Close-Grip Bench Press", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "power_rack", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
-        add(exercise("barbell_ohp", "Standing Overhead Press", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRICEPS, MuscleGroup.TRAPS, MuscleGroup.ABS), "power_rack", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 4))
-        add(exercise("barbell_reverse_lunge", "Barbell Reverse Lunge", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4))
-        add(exercise("bulgarian_split_squat_bb", "Bulgarian Split Squat (Barbell)", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4))
+        add(exercise("barbell_back_squat", "Barbell Back Squat", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.SQUAT, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_front_squat", "Barbell Front Squat", MuscleGroup.QUADS, listOf(MuscleGroup.ABS, MuscleGroup.GLUTES, MuscleGroup.UPPER_BACK), "power_rack", MovementPattern.SQUAT, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_flat_bench", "Barbell Flat Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "flat_incline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_close_grip_bench", "Close-Grip Bench Press", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "flat_incline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_ohp", "Standing Overhead Press", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRICEPS, MuscleGroup.TRAPS, MuscleGroup.ABS), "power_rack", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("barbell_reverse_lunge", "Barbell Reverse Lunge", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
+        add(exercise("bulgarian_split_squat_bb", "Bulgarian Split Squat (Barbell)", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("pull_up", "Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "power_rack", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 4))
         add(exercise("chin_up", "Chin-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "power_rack", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 4))
         add(exercise("hanging_leg_raise", "Hanging Leg Raise", MuscleGroup.ABS, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.CORE, compound = false, fatigue = 2))
-        add(exercise("barbell_calf_raise", "Standing Barbell Calf Raise", MuscleGroup.CALVES, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.ISOLATION, compound = false, fatigue = 2))
+        add(exercise("barbell_calf_raise", "Standing Barbell Calf Raise", MuscleGroup.CALVES, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.ISOLATION, compound = false, fatigue = 2, alsoNeeds = listOf("barbell")))
 
         // ── Incline Chest Press (Dedicated Rack) ──
         add(exercise("incline_barbell_bench", "Incline Barbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "incline_chest_press_machine", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
@@ -103,15 +112,15 @@ object CuratedExerciseSeed {
         add(exercise("db_shrug", "Dumbbell Shrug", MuscleGroup.TRAPS, listOf(MuscleGroup.FOREARMS), "dumbbells", MovementPattern.ISOLATION, compound = false, fatigue = 2))
 
         // ── Dumbbells (2-Tier / with Bench) ──
-        add(exercise("db_flat_bench", "Flat Dumbbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
-        add(exercise("db_incline_bench", "Incline Dumbbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
-        add(exercise("db_flat_fly", "Flat Dumbbell Fly", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = false, fatigue = 2))
-        add(exercise("db_pullover", "Dumbbell Pullover", MuscleGroup.LATS, listOf(MuscleGroup.CHEST, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("db_single_arm_row", "Single-Arm Dumbbell Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "dumbbells", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+        add(exercise("db_flat_bench", "Flat Dumbbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("flat_incline_bench")))
+        add(exercise("db_incline_bench", "Incline Dumbbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("flat_incline_bench")))
+        add(exercise("db_flat_fly", "Flat Dumbbell Fly", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS), "dumbbells", MovementPattern.HORIZONTAL_PUSH, compound = false, fatigue = 2, alsoNeeds = listOf("flat_incline_bench")))
+        add(exercise("db_pullover", "Dumbbell Pullover", MuscleGroup.LATS, listOf(MuscleGroup.CHEST, MuscleGroup.TRICEPS), "dumbbells", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3, alsoNeeds = listOf("flat_incline_bench")))
+        add(exercise("db_single_arm_row", "Single-Arm Dumbbell Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "dumbbells", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3, alsoNeeds = listOf("flat_incline_bench")))
         add(exercise("db_rdl", "Dumbbell Romanian Deadlift", MuscleGroup.HAMSTRINGS, listOf(MuscleGroup.GLUTES, MuscleGroup.LOWER_BACK), "dumbbells", MovementPattern.HINGE, compound = true, fatigue = 4))
         add(exercise("db_goblet_squat", "Goblet Squat", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.ABS), "dumbbells", MovementPattern.SQUAT, compound = true, fatigue = 3))
         add(exercise("db_lunge", "Dumbbell Lunge", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), "dumbbells", MovementPattern.LUNGE, compound = true, fatigue = 4))
-        add(exercise("db_bulgarian_split_squat", "Bulgarian Split Squat (Dumbbell)", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES), "dumbbells", MovementPattern.LUNGE, compound = true, fatigue = 4))
+        add(exercise("db_bulgarian_split_squat", "Bulgarian Split Squat (Dumbbell)", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES), "dumbbells", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("flat_incline_bench")))
 
         // ── Barbells & Rack ──
         add(exercise("barbell_curl", "Standing Barbell Curl", MuscleGroup.BICEPS, listOf(MuscleGroup.FOREARMS), "barbell", MovementPattern.ISOLATION, compound = false, fatigue = 2))
@@ -122,7 +131,7 @@ object CuratedExerciseSeed {
         add(exercise("landmine_row", "Landmine Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "barbell", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
 
         // ── Decline Bench ──
-        add(exercise("decline_bench_press", "Decline Barbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.TRICEPS, MuscleGroup.FRONT_DELTS), "decline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4))
+        add(exercise("decline_bench_press", "Decline Barbell Bench Press", MuscleGroup.CHEST, listOf(MuscleGroup.TRICEPS, MuscleGroup.FRONT_DELTS), "decline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("decline_sit_up", "Decline Sit-Up", MuscleGroup.ABS, listOf(MuscleGroup.QUADS), "decline_bench", MovementPattern.CORE, compound = false, fatigue = 2))
 
         // ── Flat/Incline Bench ──
@@ -151,13 +160,20 @@ object CuratedExerciseSeed {
         pattern: MovementPattern,
         compound: Boolean,
         fatigue: Int,
+        /**
+         * Everything else the lift needs. A barbell squat is not performable with a rack
+         * alone, and listing only the rack meant the app resolved a BODYWEIGHT fixture as
+         * the load source — no plate stack, and progression stepping in 1.25 kg instead of
+         * the barbell's 2.5.
+         */
+        alsoNeeds: List<String> = emptyList(),
     ) = ExerciseEntity(
         id = id,
         name = name,
         pattern = pattern,
         primaryMuscle = primary,
         secondaryMuscles = secondary,
-        requiredEquipmentIds = if (equipment != null) listOf(equipment) else emptyList(),
+        requiredEquipmentIds = listOfNotNull(equipment) + alsoNeeds,
         complexity = Complexity.INTERMEDIATE,
         fatigueCost = fatigue,
         isCompound = compound,

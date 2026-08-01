@@ -124,6 +124,9 @@ class SetLoggingViewModel @Inject constructor(
                     // have no dial to read, so they fall back to kilograms of added load.
                     loadUnitLabel = (eq?.loadUnit ?: LoadUnit.KILOGRAMS).label,
                     loadIsWholeNumber = eq?.loadingScheme == LoadingScheme.RESISTANCE_LEVEL,
+                    loadIsPerLimb = eq?.perLimb == true,
+                    loadIsAssistance = eq?.isAssistance == true,
+                    stationLabel = ex?.let { repo.describeStation(it) },
                 )
             }
             val nextName = nextSlot()?.let { repo.getExercise(it.exerciseId)?.name }

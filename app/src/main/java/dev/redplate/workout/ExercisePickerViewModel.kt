@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.EquipmentAvailability
 import dev.redplate.data.EquipmentEntity
+import dev.redplate.data.carriesLoad
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.MuscleGroup
@@ -451,23 +453,39 @@ class ExercisePickerViewModel @Inject constructor(
     }
 
     /** "DUMBBELL · 34 SETS" — the kit first, then how much of it you have actually done. */
+    /**
+     * "HALF RACK · BARBELL · 34 SETS" — the machine to walk to, then the thing that
+     * supplies the load, then how much you have actually done it.
+     */
     private fun tagFor(
         exercise: ExerciseEntity,
         equipment: Map<String, EquipmentEntity>,
         sets: Int,
     ): String {
-        val kit = exercise.requiredEquipmentIds
-            .firstNotNullOfOrNull { equipment[it]?.displayName }
-            ?.uppercase()
-            ?: "BODYWEIGHT"
+        val declared = exercise.requiredEquipmentIds.mapNotNull { equipment[it] }
+        val kit = if (declared.isEmpty()) {
+            "BODYWEIGHT"
+        } else {
+            listOfNotNull(
+                declared.firstOrNull { !it.carriesLoad }?.displayName,
+                declared.firstOrNull { it.carriesLoad }?.displayName,
+            ).distinct().joinToString(" · ").uppercase()
+        }
         return if (sets > 0) "$kit · $sets SETS" else kit
     }
 
+    /**
+     * Shared with the generator and the repository. This used to be its own `any` check,
+     * which read a barbell squat as available in a gym with a rack and no barbell — and
+     * became actively wrong once lifts started naming both the station and the load.
+     */
     private fun isAvailable(
         exercise: ExerciseEntity,
         equipment: Map<String, EquipmentEntity>,
-    ): Boolean = exercise.requiredEquipmentIds.isEmpty() ||
-        exercise.requiredEquipmentIds.any { equipment[it]?.isAvailable == true }
+    ): Boolean = EquipmentAvailability.canPerform(
+        exercise,
+        EquipmentAvailability.availableIds(equipment.values.toList()),
+    )
 
     private suspend fun browserTitle(intent: BrowseIntent, all: List<ExerciseEntity>): String =
         when (intent) {

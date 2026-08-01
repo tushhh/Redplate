@@ -35,9 +35,17 @@ object GymEquipmentSeed {
         pinStack("chest_press_machine", "Chest Press Machine"),
         pinStack("shoulder_press_machine", "Shoulder Press Machine"),
         pinStack("leg_curl_machine", "Leg Curl Machine"),
-        // Marked in numbered resistance levels, not kilograms — so the app records the
-        // number that is actually printed on the machine rather than inventing a mass.
-        resistanceLevel("four_station_multigym", "4-Station Multi-Gym"),
+        // --- 4-Station Multi-Gym (#?) — four independent stations on one frame ---
+        // Marked in numbered resistance levels, not kilograms, so the app records the
+        // number actually printed on the machine rather than inventing a mass. Modelled as
+        // four pieces because they are four things you queue for: naming the frame told
+        // you nothing about which station to walk to.
+        resistanceLevel("multigym_cable", "Multi-Gym · Cable"),
+        resistanceLevel("multigym_low_row", "Multi-Gym · Low Row"),
+        resistanceLevel("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown"),
+        // Counterweighted: a higher number takes MORE of your bodyweight, so it is easier.
+        // Everything that reads this has to run backwards — see EquipmentEntity.isAssistance.
+        resistanceLevel("multigym_assist_dip_chin", "Multi-Gym · Assisted Dip/Chin", assistance = true),
 
         // --- Fixtures (#12,13,22,23,24) — no load of their own, gate specific variants ---
         fixture("deadlift_platform", "Deadlift Platform", EquipmentCategory.OTHER),
@@ -78,6 +86,10 @@ object GymEquipmentSeed {
         EquipmentEntity(
             id = "dumbbells", displayName = "Dumbbells",
             category = EquipmentCategory.DUMBBELL, loadingScheme = LoadingScheme.FIXED_INCREMENT,
+            // The rack is labelled per dumbbell, so that is what gets logged: "30" is a
+            // 30 kg dumbbell in each hand, and the readout says EACH so it cannot be read
+            // as a combined figure.
+            perLimb = true,
             availableLoads = generateSequence(10.0) { it + 2.0 }.takeWhile { it <= 40.0 }.toList()
         ),
 
@@ -134,10 +146,13 @@ object GymEquipmentSeed {
      * worse than none — it put a kilogram figure on screen that appears nowhere on the
      * machine, and refused to record the level the user actually set.
      */
-    private fun resistanceLevel(id: String, name: String) = EquipmentEntity(
-        id = id, displayName = name,
-        category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
-    )
+    private fun resistanceLevel(id: String, name: String, assistance: Boolean = false) =
+        EquipmentEntity(
+            id = id, displayName = name,
+            category = EquipmentCategory.MACHINE,
+            loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
+            isAssistance = assistance,
+        )
 
     private fun fixture(id: String, name: String, category: EquipmentCategory) = EquipmentEntity(
         id = id, displayName = name,

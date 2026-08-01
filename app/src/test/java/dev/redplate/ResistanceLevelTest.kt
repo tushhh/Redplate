@@ -13,15 +13,15 @@ import org.junit.Test
 /**
  * Machines marked in numbered resistance rather than mass.
  *
- * The 4-station multi-gym was seeded as a pin stack with an invented 5–100 kg ladder, so
+ * The multi-gym stations were seeded as a pin stack with an invented 5–100 kg ladder, so
  * the app displayed a kilogram figure printed nowhere on the machine and refused to record
  * the level the user had actually set.
  */
 class ResistanceLevelTest {
 
     private val multigym = EquipmentEntity(
-        id = "four_station_multigym",
-        displayName = "4-Station Multi-Gym",
+        id = "multigym_lat_pulldown",
+        displayName = "Multi-Gym · Lat Pulldown",
         category = EquipmentCategory.MACHINE,
         loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
     )

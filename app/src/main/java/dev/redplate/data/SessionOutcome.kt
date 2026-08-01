@@ -34,15 +34,17 @@ class SessionOutcomeReader @Inject constructor(
 
     suspend fun read(session: SessionEntity): SessionOutcome {
         val working = sessionDao.getSetsForSession(session.id).filter { !it.isWarmup }
-        val inKilograms = massBasedSets(working)
+        val weighted = massBasedSets(working)
         return SessionOutcome(
             workingSets = working.size,
             durationMinutes = session.endedAt
                 ?.let { TimeUnit.MILLISECONDS.toMinutes(it - session.startedAt) }
                 ?.toInt()
                 ?: 0,
-            tonnageKg = inKilograms.sumOf { it.loadKg * it.reps },
-            excludedFromTonnage = working.size - inKilograms.size,
+            // Per-limb loads count both implements: a set of ten with 30 kg dumbbells is
+            // 600 kg moved, not 300.
+            tonnageKg = weighted.sumOf { (set, limbs) -> set.loadKg * set.reps * limbs },
+            excludedFromTonnage = working.size - weighted.size,
             prCount = countPrs(session.id, working),
         )
     }
@@ -55,16 +57,27 @@ class SessionOutcomeReader @Inject constructor(
      * PRs are unaffected — those compare a lift against its own history, where the unit is
      * consistent by construction.
      */
-    private suspend fun massBasedSets(working: List<SetLogEntity>): List<SetLogEntity> {
-        if (working.isEmpty()) return working
+    private suspend fun massBasedSets(working: List<SetLogEntity>): List<Pair<SetLogEntity, Int>> {
+        if (working.isEmpty()) return emptyList()
         val exercises = exerciseDao.getAll().associateBy { it.id }
         val equipment = equipmentDao.getAll().associateBy { it.id }
-        return working.filter { set ->
-            val exercise = exercises[set.exerciseId] ?: return@filter true
-            exercise.requiredEquipmentIds
-                .firstNotNullOfOrNull { equipment[it] }
-                ?.let { it.loadUnit == LoadUnit.KILOGRAMS }
-                ?: true
+
+        return working.mapNotNull { set ->
+            val exercise = exercises[set.exerciseId] ?: return@mapNotNull set to 1
+            // The load source, not the station: a rack weighs nothing and reads in nothing.
+            val source = exercise.requiredEquipmentIds
+                .mapNotNull { equipment[it] }
+                .firstOrNull { it.carriesLoad }
+                ?: return@mapNotNull set to 1
+
+            when {
+                // A level is ordinal, not a mass.
+                source.loadUnit != LoadUnit.KILOGRAMS -> null
+                // Assistance is weight taken *off* you. Adding it to a tonnage total would
+                // credit the machine's work as though it were yours.
+                source.isAssistance -> null
+                else -> set to source.limbMultiplier
+            }
         }
     }
 
@@ -74,12 +87,32 @@ class SessionOutcomeReader @Inject constructor(
      * session are not counted as beating each other.
      */
     private suspend fun countPrs(sessionId: Long, working: List<SetLogEntity>): Int {
+        val assisted = assistedExerciseIds(working)
         var count = 0
         for ((exerciseId, sets) in working.groupBy { it.exerciseId }) {
+            // Epley runs the wrong way on an assistance machine: more counterweight is an
+            // easier set but a bigger number, so every step backwards would read as a PR.
+            // Ranking those honestly needs a definition of "better" the app does not have,
+            // so it claims nothing rather than claiming something false.
+            if (exerciseId in assisted) continue
             val priorBest = sessionDao.getEstimated1RmExcludingSession(exerciseId, sessionId) ?: 0.0
             count += sets.count { it.reps in PR_REP_RANGE && it.estimated1Rm() > priorBest + EPSILON }
         }
         return count
+    }
+
+    /** Exercises whose load source takes effort away rather than adding it. */
+    private suspend fun assistedExerciseIds(working: List<SetLogEntity>): Set<String> {
+        if (working.isEmpty()) return emptySet()
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val equipment = equipmentDao.getAll().associateBy { it.id }
+        return working.mapNotNullTo(mutableSetOf()) { set ->
+            val exercise = exercises[set.exerciseId] ?: return@mapNotNullTo null
+            val assisted = exercise.requiredEquipmentIds
+                .mapNotNull { equipment[it] }
+                .any { it.isAssistance }
+            if (assisted) set.exerciseId else null
+        }
     }
 
     private companion object {
