@@ -50,10 +50,19 @@ object CuratedExerciseSeed {
         // ── Leg Curl Machine ──
         add(exercise("machine_leg_curl", "Machine Hamstring Curl", MuscleGroup.HAMSTRINGS, listOf(MuscleGroup.CALVES), "leg_curl_machine", MovementPattern.ISOLATION, compound = false, fatigue = 2))
 
-        // ── 4-Station Multi-Gym ──
-        add(exercise("lat_pulldown_wide", "Wide-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "four_station_multigym", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("lat_pulldown_close", "Close-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "four_station_multigym", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
-        add(exercise("seated_cable_row", "Seated Cable Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "four_station_multigym", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+        // ── 4-Station Multi-Gym · Lat Pulldown ──
+        add(exercise("lat_pulldown_wide", "Wide-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_lat_pulldown", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+        add(exercise("lat_pulldown_close", "Close-Grip Lat Pulldown", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS), "multigym_lat_pulldown", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+
+        // ── 4-Station Multi-Gym · Low Row ──
+        add(exercise("seated_cable_row", "Seated Cable Row", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.BICEPS), "multigym_low_row", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+
+        // ── 4-Station Multi-Gym · Assisted Dip/Chin ──
+        // Counterweighted: the number is how much of your bodyweight the machine takes, so
+        // progress means the number coming *down*. See EquipmentEntity.isAssistance.
+        add(exercise("assisted_dip", "Assisted Dip", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "multigym_assist_dip_chin", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 3))
+        add(exercise("assisted_chin_up", "Assisted Chin-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
+        add(exercise("assisted_pull_up", "Assisted Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "multigym_assist_dip_chin", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
 
         // ── Deadlift Platform ──
         add(exercise("conventional_deadlift", "Conventional Deadlift", MuscleGroup.LOWER_BACK, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS, MuscleGroup.QUADS, MuscleGroup.TRAPS), "deadlift_platform", MovementPattern.HINGE, compound = true, fatigue = 5, alsoNeeds = listOf("barbell")))

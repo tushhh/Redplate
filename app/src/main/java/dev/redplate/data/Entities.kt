@@ -172,7 +172,18 @@ data class EquipmentEntity(
      * against its own history, where the convention is consistent by construction.
      */
     @ColumnInfo(defaultValue = "0")
-    val perLimb: Boolean = false
+    val perLimb: Boolean = false,
+    /**
+     * True when the number *removes* effort instead of adding it — an assisted dip/chin
+     * machine, where the counterweight takes part of your bodyweight.
+     *
+     * Everything that reasons about load has to run backwards here. Getting stronger means
+     * needing *less* assistance, so a progression that stepped the number up would be
+     * congratulating you for making the exercise easier and would keep doing it until you
+     * were doing nothing at all.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val isAssistance: Boolean = false
 ) {
     /** Smallest load step this equipment can actually make. Never progress by less than this. */
     fun minIncrement(): Double = when (loadingScheme) {

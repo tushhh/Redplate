@@ -131,15 +131,64 @@ class ExerciseEquipmentMappingTest {
         for (id in listOf("power_rack", "flat_incline_bench", "deadlift_platform")) {
             assertFalse("$id is a fixture", equipment.getValue(id).carriesLoad)
         }
-        for (id in listOf("barbell", "dumbbells", "leg_press_machine", "four_station_multigym")) {
+        for (id in listOf("barbell", "dumbbells", "leg_press_machine", "multigym_lat_pulldown")) {
             assertTrue("$id supplies load", equipment.getValue(id).carriesLoad)
         }
     }
 
     @Test
     fun `the multi-gym reads in levels and everything else in kilograms`() {
-        assertEquals(LoadUnit.LEVEL, equipment.getValue("four_station_multigym").loadUnit)
+        for (id in multiGymStations) {
+            assertEquals("$id is marked in levels", LoadUnit.LEVEL, equipment.getValue(id).loadUnit)
+        }
         assertEquals(LoadUnit.KILOGRAMS, equipment.getValue("barbell").loadUnit)
         assertEquals(LoadUnit.KILOGRAMS, equipment.getValue("dumbbells").loadUnit)
+    }
+
+    // ── The 4-station multi-gym ─────────────────────────────────────────
+
+    private val multiGymStations = listOf(
+        "multigym_cable", "multigym_low_row", "multigym_lat_pulldown", "multigym_assist_dip_chin",
+    )
+
+    /**
+     * The frame was one row called "4-Station Multi-Gym", which is not somewhere you can
+     * walk to. Naming it told the user nothing about which station the lift happens at.
+     */
+    @Test
+    fun `the multi-gym is four stations, not one frame`() {
+        assertFalse(
+            "the merged frame should be gone",
+            equipment.containsKey("four_station_multigym"),
+        )
+        for (id in multiGymStations) {
+            assertNotNull("$id should exist", equipment[id])
+            assertEquals(LoadingScheme.RESISTANCE_LEVEL, equipment.getValue(id).loadingScheme)
+        }
+    }
+
+    /** Only the counterweighted station runs backwards. */
+    @Test
+    fun `assistance is marked on the dip-chin station and nowhere else`() {
+        assertTrue(equipment.getValue("multigym_assist_dip_chin").isAssistance)
+        for (other in equipment.values.filter { it.id != "multigym_assist_dip_chin" }) {
+            assertFalse("${other.id} should not be assistance", other.isAssistance)
+        }
+    }
+
+    @Test
+    fun `pulldowns and rows point at their own station`() {
+        assertEquals("multigym_lat_pulldown", loadSourceFor("lat_pulldown_wide")?.id)
+        assertEquals("multigym_lat_pulldown", loadSourceFor("lat_pulldown_close")?.id)
+        assertEquals("multigym_low_row", loadSourceFor("seated_cable_row")?.id)
+    }
+
+    @Test
+    fun `the assisted variants live on the assistance station`() {
+        for (id in listOf("assisted_dip", "assisted_chin_up", "assisted_pull_up")) {
+            val source = loadSourceFor(id)
+            assertEquals("$id belongs on the assist station", "multigym_assist_dip_chin", source?.id)
+            assertTrue("$id should be marked assisted", source?.isAssistance == true)
+        }
     }
 }

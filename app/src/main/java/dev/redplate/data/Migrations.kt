@@ -182,7 +182,90 @@ object Migrations {
         }
     }
 
+    /**
+     * 6 → 7 splits the 4-station multi-gym into the four stations it actually is, and adds
+     * `equipment.isAssistance` so one of them can be read backwards.
+     *
+     * The frame was modelled as a single piece of equipment, which told the user nothing:
+     * "4-Station Multi-Gym" is not somewhere you can walk to. It is a cable station, a low
+     * row, a lat pulldown and an assisted dip/chin — four things you queue for separately,
+     * each with its own level printed on it.
+     *
+     * The assisted dip/chin is the reason this needs a column rather than four inserts.
+     * Its counterweight *removes* effort: a higher number is easier. Left unmarked, every
+     * rule in [ProgressionEngine] would have raised the number on a good session — walking
+     * the user toward the machine doing all of the work — and its "tonnage" would have been
+     * counted as work performed rather than work avoided.
+     *
+     * The old frame's `isAvailable` carries over to all four, so a user who had switched it
+     * off does not find four new machines switched on. Set logs are untouched: a level
+     * recorded against `lat_pulldown_wide` is still that lift's history, and the exercise
+     * rows are repointed so the history stays continuous.
+     */
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `equipment` ADD COLUMN `isAssistance` INTEGER NOT NULL DEFAULT 0")
+
+            // Inherit availability from the frame the four stations came out of. If the row
+            // is already gone — a database seeded after the split — default to available.
+            fun station(id: String, name: String, assistance: Boolean) {
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO `equipment`
+                        (`id`, `displayName`, `category`, `loadingScheme`, `availableLoads`,
+                         `barWeightKg`, `platePairs`, `isAvailable`, `perLimb`, `isAssistance`)
+                    VALUES ('$id', '$name', 'MACHINE', 'RESISTANCE_LEVEL', '[]',
+                            NULL, '{}',
+                            COALESCE(
+                                (SELECT `isAvailable` FROM `equipment` WHERE `id` = 'four_station_multigym'),
+                                1
+                            ),
+                            0, ${if (assistance) 1 else 0})
+                    """.trimIndent()
+                )
+            }
+            station("multigym_cable", "Multi-Gym · Cable", assistance = false)
+            station("multigym_low_row", "Multi-Gym · Low Row", assistance = false)
+            station("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown", assistance = false)
+            station("multigym_assist_dip_chin", "Multi-Gym · Assisted Dip/Chin", assistance = true)
+
+            // Repoint the exercises that named the frame. requiredEquipmentIds is a JSON
+            // array written by Converters, so a textual substitution is exact here: the ids
+            // are quoted whole and no other id contains this one as a substring.
+            db.execSQL(
+                """
+                UPDATE `exercises`
+                SET `requiredEquipmentIds` =
+                    REPLACE(`requiredEquipmentIds`, '"four_station_multigym"', '"multigym_lat_pulldown"')
+                WHERE `id` IN ('lat_pulldown_wide', 'lat_pulldown_close')
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                UPDATE `exercises`
+                SET `requiredEquipmentIds` =
+                    REPLACE(`requiredEquipmentIds`, '"four_station_multigym"', '"multigym_low_row"')
+                WHERE `id` = 'seated_cable_row'
+                """.trimIndent()
+            )
+            // Anything else still pointing at the frame goes to the cable station, which is
+            // the general-purpose one. Better than leaving an exercise naming equipment that
+            // no longer exists, which reads as unavailable and silently disappears.
+            db.execSQL(
+                """
+                UPDATE `exercises`
+                SET `requiredEquipmentIds` =
+                    REPLACE(`requiredEquipmentIds`, '"four_station_multigym"', '"multigym_cable"')
+                WHERE `requiredEquipmentIds` LIKE '%four_station_multigym%'
+                """.trimIndent()
+            )
+
+            db.execSQL("DELETE FROM `equipment` WHERE `id` = 'four_station_multigym'")
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+        MIGRATION_6_7,
     )
 }

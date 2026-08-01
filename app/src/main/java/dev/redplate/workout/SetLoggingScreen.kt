@@ -317,8 +317,13 @@ private fun InputScreen(
                     .padding(vertical = 2.dp)
                     .semantics(mergeDescendants = true) {
                         contentDescription =
-                            "Working load ${formatKg(state.loadKg)} ${state.loadUnitLabel}" +
-                                (if (state.loadIsPerLimb) " in each hand. " else ". ") +
+                            (if (state.loadIsAssistance) "Assistance " else "Working load ") +
+                                "${formatKg(state.loadKg)} ${state.loadUnitLabel}" +
+                                when {
+                                    state.loadIsPerLimb -> " in each hand. "
+                                    state.loadIsAssistance -> ", higher is easier. "
+                                    else -> ". "
+                                } +
                                 "Tap to type a different value."
                     },
             ) {
@@ -331,14 +336,23 @@ private fun InputScreen(
                 Text(
                     // "KG EACH" on a dumbbell rack: the number is one implement, and
                     // nothing used to say so.
-                    text = if (state.loadIsPerLimb) {
-                        "${state.loadUnitLabel} EACH"
-                    } else {
-                        state.loadUnitLabel
+                    text = when {
+                        state.loadIsPerLimb -> "${state.loadUnitLabel} EACH"
+                        // "LEVEL ASSIST" — the number is help, not work.
+                        state.loadIsAssistance -> "${state.loadUnitLabel} ASSIST"
+                        else -> state.loadUnitLabel
                     },
                     style = RedplateType.mono.copy(fontSize = 14.sp),
                     color = colors.inkMuted,
                     modifier = Modifier.padding(bottom = 9.dp),
+                )
+            }
+
+            if (state.loadIsAssistance) {
+                Text(
+                    text = "The machine takes this much off you — higher is easier.",
+                    style = RedplateType.mono.copy(fontSize = 10.sp),
+                    color = colors.inkMuted,
                 )
             }
 

@@ -70,6 +70,12 @@ data class SetLoggingUiState(
      * says EACH so the number cannot be read as a combined figure.
      */
     val loadIsPerLimb: Boolean = false,
+    /**
+     * True on a counterweighted machine, where the number is help taken off you rather than
+     * load added. Everything about this reads backwards — a bigger number is an easier set —
+     * so the readout has to say so out loud, or the user will chase the wrong direction.
+     */
+    val loadIsAssistance: Boolean = false,
     /** "Half Rack · Barbell" — where the lift is done. */
     val stationLabel: String? = null,
 

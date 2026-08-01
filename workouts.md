@@ -115,6 +115,11 @@
 | Pointed-Toe Leg Curls | HAMSTRINGS | GLUTES |
 
 ### 11. 4-Station Multi-Gym
+
+Four separate stations on one frame: **cable**, **low row**, **lat pulldown**,
+**assisted dip/chin**. Each is marked in numbered resistance levels, not kilograms.
+
+#### 11a. Lat Pulldown
 | Exercise | Primary Muscle Group | Secondary Muscle Groups |
 | :--- | :--- | :--- |
 | Wide-Grip Lat Pulldowns | LATS | BICEPS, UPPER BACK |
@@ -122,14 +127,32 @@
 | Reverse-Grip Lat Pulldowns | LATS | BICEPS |
 | Neutral-Grip Lat Pulldowns | LATS | BICEPS, UPPER BACK |
 | Behind-The-Neck Lat Pulldowns | LATS | SHOULDERS, UPPER BACK |
+
+#### 11b. Low Row
+| Exercise | Primary Muscle Group | Secondary Muscle Groups |
+| :--- | :--- | :--- |
 | Seated Cable Rows | UPPER BACK | LATS, BICEPS |
 | Wide-Grip Seated Rows | UPPER BACK | TRAPS (Posterior), SHOULDERS |
+
+#### 11c. Cable
+| Exercise | Primary Muscle Group | Secondary Muscle Groups |
+| :--- | :--- | :--- |
 | Tricep Pushdowns | TRICEPS | SHOULDERS |
 | Overhead Cable Extensions | TRICEPS | SHOULDERS |
 | Cable Bicep Curls | BICEPS | FOREARMS |
 | Cable Face Pulls | TRAPS (Posterior) | SHOULDERS, UPPER BACK |
 | Upright Cable Rows | TRAPS (Anterior) | SHOULDERS, BICEPS |
 | Cable Shrugs | TRAPS (Anterior) | FOREARMS |
+
+#### 11d. Assisted Dip/Chin
+Counterweighted — **a higher level is easier**, because the machine is taking more of your
+bodyweight. Progress by needing *less* assistance.
+
+| Exercise | Primary Muscle Group | Secondary Muscle Groups |
+| :--- | :--- | :--- |
+| Assisted Dips | TRICEPS | CHEST, FRONT DELTS |
+| Assisted Chin-Ups | LATS | BICEPS, UPPER BACK |
+| Assisted Pull-Ups | LATS | BICEPS, UPPER BACK |
 
 ---
 
