@@ -383,8 +383,8 @@ object Migrations {
     }
 
     /**
-     * 10 → 11 puts kilograms back on the low row and lat pulldown, and drops the free
-     * chin-up.
+     * 10 → 11 puts kilograms back on the low row and lat pulldown, and drops everything
+     * that hung from the half rack's bar.
      *
      * **The stacks.** Those two stations turned out to be printed in kilograms after all —
      * 5, 12.5, 20 … 130, photographed off the selector plates and transcribed into
@@ -407,11 +407,13 @@ object Migrations {
      * is left exactly as logged, which also protects any load that predates 3 → 4 and is
      * already a genuine kilogram figure.
      *
-     * **The chin-up.** `chin_up` hung from the half rack's bar, and the gym has nothing to
-     * perform a free chin-up on. `assisted_chin_up` on the multi-gym's dip/chin station is
-     * unaffected — that station exists. Removal follows 9 → 10: excluded always, deleted
-     * only where no set log or template slot points at it, so no rep already recorded is
-     * orphaned.
+     * **The bar that is not there.** The half rack has no pull-up bar on it. `chin_up`,
+     * `pull_up` and `hanging_leg_raise` all named the rack and all needed that one bar, so
+     * all three go: a lift the gym cannot perform is worse than a missing one, because the
+     * generator will keep prescribing it. `assisted_chin_up` and `assisted_dip` are
+     * unaffected — the multi-gym's dip/chin station exists. Removal follows 9 → 10:
+     * excluded always, deleted only where no set log or template slot points at it, so no
+     * rep already recorded is orphaned.
      *
      * No table, column or index changes here.
      */
@@ -452,11 +454,15 @@ object Migrations {
             convert("set_logs", "loadKg", "exerciseId")
             convert("template_slots", "workingLoadKg", "exerciseId")
 
-            db.execSQL("UPDATE `exercises` SET `isExcluded` = 1 WHERE `id` = 'chin_up'")
+            // Everything that needed the pull-up bar the half rack does not have.
+            val offTheBar = listOf("chin_up", "pull_up", "hanging_leg_raise")
+            val barList = offTheBar.joinToString(",") { "'$it'" }
+
+            db.execSQL("UPDATE `exercises` SET `isExcluded` = 1 WHERE `id` IN ($barList)")
             db.execSQL(
                 """
                 DELETE FROM `exercises`
-                WHERE `id` = 'chin_up'
+                WHERE `id` IN ($barList)
                   AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `set_logs`)
                   AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `template_slots`)
                 """.trimIndent()

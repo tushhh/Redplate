@@ -50,7 +50,7 @@ class ExerciseEquipmentMappingTest {
     @Test
     fun `every loaded lift resolves to equipment that carries load`() {
         val bodyweight = setOf(
-            "pull_up", "hanging_leg_raise", "bench_tricep_dip",
+            "bench_tricep_dip",
             "decline_sit_up", "hyperextension", "glute_focused_extension", "push_up",
             "plank", "bodyweight_squat", "stairmill_climbing", "treadmill_incline_walk",
             "rower_full_body",
@@ -90,8 +90,11 @@ class ExerciseEquipmentMappingTest {
         val squat = exercises.first { it.id == "barbell_back_squat" }
         assertFalse(EquipmentAvailability.canPerform(squat, withoutBarbell))
 
-        val pullUp = exercises.first { it.id == "pull_up" }
-        assertTrue("A pull-up needs no barbell", EquipmentAvailability.canPerform(pullUp, withoutBarbell))
+        val assistedChin = exercises.first { it.id == "assisted_chin_up" }
+        assertTrue(
+            "An assisted chin needs no barbell",
+            EquipmentAvailability.canPerform(assistedChin, withoutBarbell),
+        )
     }
 
     @Test
@@ -216,16 +219,27 @@ class ExerciseEquipmentMappingTest {
     }
 
     /**
-     * There is no bar or station in this gym to perform a free chin-up on. The supinated
-     * pull lives on the multi-gym's assisted dip/chin station instead.
+     * The half rack has no pull-up bar on it, so nothing may hang from it. All three lifts
+     * that did are gone; the multi-gym's dip/chin station covers the vertical pull instead.
+     *
+     * Guarding the whole pool rather than the three ids is the point: any *new* lift that
+     * hangs from the rack fails here, which is the mistake that put these three in the seed
+     * to begin with.
      */
     @Test
-    fun `there is no free chin-up in the pool`() {
-        assertFalse(
-            "chin_up needs apparatus this gym does not have",
-            exercises.any { it.id == "chin_up" },
-        )
+    fun `nothing hangs from the half rack`() {
+        for (id in listOf("chin_up", "pull_up", "hanging_leg_raise")) {
+            assertFalse(
+                "'$id' needs a bar this rack does not have",
+                exercises.any { it.id == id },
+            )
+        }
         assertTrue(exercises.any { it.id == "assisted_chin_up" })
+
+        // What is left on the rack is squatting and pressing, and every one of those needs
+        // the barbell. A rack-only lift is a lift that hangs from the bar.
+        val rackOnly = exercises.filter { it.requiredEquipmentIds == listOf("power_rack") }
+        assertTrue("These would need the bar: ${rackOnly.map { it.id }}", rackOnly.isEmpty())
     }
 
     /** Only the counterweighted station runs backwards. */

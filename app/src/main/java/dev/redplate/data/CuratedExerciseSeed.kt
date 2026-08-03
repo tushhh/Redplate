@@ -76,13 +76,14 @@ object CuratedExerciseSeed {
         add(exercise("barbell_close_grip_bench", "Close-Grip Bench Press", MuscleGroup.TRICEPS, listOf(MuscleGroup.CHEST, MuscleGroup.FRONT_DELTS), "flat_incline_bench", MovementPattern.HORIZONTAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("barbell_ohp", "Standing Overhead Press", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.TRICEPS, MuscleGroup.TRAPS, MuscleGroup.ABS), "power_rack", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
         add(exercise("barbell_reverse_lunge", "Barbell Lunge", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.HAMSTRINGS), "power_rack", MovementPattern.LUNGE, compound = true, fatigue = 4, alsoNeeds = listOf("barbell")))
-        add(exercise("pull_up", "Pull-Up", MuscleGroup.LATS, listOf(MuscleGroup.BICEPS, MuscleGroup.UPPER_BACK), "power_rack", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 4))
-        // No free Chin-Up here on purpose: the gym has nothing to perform one on. The
-        // supinated pull is covered by `assisted_chin_up` on the multi-gym's dip/chin
-        // station, which is the only chin apparatus on the floor. Pull-Up is left on the
-        // rack because it was not reported missing — if that bar turns out not to exist
-        // either, this and `hanging_leg_raise` go the same way.
-        add(exercise("hanging_leg_raise", "Hanging Leg Raise", MuscleGroup.ABS, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.CORE, compound = false, fatigue = 2))
+        // Nothing hangs from this rack. There is no pull-up bar on it, so Pull-Up,
+        // Chin-Up and Hanging Leg Raise are all absent on purpose — every one of them
+        // needed the same bar. The rack is a squat and press station and nothing else.
+        //
+        // What covers the work instead: `assisted_chin_up` and `assisted_dip` on the
+        // multi-gym's dip/chin station for the vertical pull, the lat pulldown for the
+        // rest of it, and `decline_sit_up` / `cable_woodchop` for the core work that used
+        // to hang from it.
         add(exercise("barbell_calf_raise", "Standing Barbell Calf Raise", MuscleGroup.CALVES, listOf(MuscleGroup.QUADS), "power_rack", MovementPattern.ISOLATION, compound = false, fatigue = 2, alsoNeeds = listOf("barbell")))
 
         // ── Incline Chest Press (Dedicated Rack) ──
