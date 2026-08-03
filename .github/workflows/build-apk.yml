@@ -1,0 +1,58 @@
+name: Build APK
+
+# Builds an installable debug APK on GitHub's runners.
+#
+# This exists because the app cannot always be built where it is being edited — a
+# container without the Android SDK, or a laptop that is not to hand. The runner has the
+# SDK and can reach Google's Maven, so the APK is downloadable from the run's artifacts.
+#
+# The APK is built before the tests run, and uploaded straight after, so a failing test
+# still leaves something installable behind. The job still goes red — the tests are the
+# quality gate, they are just not the delivery gate.
+
+on:
+  push:
+    branches:
+      - master
+      - "claude/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the toolchain the project pins in app/build.gradle.kts.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Hilt and Room both run annotation processors; the committed 2 GB heap is sized
+      # for a warm desktop daemon and is tight on a cold runner. Overridden here only,
+      # so the project's own setting is unchanged.
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace -Dorg.gradle.jvmargs=-Xmx4g
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: redplate-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace -Dorg.gradle.jvmargs=-Xmx4g
+
+      # The HTML report says which assertion failed; the console only says how many did.
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
