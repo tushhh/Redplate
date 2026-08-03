@@ -16,12 +16,16 @@ import org.junit.Test
  * The multi-gym stations were seeded as a pin stack with an invented 5–100 kg ladder, so
  * the app displayed a kilogram figure printed nowhere on the machine and refused to record
  * the level the user had actually set.
+ *
+ * The low row and lat pulldown have since been read off the plates and are back on real
+ * kilograms; the cable and assisted dip/chin stations genuinely have no mass printed on
+ * them, and the cable stands in for that case here.
  */
 class ResistanceLevelTest {
 
     private val multigym = EquipmentEntity(
-        id = "multigym_lat_pulldown",
-        displayName = "Multi-Gym · Lat Pulldown",
+        id = "multigym_cable",
+        displayName = "Multi-Gym · Cable",
         category = EquipmentCategory.MACHINE,
         loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
     )

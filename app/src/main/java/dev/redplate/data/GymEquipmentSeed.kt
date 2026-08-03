@@ -17,6 +17,21 @@ object GymEquipmentSeed {
         25.0 to 4, 20.0 to 4, 15.0 to 2, 10.0 to 2, 5.0 to 2, 2.5 to 2, 1.25 to 2
     )
 
+    /**
+     * The low row and lat pulldown selector stacks, read off the plates themselves.
+     *
+     * Not an assumption and not a generated ladder: these are the fifteen numbers printed
+     * on the machine, in order, so the app's readout matches the label the user is looking
+     * at when they set the pin. Note the spacing is not uniform — 7.5 kg per pin up to
+     * 50 kg, then 10 kg — which is exactly why it has to be transcribed rather than
+     * generated. [EquipmentEntity.minIncrement] takes the smallest real gap, so nothing
+     * downstream ever prescribes a jump the pin cannot make.
+     */
+    val MULTIGYM_STACK_KG: List<Double> = listOf(
+        5.0, 12.5, 20.0, 27.5, 35.0, 42.5, 50.0,
+        60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0,
+    )
+
     fun seed(): List<EquipmentEntity> = listOf(
 
         // --- Cardio machines (#1,2,3,4,28,29) — no discrete load, resistance set at console ---
@@ -36,13 +51,16 @@ object GymEquipmentSeed {
         pinStack("shoulder_press_machine", "Shoulder Press Machine"),
         pinStack("leg_curl_machine", "Leg Curl Machine"),
         // --- 4-Station Multi-Gym (#?) — four independent stations on one frame ---
-        // Marked in numbered resistance levels, not kilograms, so the app records the
-        // number actually printed on the machine rather than inventing a mass. Modelled as
-        // four pieces because they are four things you queue for: naming the frame told
-        // you nothing about which station to walk to.
+        // Modelled as four pieces because they are four things you queue for: naming the
+        // frame told you nothing about which station to walk to.
+        //
+        // The low row and lat pulldown stacks are printed in kilograms — confirmed from a
+        // photo of the selector plates, transcribed into [MULTIGYM_STACK_KG]. The
+        // remaining two are still numbered levels with no mass printed anywhere, so they
+        // record the number on the machine rather than inventing one.
+        pinStack("multigym_low_row", "Multi-Gym · Low Row", MULTIGYM_STACK_KG),
+        pinStack("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown", MULTIGYM_STACK_KG),
         resistanceLevel("multigym_cable", "Multi-Gym · Cable"),
-        resistanceLevel("multigym_low_row", "Multi-Gym · Low Row"),
-        resistanceLevel("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown"),
         // Counterweighted: a higher number takes MORE of your bodyweight, so it is easier.
         // Everything that reads this has to run backwards — see EquipmentEntity.isAssistance.
         resistanceLevel("multigym_assist_dip_chin", "Multi-Gym · Assisted Dip/Chin", assistance = true),
@@ -142,11 +160,19 @@ object GymEquipmentSeed {
         category = EquipmentCategory.CARDIO_MACHINE, loadingScheme = LoadingScheme.BODYWEIGHT
     )
 
-    private fun pinStack(id: String, name: String) = EquipmentEntity(
+    /**
+     * A selectorised stack marked in kilograms. [loads] defaults to the unconfirmed
+     * commercial-gym ladder; pass the real one wherever the plates have been read.
+     */
+    private fun pinStack(
+        id: String,
+        name: String,
+        /* ASSUMPTION: 2.5kg stack increments, 5-100kg. Adjust per-machine if you check the pins. */
+        loads: List<Double> = generateSequence(5.0) { it + 2.5 }.takeWhile { it <= 100.0 }.toList(),
+    ) = EquipmentEntity(
         id = id, displayName = name,
         category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PIN_STACK,
-        /* ASSUMPTION: 2.5kg stack increments, 5-100kg. Adjust per-machine if you check the pins. */
-        availableLoads = generateSequence(5.0) { it + 2.5 }.takeWhile { it <= 100.0 }.toList()
+        availableLoads = loads
     )
 
     /**

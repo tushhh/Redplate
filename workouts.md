@@ -117,7 +117,14 @@
 ### 11. 4-Station Multi-Gym
 
 Four separate stations on one frame: **cable**, **low row**, **lat pulldown**,
-**assisted dip/chin**. Each is marked in numbered resistance levels, not kilograms.
+**assisted dip/chin**.
+
+The **low row** and **lat pulldown** stacks are printed in kilograms:
+`5 · 12.5 · 20 · 27.5 · 35 · 42.5 · 50 · 60 · 70 · 80 · 90 · 100 · 110 · 120 · 130`.
+Note the spacing changes — 7.5 kg per pin up to 50 kg, 10 kg after that.
+
+The **cable** and **assisted dip/chin** stations are marked in numbered resistance levels
+with no mass printed anywhere, so those two log the level rather than a weight.
 
 #### 11a. Lat Pulldown
 | Exercise | Primary Muscle Group | Secondary Muscle Groups |
@@ -201,11 +208,10 @@ bodyweight. Progress by needing *less* assistance.
 | Bulgarian Split Squats | QUADS | GLUTES |
 | Good Mornings | LOWER BACK | HAMSTRINGS, GLUTES |
 | Standing Barbell Calf Raises | CALVES | QUADS |
-| Pull-Ups (Rack Bar) | LATS | BICEPS, UPPER BACK |
-| Chin-Ups (Rack Bar) | LATS | BICEPS |
-| Neutral-Grip Pull-Ups | LATS | BICEPS, UPPER BACK |
-| Toes-To-Bar | ABS | LATS |
-| Hanging Leg Raises | ABS | QUADS |
+
+No bar work here: **the half racks have no pull-up bar.** Pull-ups, chin-ups, toes-to-bar
+and hanging leg raises are not performable in this gym. The vertical pull is covered by the
+lat pulldown and the multi-gym's assisted dip/chin station (§11a, §11d).
 
 ### 14. Bumper Plates (Used Solo)
 | Exercise | Primary Muscle Group | Secondary Muscle Groups |

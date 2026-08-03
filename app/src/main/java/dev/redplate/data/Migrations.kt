@@ -382,8 +382,96 @@ object Migrations {
         }
     }
 
+    /**
+     * 10 → 11 puts kilograms back on the low row and lat pulldown, and drops everything
+     * that hung from the half rack's bar.
+     *
+     * **The stacks.** Those two stations turned out to be printed in kilograms after all —
+     * 5, 12.5, 20 … 130, photographed off the selector plates and transcribed into
+     * [GymEquipmentSeed.MULTIGYM_STACK_KG]. Migration 3 → 4 stripped the multi-gym of a
+     * *made-up* 5–100 kg ladder, which was right at the time: nothing had read the machine.
+     * This is the opposite situation — the numbers are the ones on the plates, so the
+     * station goes back to `PIN_STACK` and the readout says `50 KG` because that is what
+     * the label under the pin says. The cable and assisted dip/chin stations are untouched;
+     * they really are numbered levels with no mass on them.
+     *
+     * **The history.** This one *does* rewrite logged loads, and only because it is a unit
+     * conversion rather than a correction. A "level" recorded against these stations was
+     * always a pin position — the user counted plates down the stack, because there was
+     * nothing else to count — and pin position 7 has now been measured at 50 kg. Leaving it
+     * would not preserve history, it would reinterpret "the 7th plate" as "7 kilograms",
+     * and the progression engine would open the next pulldown session at 12.5 kg.
+     *
+     * Only whole numbers within the stack's 15 positions convert. Anything else — a
+     * fractional value, or a figure above 15 — cannot be a pin position on this machine and
+     * is left exactly as logged, which also protects any load that predates 3 → 4 and is
+     * already a genuine kilogram figure.
+     *
+     * **The bar that is not there.** The half rack has no pull-up bar on it. `chin_up`,
+     * `pull_up` and `hanging_leg_raise` all named the rack and all needed that one bar, so
+     * all three go: a lift the gym cannot perform is worse than a missing one, because the
+     * generator will keep prescribing it. `assisted_chin_up` and `assisted_dip` are
+     * unaffected — the multi-gym's dip/chin station exists. Removal follows 9 → 10:
+     * excluded always, deleted only where no set log or template slot points at it, so no
+     * rep already recorded is orphaned.
+     *
+     * No table, column or index changes here.
+     */
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val stations = listOf("multigym_low_row", "multigym_lat_pulldown")
+            val stack = GymEquipmentSeed.MULTIGYM_STACK_KG
+            val loadsJson = stack.joinToString(",", "[", "]") { it.toString() }
+
+            for (id in stations) {
+                db.execSQL(
+                    """
+                    UPDATE `equipment`
+                    SET `loadingScheme` = 'PIN_STACK', `availableLoads` = '$loadsJson'
+                    WHERE `id` = '$id'
+                    """.trimIndent()
+                )
+            }
+
+            // Pin position n (1-based) is the nth number printed on the stack.
+            val positionToKg = stack.withIndex().joinToString(" ") { (index, kg) ->
+                "WHEN ${index + 1} THEN $kg"
+            }
+            val onTheseStations = listOf("lat_pulldown_wide", "lat_pulldown_close", "seated_cable_row")
+            val exerciseList = onTheseStations.joinToString(",") { "'$it'" }
+
+            fun convert(table: String, column: String, keyColumn: String) {
+                db.execSQL(
+                    """
+                    UPDATE `$table`
+                    SET `$column` = CASE CAST(`$column` AS INTEGER) $positionToKg ELSE `$column` END
+                    WHERE `$keyColumn` IN ($exerciseList)
+                      AND `$column` = CAST(`$column` AS INTEGER)
+                      AND `$column` BETWEEN 1 AND ${stack.size}
+                    """.trimIndent()
+                )
+            }
+            convert("set_logs", "loadKg", "exerciseId")
+            convert("template_slots", "workingLoadKg", "exerciseId")
+
+            // Everything that needed the pull-up bar the half rack does not have.
+            val offTheBar = listOf("chin_up", "pull_up", "hanging_leg_raise")
+            val barList = offTheBar.joinToString(",") { "'$it'" }
+
+            db.execSQL("UPDATE `exercises` SET `isExcluded` = 1 WHERE `id` IN ($barList)")
+            db.execSQL(
+                """
+                DELETE FROM `exercises`
+                WHERE `id` IN ($barList)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `set_logs`)
+                  AND `id` NOT IN (SELECT DISTINCT `exerciseId` FROM `template_slots`)
+                """.trimIndent()
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
     )
 }

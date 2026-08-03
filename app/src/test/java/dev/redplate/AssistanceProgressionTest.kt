@@ -30,9 +30,10 @@ class AssistanceProgressionTest {
         isAssistance = true,
     )
 
-    private val pulldown = assist.copy(
-        id = "multigym_lat_pulldown",
-        displayName = "Multi-Gym · Lat Pulldown",
+    /** The same frame, minus the counterweight: a level-marked station that adds effort. */
+    private val cable = assist.copy(
+        id = "multigym_cable",
+        displayName = "Multi-Gym · Cable",
         isAssistance = false,
     )
 
@@ -88,7 +89,7 @@ class AssistanceProgressionTest {
     /** The same session on an unassisted station goes the other way. */
     @Test
     fun `an ordinary station steps the level up on the same session`() {
-        val outcome = decide(pulldown, repsToRir = arrayOf(10 to 1, 10 to 1, 10 to 0))
+        val outcome = decide(cable, repsToRir = arrayOf(10 to 1, 10 to 1, 10 to 0))
         assertTrue(outcome is ProgressionOutcome.Up)
         assertEquals(9.0, outcome.nextLoadKg, 1e-9)
     }
