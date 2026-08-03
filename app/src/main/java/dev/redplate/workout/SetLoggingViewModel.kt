@@ -11,6 +11,7 @@ import dev.redplate.data.LoadingScheme
 import dev.redplate.data.loadUnit
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.PlateMath
+import dev.redplate.data.ProfileDao
 import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
@@ -32,6 +33,8 @@ import kotlin.math.roundToInt
 @HiltViewModel
 class SetLoggingViewModel @Inject constructor(
     private val repo: WorkoutRepository,
+    private val profileDao: ProfileDao,
+    private val programGenerator: ProgramGenerator,
     savedState: SavedStateHandle,
     val mediaResolver: MediaResolver,
     private val restNotifier: RestTimerNotifier,
@@ -155,10 +158,15 @@ class SetLoggingViewModel @Inject constructor(
      * Alternatives the user could actually perform right now: same primary muscle, kit
      * they own, ranked by how much of the secondary work they also cover. This is what
      * makes an occupied rack a one-tap problem instead of a session-ending one.
+     *
+     * Lifts already in the running order are excluded. Swapping into one would put the
+     * same exercise in two slots of the same session — you would meet it again later and
+     * be asked to train it twice, which is not a substitution.
      */
-    private suspend fun loadSubstitutes(current: ExerciseEntity): List<SubstituteOption> =
-        repo.availableExercisesForMuscle(current.primaryMuscle)
-            .filter { it.id != current.id }
+    private suspend fun loadSubstitutes(current: ExerciseEntity): List<SubstituteOption> {
+        val alreadyInSession = sessionSlots.mapTo(mutableSetOf()) { it.exerciseId }
+        return repo.availableExercisesForMuscle(current.primaryMuscle)
+            .filter { it.id != current.id && it.id !in alreadyInSession }
             .sortedWith(
                 compareByDescending<ExerciseEntity> {
                     it.secondaryMuscles.count { m -> m in current.secondaryMuscles }
@@ -178,6 +186,7 @@ class SetLoggingViewModel @Inject constructor(
                     primaryMuscle = candidate.primaryMuscle,
                 )
             }
+    }
 
     /**
      * Share of the original's muscles a candidate also trains, as a percentage.
@@ -519,6 +528,38 @@ class SetLoggingViewModel @Inject constructor(
         val next = nextSlot() ?: return
         skipRest()
         onNavigate(sessionId, next.exerciseId)
+    }
+
+    /**
+     * Puts a different lift in this slot and opens it.
+     *
+     * The slot is rewritten *before* navigating, and that ordering is the whole point.
+     * This used to navigate straight to the new exercise and leave the template alone, so
+     * the incoming screen looked for an exercise the running order did not contain,
+     * [slotIndex] came back -1, and everything derived from it collapsed: no prescription
+     * (the generic 3 × 8-12 at 120 s took over), no working load, and — because
+     * [nextSlot] returns null on a negative index — no next exercise. The rest screen's
+     * one button could then only offer "Finish session", so swapping a lift silently
+     * ended the workout at that lift, however many were left to do.
+     *
+     * [ProgramGenerator.replaceSlotExercise] re-prescribes for the new movement rather
+     * than inheriting the old one's rep range, and deliberately drops the working load:
+     * it belonged to the lift that was there. The swap is written to the template, so it
+     * persists into the rest of the block — the same thing the pre-session swap in the
+     * picker does.
+     *
+     * A freestyle session has no slot to rewrite, so it just navigates, exactly as before.
+     */
+    fun swapExercise(newExerciseId: String, onNavigate: (Long, String) -> Unit) {
+        val current = slot
+        skipRest()
+        viewModelScope.launch {
+            val profile = profileDao.get()
+            if (current != null && profile != null) {
+                programGenerator.replaceSlotExercise(current.id, newExerciseId, profile)
+            }
+            onNavigate(sessionId, newExerciseId)
+        }
     }
 
     /** Stamps the finish time so the session stops counting as in progress. */

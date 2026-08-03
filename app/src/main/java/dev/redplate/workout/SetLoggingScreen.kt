@@ -173,9 +173,12 @@ fun SetLoggingRoute(
             loggedSetCount = state.loggedSets.count { !it.isWarmup },
             substitutes = state.substitutes,
             onDismiss = { showSwap = false },
+            // Goes through the ViewModel so the slot is rewritten before the next screen
+            // reads the running order. Navigating first left the incoming screen unable
+            // to find itself in the session, which ended the workout on the spot.
             onSwap = { exerciseId ->
                 showSwap = false
-                onSwapExercise(viewModel.sessionId, exerciseId)
+                viewModel.swapExercise(exerciseId, onSwapExercise)
             },
         )
     }
