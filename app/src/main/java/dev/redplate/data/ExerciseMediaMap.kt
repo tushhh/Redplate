@@ -52,7 +52,6 @@ object ExerciseMediaMap {
         "barbell_ohp"                 to "Barbell_Shoulder_Press",
         "barbell_reverse_lunge"       to "Barbell_Lunge",
         "pull_up"                     to "Pullups",
-        "chin_up"                     to "Chin-Up",
         "hanging_leg_raise"           to "Hanging_Leg_Raise",
         "barbell_calf_raise"          to "Standing_Barbell_Calf_Raise",
         "leg_press"                   to "Leg_Press",

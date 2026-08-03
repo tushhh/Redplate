@@ -327,8 +327,7 @@ private fun describeLoading(eq: EquipmentEntity): String {
         if (min != null && max != null) parts += "${formatKg(min)} → ${formatKg(max)} KG PLATES"
     }
     when (eq.loadingScheme) {
-        LoadingScheme.PIN_STACK ->
-            stepOf(eq.availableLoads)?.let { parts += "${formatKg(it)} KG PINS" }
+        LoadingScheme.PIN_STACK -> describeStack(eq.availableLoads)?.let { parts += it }
 
         LoadingScheme.FIXED_INCREMENT ->
             eq.availableLoads.maxOrNull()?.let { parts += "UP TO ${formatKg(it)} KG" }
@@ -358,6 +357,21 @@ private fun describeLadder(ladder: List<Double>): String {
 
 private fun stepOf(loads: List<Double>): Double? =
     loads.sorted().zipWithNext { a, b -> b - a }.minOrNull()
+
+/**
+ * A stack whose pins are evenly spaced can be described by that spacing. Plenty are not —
+ * the multi-gym's row and pulldown go up in 7.5 kg to 50 and 10 kg after that — and calling
+ * those "7.5 KG PINS" states a spacing the machine does not have. Those report their range
+ * instead, which is true of any stack.
+ */
+private fun describeStack(loads: List<Double>): String? {
+    val sorted = loads.sorted()
+    val gaps = sorted.zipWithNext { a, b -> b - a }
+    val step = gaps.minOrNull() ?: return null
+    val uniform = gaps.all { kotlin.math.abs(it - step) < 1e-6 }
+    return if (uniform) "${formatKg(step)} KG PINS"
+    else "${formatKg(sorted.first())} → ${formatKg(sorted.last())} KG STACK"
+}
 
 private fun formatKg(kg: Double): String =
     if (kg % 1.0 == 0.0) kg.toInt().toString() else "%.2f".format(kg).trimEnd('0').trimEnd('.')

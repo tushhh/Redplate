@@ -117,7 +117,14 @@
 ### 11. 4-Station Multi-Gym
 
 Four separate stations on one frame: **cable**, **low row**, **lat pulldown**,
-**assisted dip/chin**. Each is marked in numbered resistance levels, not kilograms.
+**assisted dip/chin**.
+
+The **low row** and **lat pulldown** stacks are printed in kilograms:
+`5 · 12.5 · 20 · 27.5 · 35 · 42.5 · 50 · 60 · 70 · 80 · 90 · 100 · 110 · 120 · 130`.
+Note the spacing changes — 7.5 kg per pin up to 50 kg, 10 kg after that.
+
+The **cable** and **assisted dip/chin** stations are marked in numbered resistance levels
+with no mass printed anywhere, so those two log the level rather than a weight.
 
 #### 11a. Lat Pulldown
 | Exercise | Primary Muscle Group | Secondary Muscle Groups |
@@ -202,7 +209,6 @@ bodyweight. Progress by needing *less* assistance.
 | Good Mornings | LOWER BACK | HAMSTRINGS, GLUTES |
 | Standing Barbell Calf Raises | CALVES | QUADS |
 | Pull-Ups (Rack Bar) | LATS | BICEPS, UPPER BACK |
-| Chin-Ups (Rack Bar) | LATS | BICEPS |
 | Neutral-Grip Pull-Ups | LATS | BICEPS, UPPER BACK |
 | Toes-To-Bar | ABS | LATS |
 | Hanging Leg Raises | ABS | QUADS |

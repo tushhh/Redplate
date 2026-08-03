@@ -33,14 +33,14 @@ class StrengthAssessmentTest {
         platePairs = mapOf(25.0 to 2, 20.0 to 2, 10.0 to 2, 5.0 to 2, 2.5 to 2, 1.25 to 2),
     )
 
-    private val pulldown = EquipmentEntity(
-        id = "multigym_lat_pulldown",
-        displayName = "Multi-Gym · Lat Pulldown",
+    private val cableStation = EquipmentEntity(
+        id = "multigym_cable",
+        displayName = "Multi-Gym · Cable",
         category = EquipmentCategory.MACHINE,
         loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
     )
 
-    private val assist = pulldown.copy(
+    private val assist = cableStation.copy(
         id = "multigym_assist_dip_chin",
         displayName = "Multi-Gym · Assisted Dip/Chin",
         isAssistance = true,
@@ -264,7 +264,7 @@ class StrengthAssessmentTest {
     fun `a level-marked machine moves two notches rather than a computed weight`() {
         val levelSlot = slot(workingLoadKg = 8.0)
         val assessment = StrengthAssessment.assess("bench", week(10 to 3, 10 to 3, 10 to 3, loadKg = 8.0), levelSlot)
-        val calibration = StrengthAssessment.calibrate(assessment, levelSlot, pulldown)!!
+        val calibration = StrengthAssessment.calibrate(assessment, levelSlot, cableStation)!!
         assertEquals(10.0, calibration.toKg, 1e-9)
     }
 

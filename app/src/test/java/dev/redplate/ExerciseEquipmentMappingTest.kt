@@ -5,6 +5,7 @@ import dev.redplate.data.EquipmentAvailability
 import dev.redplate.data.GymEquipmentSeed
 import dev.redplate.data.LoadUnit
 import dev.redplate.data.LoadingScheme
+import dev.redplate.data.PlateMath
 import dev.redplate.data.carriesLoad
 import dev.redplate.data.limbMultiplier
 import dev.redplate.data.loadUnit
@@ -49,7 +50,7 @@ class ExerciseEquipmentMappingTest {
     @Test
     fun `every loaded lift resolves to equipment that carries load`() {
         val bodyweight = setOf(
-            "pull_up", "chin_up", "hanging_leg_raise", "bench_tricep_dip",
+            "pull_up", "hanging_leg_raise", "bench_tricep_dip",
             "decline_sit_up", "hyperextension", "glute_focused_extension", "push_up",
             "plank", "bodyweight_squat", "stairmill_climbing", "treadmill_incline_walk",
             "rower_full_body",
@@ -136,10 +137,21 @@ class ExerciseEquipmentMappingTest {
         }
     }
 
+    /**
+     * Two of the four multi-gym stations have kilograms printed on the selector plates and
+     * two do not. The readout has to say whichever the user is looking at.
+     */
     @Test
-    fun `the multi-gym reads in levels and everything else in kilograms`() {
-        for (id in multiGymStations) {
+    fun `only the unmarked multi-gym stations read in levels`() {
+        for (id in levelStations) {
             assertEquals("$id is marked in levels", LoadUnit.LEVEL, equipment.getValue(id).loadUnit)
+        }
+        for (id in kilogramStations) {
+            assertEquals(
+                "$id has kilograms printed on the stack",
+                LoadUnit.KILOGRAMS,
+                equipment.getValue(id).loadUnit,
+            )
         }
         assertEquals(LoadUnit.KILOGRAMS, equipment.getValue("barbell").loadUnit)
         assertEquals(LoadUnit.KILOGRAMS, equipment.getValue("dumbbells").loadUnit)
@@ -147,9 +159,13 @@ class ExerciseEquipmentMappingTest {
 
     // ── The 4-station multi-gym ─────────────────────────────────────────
 
-    private val multiGymStations = listOf(
-        "multigym_cable", "multigym_low_row", "multigym_lat_pulldown", "multigym_assist_dip_chin",
-    )
+    /** Printed in kilograms — read off the plates, not generated. */
+    private val kilogramStations = listOf("multigym_low_row", "multigym_lat_pulldown")
+
+    /** Numbered selectors with no mass on them anywhere. */
+    private val levelStations = listOf("multigym_cable", "multigym_assist_dip_chin")
+
+    private val multiGymStations = kilogramStations + levelStations
 
     /**
      * The frame was one row called "4-Station Multi-Gym", which is not somewhere you can
@@ -163,8 +179,53 @@ class ExerciseEquipmentMappingTest {
         )
         for (id in multiGymStations) {
             assertNotNull("$id should exist", equipment[id])
+        }
+        for (id in levelStations) {
             assertEquals(LoadingScheme.RESISTANCE_LEVEL, equipment.getValue(id).loadingScheme)
         }
+    }
+
+    /**
+     * The low row and lat pulldown stacks are labelled in kilograms, so they are a pin
+     * stack with the numbers that are actually on the plates — not a generated ladder and
+     * not levels. The spacing is deliberately uneven: 7.5 kg per pin to 50, then 10 kg.
+     */
+    @Test
+    fun `the low row and pulldown carry the stack printed on the machine`() {
+        val printed = listOf(
+            5.0, 12.5, 20.0, 27.5, 35.0, 42.5, 50.0,
+            60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0,
+        )
+        for (id in kilogramStations) {
+            val station = equipment.getValue(id)
+            assertEquals(LoadingScheme.PIN_STACK, station.loadingScheme)
+            assertEquals("$id should carry the printed stack", printed, station.availableLoads)
+            assertEquals("the smallest real pin gap", 7.5, station.minIncrement(), 1e-9)
+        }
+    }
+
+    /** Nothing may prescribe a load that is not a pin position on the stack. */
+    @Test
+    fun `pulldown loads snap to printed pin positions`() {
+        val pulldown = equipment.getValue("multigym_lat_pulldown")
+        assertEquals(50.0, pulldown.nearestAchievable(48.0), 1e-9)
+        assertEquals(60.0, PlateMath.nextLoadUp(50.0, pulldown), 1e-9)
+        assertEquals(42.5, PlateMath.nextLoadDown(50.0, pulldown), 1e-9)
+        // Above the top plate there is nowhere further to go.
+        assertEquals(130.0, PlateMath.nextLoadUp(130.0, pulldown), 1e-9)
+    }
+
+    /**
+     * There is no bar or station in this gym to perform a free chin-up on. The supinated
+     * pull lives on the multi-gym's assisted dip/chin station instead.
+     */
+    @Test
+    fun `there is no free chin-up in the pool`() {
+        assertFalse(
+            "chin_up needs apparatus this gym does not have",
+            exercises.any { it.id == "chin_up" },
+        )
+        assertTrue(exercises.any { it.id == "assisted_chin_up" })
     }
 
     /** Only the counterweighted station runs backwards. */

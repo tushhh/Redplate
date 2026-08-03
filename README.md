@@ -101,6 +101,10 @@ is a `RESISTANCE_LEVEL` machine: the readout says `LEVEL 7`, the steppers move o
 time, and no kilogram figure is invented. Levels are ordinal, so they're never converted and
 never added into tonnage — level 8 is harder than level 6, but it isn't eight kilograms.
 
+Where a stack *is* labelled, the labels are transcribed rather than generated. The multi-gym's
+row and pulldown run `5 · 12.5 · 20 … 50 · 60 · 70 … 130`: 7.5 kg a pin, then 10 kg. The app
+steps between the numbers on the plates, so it never prescribes a weight that isn't a pin.
+
 Each exercise names both the **station** it happens at and whatever **supplies the load** —
 a barbell squat needs the half rack *and* the barbell, not just the rack. The set logging
 header and the exercise browser say which, so an unfamiliar name is still a machine you can
