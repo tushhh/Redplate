@@ -13,6 +13,8 @@ object CuratedExerciseSeed {
 
         // ── Treadmill ──
         add(exercise("treadmill_incline_walk", "Incline Walking", MuscleGroup.GLUTES, listOf(MuscleGroup.CALVES, MuscleGroup.HAMSTRINGS), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 2))
+        add(exercise("treadmill_jog", "Easy Jog", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 2))
+        add(exercise("treadmill_interval_run", "Interval Running", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 4))
 
         // ── Concept2 Rower ──
         add(exercise("rower_full_body", "Rowing (Full Body)", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.QUADS, MuscleGroup.BICEPS), "concept2_rower", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))

@@ -48,6 +48,38 @@ fun DifficultyChips(
     }
 }
 
+/**
+ * Three 64dp chips for cardio effort.
+ */
+@Composable
+fun EffortChips(
+    selected: Difficulty?,
+    onSelect: (Difficulty) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val row = listOf(Difficulty.EASY, Difficulty.TWO_LEFT, Difficulty.ALL_OUT)
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        row.forEach { diff ->
+            val label = when (diff) {
+                Difficulty.EASY -> "Easy"
+                Difficulty.TWO_LEFT -> "Hard"
+                Difficulty.ALL_OUT -> "All Out"
+                else -> ""
+            }
+            DifficultyChip(
+                label = label,
+                isSelected = diff == selected,
+                onClick = { onSelect(diff) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChipRow(
     chips: List<Difficulty>,

@@ -373,7 +373,17 @@ data class TemplateSlotEntity(
     val progression: ProgressionRule,
     /** Null until the first session; thereafter carried forward by the engine. */
     val workingLoadKg: Double? = null,
-    val supersetGroup: Int? = null
+    val supersetGroup: Int? = null,
+    /**
+     * True when this slot is a cardio finisher rather than a strength set.
+     *
+     * When true: [repRangeLow]/[repRangeHigh] = target duration in minutes (not reps),
+     * [workingLoadKg] is ignored (no weight), [restSeconds] = 0 (always last slot).
+     * The set logging screen shows a duration stepper and effort chips instead of the
+     * load readout and RIR chips.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val isCardioFinisher: Boolean = false,
 )
 
 // ---------------------------------------------------------------------------

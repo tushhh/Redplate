@@ -32,10 +32,12 @@ class ProgramGenerator @Inject constructor(
      * Runs in a single transaction: a half-written program is worse than none.
      */
     suspend fun generate(profile: ProfileEntity, now: Long = System.currentTimeMillis()): Long {
-        val pool = performablePool(profile, EquipmentAvailability.availableIds(equipmentDao.getAll()))
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        val pool = performablePool(profile, available)
+        val cardioPool = cardioPool(available)
 
         val split = Split.forDays(profile.daysPerWeek)
-        val plan = buildPlan(split, pool, profile)
+        val plan = buildPlan(split, pool, cardioPool, profile)
         // The user's chosen weekdays win over the split's own layout when they have set
         // any; the split default is only a starting suggestion.
         val weekdays = profile.planSettings().weekdayIndices()
@@ -202,11 +204,12 @@ class ProgramGenerator @Inject constructor(
     suspend fun refitToCeiling(profile: ProfileEntity, mesocycleId: Long): Int {
         val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
         val pool = performablePool(profile, available)
+        val cardioPool = cardioPool(available)
         val exercises = exerciseDao.getAll().associateBy { it.id }
         val split = Split.forDays(profile.daysPerWeek)
 
         // Untrimmed, so the day's dropped intentions are visible and can be restored.
-        val fullPlan = buildPlan(split, pool, profile, ceilingMinutes = null)
+        val fullPlan = buildPlan(split, pool, cardioPool, profile, ceilingMinutes = null)
         val templates = programDao.getAllTemplates()
             .filter { it.mesocycleId == mesocycleId && it.dayIndex >= 0 }
             .sortedBy { it.id }
@@ -337,6 +340,17 @@ class ProgramGenerator @Inject constructor(
             ))
     }
 
+    private suspend fun cardioPool(available: Set<String>): List<ExerciseEntity> {
+        val cardioIds = equipmentDao.getAll()
+            .filter { it.category == EquipmentCategory.CARDIO_MACHINE }
+            .mapTo(mutableSetOf()) { it.id }
+
+        return exerciseDao.getAll()
+            .filter { !it.isExcluded }
+            .filter { EquipmentAvailability.canPerform(it, available) }
+            .filter { exercise -> exercise.requiredEquipmentIds.any { it in cardioIds } }
+    }
+
     // ── Editing a template in place (8c: swap a row, add a row) ─────────
 
     /**
@@ -417,6 +431,7 @@ class ProgramGenerator @Inject constructor(
     private fun buildPlan(
         split: Split,
         pool: List<ExerciseEntity>,
+        cardioPool: List<ExerciseEntity>,
         profile: ProfileEntity,
         ceilingMinutes: Int? = profile.sessionCeilingMinutes,
     ): List<PlannedDay> {
@@ -431,7 +446,36 @@ class ProgramGenerator @Inject constructor(
                 usedToday += exercise.id
                 usedThisWeek += exercise.id
                 FilledSlot(spec, exercise, setsFor(spec, profile), profile.goal)
+            }.toMutableList()
+
+            if (profile.goal == Goal.LEAN && cardioPool.isNotEmpty()) {
+                val finisherPreference = listOf(
+                    "treadmill_incline_walk",
+                    "treadmill_jog",
+                    "treadmill_interval_run",
+                    "rower_full_body",
+                    "stairmill_climbing",
+                )
+                
+                val candidates = cardioPool
+                    .sortedBy { finisherPreference.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+                
+                val unusedCandidates = candidates.filter { it.id !in usedThisWeek }
+                val finisher = unusedCandidates.firstOrNull() ?: candidates.firstOrNull()
+                
+                if (finisher != null) {
+                    usedToday += finisher.id
+                    usedThisWeek += finisher.id
+                    filled.add(FilledSlot(
+                        spec = SlotSpec(finisher.primaryMuscle, finisher.pattern, false),
+                        exercise = finisher,
+                        sets = 1,
+                        goal = profile.goal,
+                        isCardioFinisher = true
+                    ))
+                }
             }
+
             PlannedDay(day.label, ceilingMinutes?.let { trimToTimeBudget(filled, it) } ?: filled)
         }
     }
@@ -487,8 +531,9 @@ class ProgramGenerator @Inject constructor(
      */
     private fun trimToTimeBudget(slots: List<FilledSlot>, ceilingMinutes: Int): List<FilledSlot> {
         val kept = slots.toMutableList()
+        // Never drop the cardio finisher when trimming for time; drop isolation lifts before it.
         while (kept.size > MIN_EXERCISES && estimateMinutes(kept) > ceilingMinutes) {
-            val lastIsolation = kept.indexOfLast { !it.spec.compound }
+            val lastIsolation = kept.indexOfLast { !it.spec.compound && !it.isCardioFinisher }
             kept.removeAt(if (lastIsolation >= 0) lastIsolation else kept.lastIndex)
         }
         return kept
@@ -507,6 +552,24 @@ class ProgramGenerator @Inject constructor(
         goal: Goal,
     ): TemplateSlotEntity {
         val rx = Prescription.of(goal, spec.compound)
+        
+        if (isCardioFinisher) {
+            return TemplateSlotEntity(
+                templateId = templateId,
+                exerciseId = exercise.id,
+                orderIndex = orderIndex,
+                targetSets = 1,
+                // Duration in minutes
+                repRangeLow = 10,
+                repRangeHigh = 10,
+                targetRir = 2,
+                restSeconds = 0,
+                progression = ProgressionRule.DOUBLE_PROGRESSION,
+                workingLoadKg = null,
+                isCardioFinisher = true,
+            )
+        }
+        
         return TemplateSlotEntity(
             templateId = templateId,
             exerciseId = exercise.id,
@@ -522,6 +585,7 @@ class ProgramGenerator @Inject constructor(
                 ProgressionRule.DOUBLE_PROGRESSION
             },
             workingLoadKg = null, // set from the first session's actual performance
+            isCardioFinisher = false,
         )
     }
 
@@ -568,6 +632,7 @@ class ProgramGenerator @Inject constructor(
         val sets: Int,
         /** Carried so the time estimate can read the rest this slot will be prescribed. */
         val goal: Goal,
+        val isCardioFinisher: Boolean = false,
     )
 
     private data class PlannedDay(val label: String, val slots: List<FilledSlot>)

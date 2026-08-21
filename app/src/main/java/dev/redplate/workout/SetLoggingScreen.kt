@@ -83,8 +83,8 @@ fun SetLoggingRoute(
                 WorkoutEvent.PrHit -> haptics.prHit()
                 // Deliberately silent: RestAlarmReceiver owns the end-of-rest buzz, so it
                 // happens whether or not this screen is up. Vibrating here as well would
-                // double it for anyone who happened to be watching.
                 WorkoutEvent.RestComplete -> Unit
+                WorkoutEvent.SessionFinished -> viewModel.finishSession(onSessionFinished)
             }
         }
     }
@@ -304,80 +304,106 @@ private fun InputScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            if (state.coachReasoningLine.isNotEmpty()) {
+            if (state.isCardioFinisher) {
                 Text(
-                    text = state.coachReasoningLine,
-                    style = RedplateType.body.copy(fontSize = 15.sp),
-                    color = colors.inkSecondary,
-                )
-                Spacer(Modifier.height(2.dp))
-            }
-
-            // Tapping the readout types the value in directly. The steppers walk what the
-            // app believes the equipment can make; this records what it actually was.
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onEditLoad)
-                    .padding(vertical = 2.dp)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription =
-                            (if (state.loadIsAssistance) "Assistance " else "Working load ") +
-                                "${formatKg(state.loadKg)} ${state.loadUnitLabel}" +
-                                when {
-                                    state.loadIsPerLimb -> " in each hand. "
-                                    state.loadIsAssistance -> ", higher is easier. "
-                                    else -> ". "
-                                } +
-                                "Tap to type a different value."
-                    },
-            ) {
-                Text(
-                    text = formatKg(state.loadKg),
-                    style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
-                    color = colors.ink,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    // "KG EACH" on a dumbbell rack: the number is one implement, and
-                    // nothing used to say so.
-                    text = when {
-                        state.loadIsPerLimb -> "${state.loadUnitLabel} EACH"
-                        // "LEVEL ASSIST" — the number is help, not work.
-                        state.loadIsAssistance -> "${state.loadUnitLabel} ASSIST"
-                        else -> state.loadUnitLabel
-                    },
-                    style = RedplateType.mono.copy(fontSize = 14.sp),
-                    color = colors.inkMuted,
-                    modifier = Modifier.padding(bottom = 9.dp),
-                )
-            }
-
-            if (state.loadIsAssistance) {
-                Text(
-                    text = "The machine takes this much off you — higher is easier.",
-                    style = RedplateType.mono.copy(fontSize = 10.sp),
+                    text = "TARGET DURATION",
+                    style = RedplateType.mono.copy(fontSize = 12.sp),
                     color = colors.inkMuted,
                 )
-            }
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                ) {
+                    Text(
+                        text = state.reps.toString(),
+                        style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
+                        color = colors.ink,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "MINUTES",
+                        style = RedplateType.mono.copy(fontSize = 14.sp),
+                        color = colors.inkMuted,
+                        modifier = Modifier.padding(bottom = 9.dp),
+                    )
+                }
+            } else {
+                if (state.coachReasoningLine.isNotEmpty()) {
+                    Text(
+                        text = state.coachReasoningLine,
+                        style = RedplateType.body.copy(fontSize = 15.sp),
+                        color = colors.inkSecondary,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
 
-            if (!state.isExactLoad) {
-                Text(
-                    text = "Closest the plates allow. Tap to enter what you used.",
-                    style = RedplateType.mono.copy(fontSize = 10.sp),
-                    color = colors.inkMuted,
-                )
-            }
-
-            if (state.isPlateLoaded && state.plateLoad != null) {
-                PlateStack(
-                    plateLoad = state.plateLoad,
-                    plateHeight = PLATE_HEIGHT_COMPACT,
+                // Tapping the readout types the value in directly. The steppers walk what the
+                // app believes the equipment can make; this records what it actually was.
+                Row(
+                    verticalAlignment = Alignment.Bottom,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                )
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onEditLoad)
+                        .padding(vertical = 2.dp)
+                        .semantics(mergeDescendants = true) {
+                            contentDescription =
+                                (if (state.loadIsAssistance) "Assistance " else "Working load ") +
+                                    "${formatKg(state.loadKg)} ${state.loadUnitLabel}" +
+                                    when {
+                                        state.loadIsPerLimb -> " in each hand. "
+                                        state.loadIsAssistance -> ", higher is easier. "
+                                        else -> ". "
+                                    } +
+                                    "Tap to type a different value."
+                        },
+                ) {
+                    Text(
+                        text = formatKg(state.loadKg),
+                        style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
+                        color = colors.ink,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        // "KG EACH" on a dumbbell rack: the number is one implement, and
+                        // nothing used to say so.
+                        text = when {
+                            state.loadIsPerLimb -> "${state.loadUnitLabel} EACH"
+                            // "LEVEL ASSIST" — the number is help, not work.
+                            state.loadIsAssistance -> "${state.loadUnitLabel} ASSIST"
+                            else -> state.loadUnitLabel
+                        },
+                        style = RedplateType.mono.copy(fontSize = 14.sp),
+                        color = colors.inkMuted,
+                        modifier = Modifier.padding(bottom = 9.dp),
+                    )
+                }
+
+                if (state.loadIsAssistance) {
+                    Text(
+                        text = "The machine takes this much off you — higher is easier.",
+                        style = RedplateType.mono.copy(fontSize = 10.sp),
+                        color = colors.inkMuted,
+                    )
+                }
+
+                if (!state.isExactLoad) {
+                    Text(
+                        text = "Closest the plates allow. Tap to enter what you used.",
+                        style = RedplateType.mono.copy(fontSize = 10.sp),
+                        color = colors.inkMuted,
+                    )
+                }
+
+                if (state.isPlateLoaded && state.plateLoad != null) {
+                    PlateStack(
+                        plateLoad = state.plateLoad,
+                        plateHeight = PLATE_HEIGHT_COMPACT,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                    )
+                }
             }
         }
 
@@ -388,19 +414,40 @@ private fun InputScreen(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 8.dp),
         ) {
-            RepCounter(
-                reps = state.reps,
-                onDown = onRepsDown,
-                onUp = onRepsUp,
-                onLoadDown = onLoadDown,
-                onLoadUp = onLoadUp,
-                unitLabel = state.loadUnitLabel,
-            )
-            Spacer(Modifier.height(10.dp))
-            DifficultyChips(
-                selected = state.difficulty,
-                onSelect = onSetDifficulty,
-            )
+            if (state.isCardioFinisher) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StepButton("−", "Decrease duration", onClick = onRepsDown)
+                    Text(
+                        text = "DURATION",
+                        style = RedplateType.mono.copy(fontSize = 14.sp),
+                        color = colors.inkMuted,
+                    )
+                    StepButton("+", "Increase duration", onClick = onRepsUp)
+                }
+                Spacer(Modifier.height(10.dp))
+                EffortChips(
+                    selected = state.difficulty,
+                    onSelect = onSetDifficulty,
+                )
+            } else {
+                RepCounter(
+                    reps = state.reps,
+                    onDown = onRepsDown,
+                    onUp = onRepsUp,
+                    onLoadDown = onLoadDown,
+                    onLoadUp = onLoadUp,
+                    unitLabel = state.loadUnitLabel,
+                )
+                Spacer(Modifier.height(10.dp))
+                DifficultyChips(
+                    selected = state.difficulty,
+                    onSelect = onSetDifficulty,
+                )
+            }
         }
 
         PrimaryBar(

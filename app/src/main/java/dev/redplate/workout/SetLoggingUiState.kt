@@ -10,6 +10,7 @@ import dev.redplate.data.PlateMath
  */
 data class SetLoggingUiState(
     val isLoading: Boolean = true,
+    val isCardioFinisher: Boolean = false,
 
     // ── Read-only prescription (top zone) ──
     val exerciseId: String = "",
@@ -182,4 +183,5 @@ sealed interface WorkoutEvent {
     data object SetLogged : WorkoutEvent
     data object PrHit : WorkoutEvent
     data object RestComplete : WorkoutEvent
+    data object SessionFinished : WorkoutEvent
 }

@@ -101,6 +101,7 @@ class SetLoggingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     isLoading = false,
+                    isCardioFinisher = sl?.isCardioFinisher == true,
                     exerciseId = exerciseId,
                     exerciseName = ex?.name ?: "Exercise",
                     primaryMuscle = ex?.primaryMuscle ?: dev.redplate.data.MuscleGroup.CHEST,
@@ -408,7 +409,7 @@ class SetLoggingViewModel @Inject constructor(
                     sessionId = sessionId,
                     exerciseId = exerciseId,
                     setIndex = s.loggedSets.size,
-                    loadKg = s.loadKg,
+                    loadKg = if (s.isCardioFinisher) 0.0 else s.loadKg,
                     reps = s.reps,
                     rir = s.rir,
                     isWarmup = s.isWarmup,
@@ -427,7 +428,12 @@ class SetLoggingViewModel @Inject constructor(
             // After a warmup, default the next set back to working.
             if (s.isWarmup) _state.update { it.copy(isWarmup = false) }
 
-            startRest()
+            if (s.isCardioFinisher) {
+                // Finisher is always the last slot. No rest timer needed, just complete.
+                _events.tryEmit(WorkoutEvent.SessionFinished)
+            } else {
+                startRest()
+            }
         }
     }
 
