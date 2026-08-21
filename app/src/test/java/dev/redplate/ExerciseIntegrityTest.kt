@@ -156,7 +156,11 @@ class ExerciseIntegrityTest {
             .map { it.id }
             .toSet()
         assertEquals(
-            setOf("stairmill_climbing", "treadmill_incline_walk", "rower_full_body"),
+            setOf(
+                "stairmill_climbing", "treadmill_incline_walk",
+                "treadmill_jog", "treadmill_interval_run",
+                "rower_full_body",
+            ),
             onCardio,
         )
     }

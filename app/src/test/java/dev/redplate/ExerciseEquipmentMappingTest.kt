@@ -53,6 +53,7 @@ class ExerciseEquipmentMappingTest {
             "bench_tricep_dip",
             "decline_sit_up", "hyperextension", "glute_focused_extension", "push_up",
             "plank", "bodyweight_squat", "stairmill_climbing", "treadmill_incline_walk",
+            "treadmill_jog", "treadmill_interval_run",
             "rower_full_body",
         )
         for (exercise in exercises) {
