@@ -128,7 +128,6 @@ object CuratedExerciseSeed {
 
         // ── Barbells & Rack ──
         add(exercise("barbell_curl", "Standing Barbell Curl", MuscleGroup.BICEPS, listOf(MuscleGroup.FOREARMS), "barbell", MovementPattern.ISOLATION, compound = false, fatigue = 2))
-        add(exercise("barbell_skullcrusher", "Barbell Skullcrusher", MuscleGroup.TRICEPS, listOf(MuscleGroup.FRONT_DELTS), "barbell", MovementPattern.ISOLATION, compound = false, fatigue = 2, alsoNeeds = listOf("flat_incline_bench")))
         add(exercise("barbell_upright_row", "Barbell Upright Row", MuscleGroup.SIDE_DELTS, listOf(MuscleGroup.TRAPS, MuscleGroup.BICEPS), "barbell", MovementPattern.VERTICAL_PULL, compound = true, fatigue = 3))
         add(exercise("barbell_shrug", "Barbell Shrug", MuscleGroup.TRAPS, listOf(MuscleGroup.FOREARMS), "barbell", MovementPattern.ISOLATION, compound = false, fatigue = 2))
         add(exercise("landmine_press", "Landmine Press", MuscleGroup.FRONT_DELTS, listOf(MuscleGroup.CHEST, MuscleGroup.TRICEPS), "barbell", MovementPattern.VERTICAL_PUSH, compound = true, fatigue = 3, alsoNeeds = listOf("landmine_attachment")))

@@ -99,7 +99,7 @@ class ExerciseIntegrityTest {
     fun `lifts done on a bench name a bench`() {
         val benches = setOf("flat_incline_bench", "decline_bench", "back_extension_bench")
         val needsOne = listOf(
-            "barbell_flat_bench", "barbell_close_grip_bench", "barbell_skullcrusher",
+            "barbell_flat_bench", "barbell_close_grip_bench",
             "db_flat_bench", "db_incline_bench", "db_flat_fly", "db_pullover",
             "db_rear_delt_fly", "decline_bench_press", "decline_sit_up", "bench_step_up",
         )
