@@ -77,7 +77,6 @@ object ExerciseMediaMap {
         "db_bulgarian_split_squat"    to "Split_Squat_with_Dumbbells",
         "barbell_curl"                to "Barbell_Curl",
         "barbell_shrug"               to "Barbell_Shrug",
-        "barbell_upright_row"         to "Barbell_Upright_Row",
         "decline_bench_press"         to "Decline_Barbell_Bench_Press",
         "decline_sit_up"              to "Decline_Crunch",
         "bench_tricep_dip"            to "Bench_Dips",
