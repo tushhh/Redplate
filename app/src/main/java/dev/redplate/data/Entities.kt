@@ -183,7 +183,25 @@ data class EquipmentEntity(
      * were doing nothing at all.
      */
     @ColumnInfo(defaultValue = "0")
-    val isAssistance: Boolean = false
+    val isAssistance: Boolean = false,
+    /**
+     * Lower number = picked first by [ProgramGenerator].
+     *
+     * Dedicated single-purpose machines (pec fly, chest press, shoulder press,
+     * hip adductor, leg curl, glute drive) are 10 so they win the slot competition
+     * over cables (40) and dumbbells (30), which become the default swap options.
+     *
+     * Scale:
+     *   10 — dedicated selectorised/plate machine
+     *   20 — barbell / compound platform
+     *   30 — dumbbells
+     *   40 — cable / multi-station / assisted
+     *   50 — bodyweight fixtures (bench, back-extension)
+     *   60 — functional / ROX zone
+     *   70 — cardio machines
+     */
+    @ColumnInfo(defaultValue = "40")
+    val selectionPriority: Int = 40,
 ) {
     /** Smallest load step this equipment can actually make. Never progress by less than this. */
     fun minIncrement(): Double = when (loadingScheme) {

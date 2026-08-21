@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
         VolumeSnapshotEntity::class,
         VolumeLandmarkEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

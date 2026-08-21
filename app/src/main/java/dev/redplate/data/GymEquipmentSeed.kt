@@ -8,6 +8,16 @@ package dev.redplate.data
  * against the actual hardware. Items marked isAvailable = false are deliberately withheld
  * from the exercise filter until their contents are confirmed — fail closed, never guess
  * open, per COACHING.md §2.
+ *
+ * [EquipmentEntity.selectionPriority] controls which exercises the program generator
+ * schedules first. Lower = higher priority. Scale:
+ *   10 — dedicated single-purpose machines (pec fly, chest press, shoulder press, etc.)
+ *   20 — barbell / compound platforms (barbell, smith machine)
+ *   30 — dumbbells
+ *   40 — cable / multi-station / assisted
+ *   50 — bodyweight fixtures (bench, back extension)
+ *   60 — functional / ROX zone
+ *   70 — cardio machines (filtered from strength slots; finisher use only)
  */
 object GymEquipmentSeed {
 
@@ -34,7 +44,8 @@ object GymEquipmentSeed {
 
     fun seed(): List<EquipmentEntity> = listOf(
 
-        // --- Cardio machines (#1,2,3,4,28,29) — no discrete load, resistance set at console ---
+        // --- Cardio machines (#1,2,3,4,28,29) — priority 70 ---
+        // Filtered out of strength slots by ProgramGenerator; only surface as finisher options.
         cardio("stairmill", "Stairmill"),
         cardio("treadmill", "Treadmill"),
         cardio("crosstrainer", "Crosstrainer"),
@@ -42,15 +53,17 @@ object GymEquipmentSeed {
         cardio("airbike", "Airbike"),
         cardio("skierg", "SkiErg"),
 
-        // --- Pin-loaded selectorised (#5-11) ---
-        // ASSUMPTION: 2.5kg stack increments, 5-100kg range. Confirm against console if precision matters.
-        pinStack("dual_adjustable_pulley", "Dual Adjustable Pulley"),
-        pinStack("hip_adductor_abductor", "Hip Adductor/Abductor"),
-        pinStack("pec_fly_rear_delt", "Pec Fly / Rear Delt"),
-        pinStack("chest_press_machine", "Chest Press Machine"),
-        pinStack("shoulder_press_machine", "Shoulder Press Machine"),
-        pinStack("leg_curl_machine", "Leg Curl Machine"),
-        // --- 4-Station Multi-Gym (#?) — four independent stations on one frame ---
+        // --- Dedicated single-purpose machines (#6,7,8,9,10) — priority 10 ---
+        // These machines were skipped when cables sorted first alphabetically.
+        // Priority 10 means they win every slot competition before cables (40) or
+        // dumbbells (30) get a look in. Cables and dumbbells remain as swap options.
+        pinStack("hip_adductor_abductor", "Hip Adductor/Abductor", priority = 10),
+        pinStack("pec_fly_rear_delt", "Pec Fly / Rear Delt", priority = 10),
+        pinStack("chest_press_machine", "Chest Press Machine", priority = 10),
+        pinStack("shoulder_press_machine", "Shoulder Press Machine", priority = 10),
+        pinStack("leg_curl_machine", "Leg Curl Machine", priority = 10),
+
+        // --- 4-Station Multi-Gym (#11) — priority 40 (cable / multi-station) ---
         // Modelled as four pieces because they are four things you queue for: naming the
         // frame told you nothing about which station to walk to.
         //
@@ -58,49 +71,63 @@ object GymEquipmentSeed {
         // photo of the selector plates, transcribed into [MULTIGYM_STACK_KG]. The
         // remaining two are still numbered levels with no mass printed anywhere, so they
         // record the number on the machine rather than inventing one.
-        pinStack("multigym_low_row", "Multi-Gym · Low Row", MULTIGYM_STACK_KG),
-        pinStack("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown", MULTIGYM_STACK_KG),
-        resistanceLevel("multigym_cable", "Multi-Gym · Cable"),
+        pinStack("multigym_low_row", "Multi-Gym · Low Row", MULTIGYM_STACK_KG, priority = 40),
+        pinStack("multigym_lat_pulldown", "Multi-Gym · Lat Pulldown", MULTIGYM_STACK_KG, priority = 40),
+        resistanceLevel("multigym_cable", "Multi-Gym · Cable", priority = 40),
         // Counterweighted: a higher number takes MORE of your bodyweight, so it is easier.
         // Everything that reads this has to run backwards — see EquipmentEntity.isAssistance.
-        resistanceLevel("multigym_assist_dip_chin", "Multi-Gym · Assisted Dip/Chin", assistance = true),
+        resistanceLevel("multigym_assist_dip_chin", "Multi-Gym · Assisted Dip/Chin", assistance = true, priority = 40),
 
-        // --- Fixtures (#12,13,22,23,24) — no load of their own, gate specific variants ---
-        fixture("deadlift_platform", "Deadlift Platform", EquipmentCategory.OTHER),
-        fixture("power_rack", "Half Rack", EquipmentCategory.BARBELL),
-        fixture("decline_bench", "Decline Bench", EquipmentCategory.OTHER),
-        fixture("flat_incline_bench", "Flat/Incline Bench", EquipmentCategory.OTHER),
-        fixture("back_extension_bench", "Back Extension Bench", EquipmentCategory.OTHER),
+        // --- Dual Adjustable Pulley (#5) — priority 40 ---
+        // Cable machine — an excellent swap option and irreplaceable for many isolation
+        // patterns, but not the first choice when a dedicated machine exists for that slot.
+        // ASSUMPTION: 2.5kg stack increments, 5-100kg range.
+        pinStack("dual_adjustable_pulley", "Dual Adjustable Pulley", priority = 40),
 
-        // --- Plate-loaded machines (#15,16,17) ---
+        // --- Fixtures (#12,13,22,23,24) — priority 50 ---
+        // No load of their own; gate specific barbell/dumbbell variants.
+        // Priority 50 keeps fixture-dependent exercises behind cables in the pool, so
+        // they are not preferentially scheduled either.
+        fixture("deadlift_platform", "Deadlift Platform", EquipmentCategory.OTHER, priority = 50),
+        fixture("power_rack", "Half Rack", EquipmentCategory.BARBELL, priority = 50),
+        fixture("decline_bench", "Decline Bench", EquipmentCategory.OTHER, priority = 50),
+        fixture("flat_incline_bench", "Flat/Incline Bench", EquipmentCategory.OTHER, priority = 50),
+        fixture("back_extension_bench", "Back Extension Bench", EquipmentCategory.OTHER, priority = 50),
+
+        // --- Plate-loaded dedicated machines (#15,16,17) — priority 10 ---
         // ASSUMPTION: carriage/starting weight. Printed on the machine or in its manual.
         EquipmentEntity(
             id = "incline_chest_press_machine", displayName = "Incline Chest Press Machine",
             category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PLATE_LOADED,
-            barWeightKg = 10.0 /* ASSUMPTION: carriage weight */, platePairs = commercialPlatePool
+            barWeightKg = 10.0 /* ASSUMPTION: carriage weight */, platePairs = commercialPlatePool,
+            selectionPriority = 10,
         ),
         EquipmentEntity(
             id = "leg_press_machine", displayName = "Leg Press",
             category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PLATE_LOADED,
-            barWeightKg = 20.0 /* ASSUMPTION: sled weight */, platePairs = commercialPlatePool
+            barWeightKg = 20.0 /* ASSUMPTION: sled weight */, platePairs = commercialPlatePool,
+            selectionPriority = 10,
         ),
         EquipmentEntity(
             id = "glute_drive_machine", displayName = "Glute Drive",
             category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PLATE_LOADED,
-            barWeightKg = 10.0 /* ASSUMPTION: carriage weight */, platePairs = commercialPlatePool
+            barWeightKg = 10.0 /* ASSUMPTION: carriage weight */, platePairs = commercialPlatePool,
+            selectionPriority = 10,
         ),
 
-        // --- Smith Machine (#18) — HIGH STAKES ASSUMPTION, confirm this one first ---
+        // --- Smith Machine (#18) — priority 20 (plate-loaded compound) ---
+        // HIGH STAKES ASSUMPTION on bar weight — confirm this one first.
         EquipmentEntity(
             id = "smith_machine", displayName = "Smith Machine",
             category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PLATE_LOADED,
             barWeightKg = 10.0 /* ASSUMPTION: counterbalanced bars commonly read 0-20kg
                                    effective. Unload it and check the console before trusting
                                    any Smith Machine progression numbers. */,
-            platePairs = commercialPlatePool
+            platePairs = commercialPlatePool,
+            selectionPriority = 20,
         ),
 
-        // --- Dumbbells (#19+20, treated as one continuous rack) ---
+        // --- Dumbbells (#19+20, treated as one continuous rack) — priority 30 ---
         EquipmentEntity(
             id = "dumbbells", displayName = "Dumbbells",
             category = EquipmentCategory.DUMBBELL, loadingScheme = LoadingScheme.FIXED_INCREMENT,
@@ -108,34 +135,39 @@ object GymEquipmentSeed {
             // 30 kg dumbbell in each hand, and the readout says EACH so it cannot be read
             // as a combined figure.
             perLimb = true,
-            availableLoads = generateSequence(10.0) { it + 2.0 }.takeWhile { it <= 40.0 }.toList()
+            availableLoads = generateSequence(10.0) { it + 2.0 }.takeWhile { it <= 40.0 }.toList(),
+            selectionPriority = 30,
         ),
 
-        // --- Barbell (#14 bumper plates + #21 barbells & rack) ---
+        // --- Barbell (#14 bumper plates + #21 barbells & rack) — priority 20 ---
         EquipmentEntity(
             id = "barbell", displayName = "Barbell",
             category = EquipmentCategory.BARBELL, loadingScheme = LoadingScheme.PLATE_LOADED,
-            barWeightKg = 20.0, platePairs = commercialPlatePool
+            barWeightKg = 20.0, platePairs = commercialPlatePool,
+            selectionPriority = 20,
         ),
 
-        // --- Rox Zone (#25,26,27) ---
+        // --- Rox Zone (#25,26,27) — priority 60 (functional) ---
         EquipmentEntity(
             id = "power_sled", displayName = "Power Sled",
             category = EquipmentCategory.OTHER, loadingScheme = LoadingScheme.PLATE_LOADED,
-            barWeightKg = 15.0 /* ASSUMPTION: unloaded sled weight */, platePairs = commercialPlatePool
+            barWeightKg = 15.0 /* ASSUMPTION: unloaded sled weight */, platePairs = commercialPlatePool,
+            selectionPriority = 60,
         ),
 
         // FAIL CLOSED — contents of the Rox rack are not itemised on the floor plan.
-        // Flip isAvailable = true and set real weights once confirmed. See GYM.md item 4.
+        // Flip isAvailable = true and set real weights once confirmed.
         EquipmentEntity(
             id = "rox_kettlebells", displayName = "Kettlebells (Rox Zone)",
             category = EquipmentCategory.KETTLEBELL, loadingScheme = LoadingScheme.FIXED_INCREMENT,
-            availableLoads = emptyList(), isAvailable = false
+            availableLoads = emptyList(), isAvailable = false,
+            selectionPriority = 60,
         ),
         EquipmentEntity(
             id = "rox_bands", displayName = "Resistance Bands (Rox Zone)",
             category = EquipmentCategory.BAND, loadingScheme = LoadingScheme.BANDED,
-            isAvailable = false
+            isAvailable = false,
+            selectionPriority = 60,
         ),
 
         // FAIL CLOSED — landmine work needs a landmine sleeve or a corner to jam a bar in,
@@ -144,35 +176,41 @@ object GymEquipmentSeed {
         EquipmentEntity(
             id = "landmine_attachment", displayName = "Landmine Attachment",
             category = EquipmentCategory.BARBELL, loadingScheme = LoadingScheme.BODYWEIGHT,
-            isAvailable = false
+            isAvailable = false,
+            selectionPriority = 60,
         ),
 
-        // FAIL CLOSED — floor plan shows the target, not the ball. See GYM.md item 5.
+        // FAIL CLOSED — floor plan shows the target, not the ball.
         EquipmentEntity(
             id = "wall_ball", displayName = "Wall Ball",
             category = EquipmentCategory.OTHER, loadingScheme = LoadingScheme.FIXED_INCREMENT,
-            availableLoads = emptyList(), isAvailable = false
+            availableLoads = emptyList(), isAvailable = false,
+            selectionPriority = 60,
         ),
     )
 
     private fun cardio(id: String, name: String) = EquipmentEntity(
         id = id, displayName = name,
-        category = EquipmentCategory.CARDIO_MACHINE, loadingScheme = LoadingScheme.BODYWEIGHT
+        category = EquipmentCategory.CARDIO_MACHINE, loadingScheme = LoadingScheme.BODYWEIGHT,
+        selectionPriority = 70,
     )
 
     /**
      * A selectorised stack marked in kilograms. [loads] defaults to the unconfirmed
      * commercial-gym ladder; pass the real one wherever the plates have been read.
+     * [priority] drives which exercises get scheduled first by [ProgramGenerator].
      */
     private fun pinStack(
         id: String,
         name: String,
         /* ASSUMPTION: 2.5kg stack increments, 5-100kg. Adjust per-machine if you check the pins. */
         loads: List<Double> = generateSequence(5.0) { it + 2.5 }.takeWhile { it <= 100.0 }.toList(),
+        priority: Int = 40,
     ) = EquipmentEntity(
         id = id, displayName = name,
         category = EquipmentCategory.MACHINE, loadingScheme = LoadingScheme.PIN_STACK,
-        availableLoads = loads
+        availableLoads = loads,
+        selectionPriority = priority,
     )
 
     /**
@@ -181,17 +219,28 @@ object GymEquipmentSeed {
      * worse than none — it put a kilogram figure on screen that appears nowhere on the
      * machine, and refused to record the level the user actually set.
      */
-    private fun resistanceLevel(id: String, name: String, assistance: Boolean = false) =
-        EquipmentEntity(
-            id = id, displayName = name,
-            category = EquipmentCategory.MACHINE,
-            loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
-            isAssistance = assistance,
-        )
-
-    private fun fixture(id: String, name: String, category: EquipmentCategory) = EquipmentEntity(
+    private fun resistanceLevel(
+        id: String,
+        name: String,
+        assistance: Boolean = false,
+        priority: Int = 40,
+    ) = EquipmentEntity(
         id = id, displayName = name,
-        category = category, loadingScheme = LoadingScheme.BODYWEIGHT
+        category = EquipmentCategory.MACHINE,
+        loadingScheme = LoadingScheme.RESISTANCE_LEVEL,
+        isAssistance = assistance,
+        selectionPriority = priority,
+    )
+
+    private fun fixture(
+        id: String,
+        name: String,
+        category: EquipmentCategory,
+        priority: Int = 50,
+    ) = EquipmentEntity(
+        id = id, displayName = name,
+        category = category, loadingScheme = LoadingScheme.BODYWEIGHT,
+        selectionPriority = priority,
     )
 
 }

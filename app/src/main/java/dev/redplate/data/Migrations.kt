@@ -470,8 +470,26 @@ object Migrations {
         }
     }
 
+    /**
+     * 11 → 12 adds [EquipmentEntity.selectionPriority].
+     *
+     * Dedicated machines (pec fly, chest press, shoulder press, hip adductor, leg curl,
+     * leg press, glute drive) get priority 10 so the generator schedules them before
+     * cables (40) and dumbbells (30). Default of 40 keeps all existing rows at cable/
+     * functional priority until the seed upserts them on the next launch — which happens
+     * immediately, so no row stays at the wrong priority in practice.
+     */
+    val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `equipment` ADD COLUMN `selectionPriority` INTEGER NOT NULL DEFAULT 40"
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+        MIGRATION_11_12,
     )
 }

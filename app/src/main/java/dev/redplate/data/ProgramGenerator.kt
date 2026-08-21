@@ -306,7 +306,10 @@ class ProgramGenerator @Inject constructor(
         profile: ProfileEntity,
         available: Set<String>,
     ): List<ExerciseEntity> {
-        val cardio = equipmentDao.getAll()
+        // Build the equipment map once — used both for the cardio filter and the
+        // priority sort so we only pay for a single DAO call.
+        val allEquipment = equipmentDao.getAll().associateBy { it.id }
+        val cardio = allEquipment.values
             .filter { it.category == EquipmentCategory.CARDIO_MACHINE }
             .mapTo(mutableSetOf()) { it.id }
 
@@ -319,7 +322,19 @@ class ProgramGenerator @Inject constructor(
             // back compound with "Rowing (Full Body), 3 × 6–10 at 2 in reserve" — a
             // prescription that cannot be followed on a Concept2.
             .filterNot { exercise -> exercise.requiredEquipmentIds.any { it in cardio } }
-            .sortedBy { it.id } // deterministic tie-break before any preference ordering
+            // Sort by the load-bearing equipment's selectionPriority so dedicated machines
+            // (priority 10) are scheduled before cables (40) and dumbbells (30). Fixtures
+            // and benches carry no load so they are skipped; the first load-bearing piece
+            // wins. Id is the deterministic tiebreaker within the same priority.
+            .sortedWith(compareBy(
+                { exercise ->
+                    exercise.requiredEquipmentIds
+                        .firstNotNullOfOrNull { id ->
+                            allEquipment[id]?.takeIf { it.carriesLoad }?.selectionPriority
+                        } ?: 40
+                },
+                { it.id },
+            ))
     }
 
     // ── Editing a template in place (8c: swap a row, add a row) ─────────
@@ -713,6 +728,9 @@ private object Days {
             compound(MuscleGroup.HAMSTRINGS, MovementPattern.HINGE),
             compound(MuscleGroup.QUADS, MovementPattern.LUNGE),
             compound(MuscleGroup.GLUTES),
+            // ADDUCTORS added here so the Hip Adductor/Abductor machine is reachable
+            // in 4- and 5-day splits, not only in the 6-day legsB variant.
+            isolation(MuscleGroup.ADDUCTORS),
             isolation(MuscleGroup.CALVES),
             isolation(MuscleGroup.ABS, MovementPattern.CORE),
         ),
