@@ -69,7 +69,7 @@ fun EquipmentScreen(
             .background(colors.ground)
             .statusBarsPadding(),
     ) {
-        IntakeProgressBar(currentStep = 3)
+        IntakeProgressBar(currentStep = 4)
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Text(

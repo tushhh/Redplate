@@ -118,6 +118,8 @@ class PlanSettingsViewModel @Inject constructor(
 
     fun setGoal(goal: Goal) = edit { it.copy(goal = goal) }
 
+    fun setTrainingAge(months: Int) = edit { it.copy(trainingAgeMonths = months) }
+
     fun setDaysPerWeek(days: Int) = edit {
         // A weekday selection that no longer matches the day count is stale rather than
         // wrong; dropping it falls back to the split's layout until they pick again.

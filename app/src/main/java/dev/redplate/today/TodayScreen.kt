@@ -1,6 +1,10 @@
 package dev.redplate.today
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +66,7 @@ fun TodayRoute(
     onEditSession: (Long) -> Unit = {},
     onSeeFullWeek: () -> Unit = {},
     onSeeSummary: (Long) -> Unit = {},
+    onSetStartingWeights: () -> Unit = {},
 ) {
     val viewModel: TodayViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,6 +92,8 @@ fun TodayRoute(
         onDismissStall = viewModel::pushOnThroughStall,
         onSeeSummary = onSeeSummary,
         onTrainAgain = { templateId -> viewModel.startAnotherSession(templateId, onStartWorkout) },
+        onTrainAnyway = { viewModel.startTrainAnyway(onStartWorkout) },
+        onSetStartingWeights = onSetStartingWeights,
     )
 }
 
@@ -101,6 +108,8 @@ fun TodayScreen(
     onDismissStall: () -> Unit = {},
     onSeeSummary: (Long) -> Unit = {},
     onTrainAgain: (Long) -> Unit = {},
+    onTrainAnyway: () -> Unit = {},
+    onSetStartingWeights: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -125,6 +134,7 @@ fun TodayScreen(
             onStartWorkout = onStartWorkout,
             onEditSession = { onEditSession(state.sessionCard.templateId) },
             onSeeFullWeek = onSeeFullWeek,
+            onSetStartingWeights = onSetStartingWeights,
         )
 
         is TodayState.Completed -> CompletedScreen(
@@ -146,7 +156,11 @@ fun TodayScreen(
             onSeeFullWeek = onSeeFullWeek,
         )
 
-        is TodayState.RestDay -> RestDayScreen(state = state, onSeeFullWeek = onSeeFullWeek)
+        is TodayState.RestDay -> RestDayScreen(
+            state = state,
+            onSeeFullWeek = onSeeFullWeek,
+            onTrainAnyway = onTrainAnyway,
+        )
     }
 }
 
@@ -158,6 +172,7 @@ private fun TrainingDayScreen(
     onStartWorkout: () -> Unit,
     onEditSession: () -> Unit,
     onSeeFullWeek: () -> Unit,
+    onSetStartingWeights: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
 
@@ -187,6 +202,23 @@ private fun TrainingDayScreen(
 
             SessionCardView(card = state.sessionCard, onEditSession = onEditSession)
             Spacer(Modifier.height(10.dp))
+
+            // Before the first session: put in what you already lift, so set one opens
+            // at a real weight instead of an empty bar you have to type over.
+            if (state.liftsWithoutLoad > 0) {
+                NavRow(
+                    text = "Set starting weights · ${state.liftsWithoutLoad} lift" +
+                        if (state.liftsWithoutLoad == 1) "" else "s",
+                    onClick = onSetStartingWeights,
+                    emphasised = true,
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+
+            if (state.weekStrip.isNotEmpty()) {
+                WeekStrip(days = state.weekStrip)
+                Spacer(Modifier.height(10.dp))
+            }
 
             VolumeFooter(
                 rows = state.volumeRows,
@@ -550,6 +582,11 @@ private fun CompletedScreen(
             )
             Spacer(Modifier.height(14.dp))
 
+            if (state.weekStrip.isNotEmpty()) {
+                WeekStrip(days = state.weekStrip)
+                Spacer(Modifier.height(10.dp))
+            }
+
             VolumeFooter(
                 rows = state.volumeRows,
                 coachLine = state.volumeCoachLine,
@@ -579,7 +616,7 @@ private fun CompletedScreen(
             }
 
             Spacer(Modifier.height(10.dp))
-            SecondaryButton(label = "Train again today", onClick = onTrainAgain)
+            SecondaryButton(label = state.trainAgainLabel, onClick = onTrainAgain)
             Spacer(Modifier.height(16.dp))
         }
 
@@ -594,44 +631,156 @@ private fun CompletedScreen(
 // ── Rest day and empty ──────────────────────────────────────────────
 
 @Composable
-private fun RestDayScreen(state: TodayState.RestDay, onSeeFullWeek: () -> Unit) {
+private fun RestDayScreen(
+    state: TodayState.RestDay,
+    onSeeFullWeek: () -> Unit,
+    onTrainAnyway: () -> Unit = {},
+) {
     val colors = RedplateTheme.colors
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.ground)
-            .statusBarsPadding()
-            .padding(horizontal = 22.dp),
+            .background(colors.ground),
     ) {
-        Spacer(Modifier.height(22.dp))
-        MonoLabel(text = state.eyebrow)
-        Spacer(Modifier.height(10.dp))
-        CoachHeadline(text = state.headline)
-        Spacer(Modifier.height(5.dp))
-        Text(
-            text = state.coachBody,
-            style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
-            color = colors.inkSecondary,
-        )
-        Spacer(Modifier.height(16.dp))
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(colors.surface)
-                .clickable(onClick = onSeeFullWeek)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(horizontal = 22.dp),
         ) {
+            Spacer(Modifier.height(22.dp))
+            MonoLabel(text = state.eyebrow)
+            Spacer(Modifier.height(10.dp))
+            CoachHeadline(text = state.headline)
+            Spacer(Modifier.height(5.dp))
             Text(
-                text = state.nextSessionLabel?.let { "Next: $it" } ?: "See the full week",
-                style = RedplateType.body.copy(fontSize = 15.sp),
+                text = state.coachBody,
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = colors.inkSecondary,
-                modifier = Modifier.weight(1f),
             )
-            Chevron()
+            Spacer(Modifier.height(16.dp))
+
+            if (state.weekStrip.isNotEmpty()) {
+                WeekStrip(days = state.weekStrip)
+                Spacer(Modifier.height(10.dp))
+            }
+
+            NavRow(
+                text = state.nextSessionLabel?.let { "Next: $it" } ?: "See the full week",
+                onClick = onSeeFullWeek,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Rest is the answer, so the way past it is secondary — but it is there. Training
+        // on a day off is a decision, not a mistake, and the rotation simply carries on.
+        if (state.trainAnywayLabel != null) {
+            SecondaryButton(
+                label = state.trainAnywayLabel,
+                onClick = onTrainAnyway,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+            )
+        }
+    }
+}
+
+/** A 64 dp row that leads somewhere. [emphasised] lifts it a surface step. */
+@Composable
+private fun NavRow(text: String, onClick: () -> Unit, emphasised: Boolean = false) {
+    val colors = RedplateTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (emphasised) colors.surfaceRaised else colors.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            style = RedplateType.body.copy(fontSize = 15.sp),
+            color = if (emphasised) colors.ink else colors.inkSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        Chevron()
+    }
+}
+
+/**
+ * Where you are in the week (plan §03, "a 7-day strip"). Read-only.
+ *
+ * Every state carries a mark as well as a shade — ✓ done, ○ planned, – missed, · rest —
+ * so it reads without colour (CLAUDE.md §3).
+ */
+@Composable
+private fun WeekStrip(days: List<WeekStripDay>) {
+    val colors = RedplateTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(colors.surface)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        days.forEach { day ->
+            val description = when (day.status) {
+                StripStatus.DONE -> "trained"
+                StripStatus.PLANNED -> "session planned"
+                StripStatus.MISSED -> "planned, not trained"
+                StripStatus.REST -> "rest day"
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (day.isToday) colors.surfaceRaised else colors.surface)
+                    .padding(vertical = 7.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = (if (day.isToday) "Today, " else "") + description
+                    },
+            ) {
+                Text(
+                    text = day.label,
+                    style = RedplateType.mono.copy(
+                        fontSize = 10.5.sp,
+                        fontWeight = if (day.isToday) FontWeight.SemiBold else FontWeight.Normal,
+                    ),
+                    color = if (day.isToday) colors.ink else colors.inkMuted,
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .then(
+                            when (day.status) {
+                                StripStatus.DONE -> Modifier.background(colors.ink)
+                                StripStatus.PLANNED -> Modifier.border(1.5.dp, colors.inkMuted, CircleShape)
+                                else -> Modifier
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = when (day.status) {
+                            StripStatus.DONE -> "✓"
+                            StripStatus.PLANNED -> ""
+                            StripStatus.MISSED -> "–"
+                            StripStatus.REST -> "·"
+                        },
+                        style = RedplateType.body.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                        color = if (day.status == StripStatus.DONE) colors.inkOnLight else colors.inkMuted,
+                    )
+                }
+            }
         }
     }
 }

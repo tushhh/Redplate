@@ -16,8 +16,9 @@ import androidx.room.TypeConverters
         SetLogEntity::class,
         VolumeSnapshotEntity::class,
         VolumeLandmarkEntity::class,
+        BodyweightEntryEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -28,4 +29,5 @@ abstract class RedplateDatabase : RoomDatabase() {
     abstract fun programDao(): ProgramDao
     abstract fun sessionDao(): SessionDao
     abstract fun volumeDao(): VolumeDao
+    abstract fun bodyweightDao(): BodyweightDao
 }

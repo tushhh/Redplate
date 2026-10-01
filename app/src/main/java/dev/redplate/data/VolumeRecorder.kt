@@ -24,6 +24,8 @@ object VolumeCredit {
         for (set in sets) {
             if (!set.countsTowardVolume) continue
             val exercise = exercisesById[set.exerciseId] ?: continue
+            // Ten minutes on the rower is conditioning, not three hard sets of back work.
+            if (exercise.isConditioning) continue
             perMuscle.merge(exercise.primaryMuscle, PRIMARY_CREDIT, Double::plus)
             exercise.secondaryMuscles.forEach { perMuscle.merge(it, SECONDARY_CREDIT, Double::plus) }
         }

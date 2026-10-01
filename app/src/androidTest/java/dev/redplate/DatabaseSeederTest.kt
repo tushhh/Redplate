@@ -58,7 +58,8 @@ class DatabaseSeederTest {
         val equipmentAfterFirst = db.equipmentDao().getAll()
         val exerciseCountAfterFirst = db.exerciseDao().count()
 
-        // Second call must be a no-op: exerciseDao().count() > 0 short-circuits it.
+        // The seed now merges on every launch; a second run with nothing new must change
+        // nothing — same rows, no duplicates.
         seeder.seedIfNeeded()
 
         assertEquals(equipmentAfterFirst.size, db.equipmentDao().getAll().size)
@@ -68,8 +69,8 @@ class DatabaseSeederTest {
     @Test
     fun equipmentInsertAllIsUpsertSafeEvenOutsideTheGuard() = runBlocking {
         // Defence in depth: even if something calls insertAll directly a second time
-        // (bypassing seedIfNeeded's count() > 0 guard), REPLACE-on-conflict means the
-        // same ids overwrite rather than duplicate.
+        // (bypassing the seeder's merge), REPLACE-on-conflict means the same ids
+        // overwrite rather than duplicate.
         val equipment = GymEquipmentSeed.seed()
         db.equipmentDao().insertAll(equipment)
         db.equipmentDao().insertAll(equipment)

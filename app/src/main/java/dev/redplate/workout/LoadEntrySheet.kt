@@ -57,6 +57,7 @@ fun LoadEntrySheet(
     onBackspace: () -> Unit,
     onCommit: () -> Unit,
     onDismiss: () -> Unit,
+    title: String = "WHAT DID YOU ACTUALLY USE?",
 ) {
     val colors = RedplateTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -68,6 +69,7 @@ fun LoadEntrySheet(
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
     ) {
         LoadEntryPad(
+            title = title,
             entry = entry,
             unitLabel = unitLabel,
             allowsDecimal = allowsDecimal,
@@ -89,6 +91,7 @@ private fun LoadEntryPad(
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onCommit: () -> Unit,
+    title: String = "WHAT DID YOU ACTUALLY USE?",
 ) {
     val colors = RedplateTheme.colors
 
@@ -99,7 +102,7 @@ private fun LoadEntryPad(
             .padding(horizontal = 16.dp)
             .padding(bottom = 12.dp),
     ) {
-        MonoLabel(text = "WHAT DID YOU ACTUALLY USE?")
+        MonoLabel(text = title)
         Spacer(Modifier.height(10.dp))
 
         // The value being typed, at readout scale so it stays legible from the rack.

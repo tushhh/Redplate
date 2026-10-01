@@ -5,18 +5,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.coach.CoachCopy
-import dev.redplate.data.EquipmentDao
 import dev.redplate.data.ExerciseDao
 import dev.redplate.data.MuscleGroup
 import dev.redplate.data.ProgramDao
-import dev.redplate.data.ProgressionEngine
+import dev.redplate.data.LiftDecision
+import dev.redplate.data.ProgressionApplier
 import dev.redplate.data.ProgressionOutcome
-import dev.redplate.data.ProgressionRule
 import dev.redplate.data.SessionDao
 import dev.redplate.data.SessionEntity
 import dev.redplate.data.SessionOutcomeReader
 import dev.redplate.data.SetLogEntity
-import dev.redplate.data.TemplateSlotEntity
+import dev.redplate.data.isConditioning
 import dev.redplate.data.VolumeDao
 import dev.redplate.data.VolumeLandmarks
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,10 +37,10 @@ class SessionSummaryViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val sessionDao: SessionDao,
     private val exerciseDao: ExerciseDao,
-    private val equipmentDao: EquipmentDao,
     private val programDao: ProgramDao,
     private val volumeDao: VolumeDao,
     private val outcomeReader: SessionOutcomeReader,
+    private val progressionApplier: ProgressionApplier,
 ) : ViewModel() {
 
     private val sessionId: Long = savedState.get<Long>(ARG_SESSION_ID) ?: 0L
@@ -57,7 +56,6 @@ class SessionSummaryViewModel @Inject constructor(
         val session = sessionDao.getSessionById(sessionId) ?: return
         val sets = sessionDao.getSetsForSession(sessionId)
         val working = sets.filter { !it.isWarmup }
-        val slots = session.templateId?.let { programDao.getSlots(it) }.orEmpty()
 
         // Shared with Today's completed card, so the two screens cannot disagree about
         // how many sets were done or how long it took.
@@ -76,9 +74,10 @@ class SessionSummaryViewModel @Inject constructor(
             totalSets = outcome.workingSets,
             totalTonnage = formatTonnage(outcome.tonnageKg, outcome.excludedFromTonnage),
             prCount = prs,
-            progressionChanges = applyProgression(session, working, slots),
+            progressionChanges = describeProgression(session),
             volumeRows = volumeRows,
             volumeCoachLine = buildVolumeCoachLine(volumeRows),
+            note = session.notes,
         )
     }
 
@@ -93,6 +92,7 @@ class SessionSummaryViewModel @Inject constructor(
         val perMuscle = mutableMapOf<MuscleGroup, Double>()
         for (set in credited) {
             val exercise = exerciseDao.getById(set.exerciseId) ?: continue
+            if (exercise.isConditioning) continue
             perMuscle.merge(exercise.primaryMuscle, 1.0, Double::plus)
             exercise.secondaryMuscles.forEach { perMuscle.merge(it, 0.5, Double::plus) }
         }
@@ -113,54 +113,38 @@ class SessionSummaryViewModel @Inject constructor(
     }
 
     /**
-     * What this session changes about the next one, per lift — decided, rendered, and
-     * written back to the slot.
+     * What this session changes about the next one, per lift — decided and rendered, but
+     * never written here.
      *
-     * This is the write half of the progression loop. `TemplateSlotEntity.workingLoadKg`
-     * was read in five places and written in none, so the next session always restarted at
-     * bar weight and stall detection could never fire. The decision itself lives in
-     * [ProgressionEngine], which honours the slot's own [ProgressionRule] rather than
-     * treating everything as double progression.
-     *
-     * Only a finished session writes: an open summary is a preview of a session still
-     * being logged. The write is idempotent — the outcome is derived from the set logs and
-     * the slot's prescription, never from the load already stored — so reopening the
-     * summary re-decides to the same number instead of stacking another increase on top.
+     * The write used to live on this screen, so a session's progress was only saved if
+     * its summary was opened, and reopening an old summary re-wrote slots the weekly
+     * assessment had since moved. [ProgressionApplier] now writes once, when the session
+     * ends; this reads the same pure decision back for display.
      */
-    private suspend fun applyProgression(
-        session: SessionEntity,
-        working: List<SetLogEntity>,
-        slots: List<TemplateSlotEntity>,
-    ): List<ProgressionChange> =
-        working.groupBy { it.exerciseId }.mapNotNull { (exerciseId, sets) ->
-            val exercise = exerciseDao.getById(exerciseId) ?: return@mapNotNull null
-            val slot = slots.firstOrNull { it.exerciseId == exerciseId }
-            val equipment = exercise.requiredEquipmentIds
-                .firstNotNullOfOrNull { equipmentDao.getById(it) }
-
-            // A freestyle session has no slot to progress, but the user still gets told
-            // what the numbers mean — judged against the default range.
-            val basis = slot ?: freestyleBasis(exerciseId, sets.size)
-            val outcome = ProgressionEngine.decide(basis.progression, sets, basis, equipment)
-
-            if (slot != null && session.endedAt != null && slot.workingLoadKg != outcome.nextLoadKg) {
-                programDao.updateSlot(slot.copy(workingLoadKg = outcome.nextLoadKg))
+    private suspend fun describeProgression(session: SessionEntity): List<ProgressionChange> =
+        progressionApplier.preview(session).map { decision ->
+            when (decision) {
+                is LiftDecision.Strength -> decision.outcome.toChange(decision.exerciseName)
+                is LiftDecision.Conditioning -> {
+                    val o = decision.outcome
+                    ProgressionChange(
+                        deltaLabel = if (o.isIncrease) "+${o.nextMinutes - o.targetMinutes} MIN" else "HOLD",
+                        description = "${decision.exerciseName} — ${o.reason}",
+                        isUp = o.isIncrease,
+                    )
+                }
             }
-            outcome.toChange(exercise.name)
         }
 
-    /** A stand-in prescription so an unprogrammed lift can still be judged. Never persisted. */
-    private fun freestyleBasis(exerciseId: String, setCount: Int) = TemplateSlotEntity(
-        templateId = 0,
-        exerciseId = exerciseId,
-        orderIndex = 0,
-        targetSets = setCount,
-        repRangeLow = DEFAULT_REP_LOW,
-        repRangeHigh = DEFAULT_REP_HIGH,
-        targetRir = DEFAULT_TARGET_RIR,
-        restSeconds = DEFAULT_REST_SECONDS,
-        progression = ProgressionRule.DOUBLE_PROGRESSION,
-    )
+    /** Saves the note, or clears it when what is left is blank. */
+    fun saveNote(text: String) {
+        viewModelScope.launch {
+            val session = sessionDao.getSessionById(sessionId) ?: return@launch
+            val note = text.trim().ifEmpty { null }
+            sessionDao.updateSession(session.copy(notes = note))
+            _state.value = _state.value?.copy(note = note)
+        }
+    }
 
     private fun ProgressionOutcome.toChange(exerciseName: String): ProgressionChange = when (this) {
         is ProgressionOutcome.Up -> ProgressionChange(
@@ -245,9 +229,5 @@ class SessionSummaryViewModel @Inject constructor(
     companion object {
         const val ARG_SESSION_ID = "sessionId"
 
-        private const val DEFAULT_REP_LOW = 8
-        private const val DEFAULT_REP_HIGH = 12
-        private const val DEFAULT_TARGET_RIR = 2
-        private const val DEFAULT_REST_SECONDS = 120
     }
 }

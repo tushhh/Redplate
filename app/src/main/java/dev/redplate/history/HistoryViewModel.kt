@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.ExerciseDao
+import dev.redplate.data.isConditioning
 import dev.redplate.data.ExerciseEntity
 import dev.redplate.data.SessionDao
 import dev.redplate.data.TrainingClock
@@ -70,7 +71,9 @@ class HistoryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val allExercises = exerciseDao.getAll().filter { !it.isExcluded }
+            // Conditioning has minutes, not a load: an estimated max of a treadmill walk is
+            // a number about nothing, so it stays out of the lift list and the PRs.
+            val allExercises = exerciseDao.getAll().filter { !it.isExcluded && !it.isConditioning }
             // Start with the first exercise that has logged sets
             val exercisesWithHistory = allExercises.filter { ex ->
                 val pr = sessionDao.getPrSet(ex.id)
@@ -112,12 +115,15 @@ class HistoryViewModel @Inject constructor(
      */
     private suspend fun loadAllPrs() {
         dayStartHour = trainingClock.dayStartHour()
-        val names = exerciseDao.getAll().associate { it.id to it.name }
+        val all = exerciseDao.getAll()
+        val names = all.associate { it.id to it.name }
+        val conditioning = all.filter { it.isConditioning }.mapTo(mutableSetOf()) { it.id }
         val prs = mutableListOf<Pair<Long, PrEntry>>()
 
         // One query per lift rather than the whole table: the PR list only cares about
         // exercises that have actually been trained.
         exerciseDao.getTrainedExerciseIds()
+            .filter { it !in conditioning }
             .associateWith { sessionDao.getWorkingSetsForExercise(it).filter { s -> s.reps in 1..12 } }
             .forEach { (exerciseId, sets) ->
                 var best = 0.0

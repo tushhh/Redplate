@@ -3,6 +3,8 @@ package dev.redplate.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.BodyweightDao
+import dev.redplate.data.BodyweightTrends
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseDao
@@ -12,6 +14,7 @@ import dev.redplate.data.ProfileDao
 import dev.redplate.data.ProfileEntity
 import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
+import dev.redplate.data.isConditioning
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,10 +38,11 @@ data class SettingsState(
     val sessionCountLabel: String = "0",
     val prCountLabel: String = "0",
     val bodyweightLabel: String = "—",
+    /** "−0.4 kg a week" or a prompt to weigh in — the trend, never a target. */
+    val bodyweightDetail: String = "Log a weigh-in to start the trend",
     /** "Build muscle · 4 days · 60 min" — the plan, readable without tapping in. */
     val planSummary: String = "—",
     val plateSummary: String = "—",
-    val useMetric: Boolean = true,
     val equipmentSummary: String = "—",
     val restSummary: String = "—",
     val deloadPromptsEnabled: Boolean = true,
@@ -58,6 +62,7 @@ class SettingsViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
     private val programDao: ProgramDao,
+    private val bodyweightDao: BodyweightDao,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
@@ -81,6 +86,7 @@ class SettingsViewModel @Inject constructor(
             val firstSessionAt = sessionDao.firstSessionStartedAt()
             val meso = programDao.getActiveMesocycle()
             val prCount = countPrsThisBlock(meso?.startedAt)
+            val trend = BodyweightTrends.compute(bodyweightDao.getAll())
 
             _state.value = SettingsState(
                 sinceLabel = firstSessionAt
@@ -89,13 +95,24 @@ class SettingsViewModel @Inject constructor(
                 headline = buildHeadline(sessionCount),
                 sessionCountLabel = sessionCount.toString(),
                 prCountLabel = if (meso == null) "—" else prCount.toString(),
-                bodyweightLabel = "${formatKg(profile.bodyweightKg)} kg",
+                bodyweightLabel = trend.averageKg?.let { "${formatKg(it)} kg" } ?: "—",
+                bodyweightDetail = trend.weeklyChangeKg?.let { perWeek ->
+                    val amount = "%.1f".format(kotlin.math.abs(perWeek))
+                    when {
+                        perWeek <= -0.05 -> "Down $amount kg a week"
+                        perWeek >= 0.05 -> "Up $amount kg a week"
+                        else -> "Holding steady"
+                    } + " · with your lifts beside it"
+                } ?: if (trend.points.isEmpty()) {
+                    "Log a weigh-in to start the trend"
+                } else {
+                    "Trend appears after two to three weeks"
+                },
                 planSummary = describePlan(profile),
                 plateSummary = describePlates(available),
-                useMetric = profile.useMetric,
                 equipmentSummary = "${available.size} item${plural(available.size)}",
                 restSummary = "Set by your plan",
-                deloadPromptsEnabled = _state.value.deloadPromptsEnabled,
+                deloadPromptsEnabled = profile.stallPromptsEnabled,
                 backupSummary = if (sessionCount == 0) {
                     "Nothing logged yet"
                 } else {
@@ -126,7 +143,7 @@ class SettingsViewModel @Inject constructor(
         val goal = when (profile.goal) {
             Goal.STRENGTH -> "Get stronger"
             Goal.HYPERTROPHY -> "Build muscle"
-            Goal.LEAN -> "Lean"
+            Goal.LEAN -> "Leaner & stronger"
             Goal.GENERAL -> "Generally fitter"
         }
         return "$goal · ${profile.daysPerWeek} days · ${profile.sessionCeilingMinutes} min"
@@ -148,7 +165,8 @@ class SettingsViewModel @Inject constructor(
      */
     private suspend fun countPrsThisBlock(blockStartedAt: Long?): Int {
         if (blockStartedAt == null) return 0
-        val byExercise = exerciseDao.getTrainedExerciseIds().associateWith { exerciseId ->
+        val conditioning = exerciseDao.getAll().filter { it.isConditioning }.mapTo(mutableSetOf()) { it.id }
+        val byExercise = exerciseDao.getTrainedExerciseIds().filter { it !in conditioning }.associateWith { exerciseId ->
             sessionDao.getWorkingSetsForExercise(exerciseId).filter { it.reps in 1..12 }
         }
 
@@ -167,16 +185,16 @@ class SettingsViewModel @Inject constructor(
         return count
     }
 
-    fun toggleUnits() {
-        viewModelScope.launch {
-            val profile = profileDao.get() ?: return@launch
-            profileDao.upsert(profile.copy(useMetric = !profile.useMetric))
-            refresh()
-        }
-    }
-
+    /**
+     * Persisted on the profile and read by Today. It used to live only in this
+     * ViewModel: it reset on every launch and the stall screen never consulted it.
+     */
     fun setDeloadPrompts(enabled: Boolean) {
         _state.value = _state.value.copy(deloadPromptsEnabled = enabled)
+        viewModelScope.launch {
+            val profile = profileDao.get() ?: return@launch
+            profileDao.upsert(profile.copy(stallPromptsEnabled = enabled))
+        }
     }
 
     fun toggleEquipment(equipmentId: String) {

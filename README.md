@@ -76,6 +76,13 @@ adapts it from your own history.
   lifted.
 - **Explains itself** — every slot can render its own prescription in a sentence, and every
   load change says what earned it. No black boxes.
+- **Leaner and stronger** — a goal built for losing fat while the bar keeps moving: heavy
+  5–8 rep compounds on load progression, dense accessories, and a short conditioning
+  finisher every session that progresses by the minute. Bodyweight and waist are logged as a
+  7-day-average trend and read beside the strength trend — never as a target.
+- **Weeks that bend** — a week is its sessions, not fixed weekdays. Miss Tuesday and Thursday
+  offers what was missed; a rest day offers the next session as "train anyway".
+- **Starting weights** — tell it what you already lift once, and every session opens there.
 - **Changeable** — goal, days per week, session length, priority muscles and which weekdays
   you train are all editable afterwards. Rebuilding the plan keeps your history and carries
   your loads forward.
@@ -148,7 +155,7 @@ commit to it — pick four days at sixty minutes and the screen tells you, live,
 Upper/Lower twice each at 18–22 sets a session.
 
 ```
-goal  →  schedule  →  equipment  →  who picks the exercises?  →  ⟨ plan library ⟩
+goal  →  schedule  →  about you  →  equipment  →  who picks the exercises?  →  ⟨ plan library ⟩
 ```
 
 The equipment step is the one that matters most and the one every other app gets wrong. It

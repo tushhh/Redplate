@@ -17,6 +17,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +49,8 @@ data class SessionSummaryState(
     val progressionChanges: List<ProgressionChange>,
     val volumeRows: List<VolumeRow>,
     val volumeCoachLine: String,
+    /** What the user wrote about the session — "left shoulder tight", "slept badly". */
+    val note: String? = null,
 )
 
 /**
@@ -75,8 +80,24 @@ fun SessionSummaryRoute(
     viewModel: SessionSummaryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var editingNote by rememberSaveable { mutableStateOf(false) }
     state?.let {
-        SessionSummaryScreen(state = it, onSeeLog = onSeeLog, onDone = onDone)
+        SessionSummaryScreen(
+            state = it,
+            onSeeLog = onSeeLog,
+            onDone = onDone,
+            onAddNote = { editingNote = true },
+        )
+        if (editingNote) {
+            NoteSheet(
+                initial = it.note.orEmpty(),
+                onSave = { text ->
+                    viewModel.saveNote(text)
+                    editingNote = false
+                },
+                onDismiss = { editingNote = false },
+            )
+        }
     }
 }
 
@@ -85,6 +106,7 @@ fun SessionSummaryScreen(
     state: SessionSummaryState,
     onSeeLog: () -> Unit,
     onDone: () -> Unit,
+    onAddNote: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -196,6 +218,25 @@ fun SessionSummaryScreen(
                 }
             }
 
+            if (state.note != null) {
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .padding(horizontal = 17.dp, vertical = 14.dp),
+                ) {
+                    SectionLabel(text = "Your note")
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        text = state.note,
+                        style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 21.sp),
+                        color = colors.inkBright,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
         }
 
@@ -204,10 +245,16 @@ fun SessionSummaryScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SecondaryButton(
                 label = "See the log",
                 onClick = onSeeLog,
+                modifier = Modifier.weight(1f),
+            )
+            SecondaryButton(
+                label = if (state.note == null) "Add a note" else "Edit note",
+                onClick = onAddNote,
                 modifier = Modifier.weight(1f),
             )
         }

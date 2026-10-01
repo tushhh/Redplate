@@ -8,16 +8,42 @@ package dev.redplate.data
 object CuratedExerciseSeed {
 
     fun seed(): List<ExerciseEntity> = buildList {
-        // ── Stairmill ──
-        add(exercise("stairmill_climbing", "Stair Climbing", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.CALVES), "stairmill", MovementPattern.SQUAT, compound = true, fatigue = 3))
-
-        // ── Treadmill ──
-        add(exercise("treadmill_incline_walk", "Incline Walking", MuscleGroup.GLUTES, listOf(MuscleGroup.CALVES, MuscleGroup.HAMSTRINGS), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 2))
-        add(exercise("treadmill_jog", "Easy Jog", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 2))
-        add(exercise("treadmill_interval_run", "Interval Running", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill", MovementPattern.CARRY, compound = true, fatigue = 4))
-
-        // ── Concept2 Rower ──
-        add(exercise("rower_full_body", "Rowing (Full Body)", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.QUADS, MuscleGroup.BICEPS), "concept2_rower", MovementPattern.HORIZONTAL_PULL, compound = true, fatigue = 3))
+        // ── Conditioning (cardio machines) ──
+        // Prescribed in minutes as a short finisher, never as a strength slot. They carry
+        // MovementPattern.CONDITIONING, which is what keeps them out of PRs, out of muscle
+        // volume, and out of the swap list for a squat. The instructions say how hard,
+        // because "10 minutes on the bike" is not a prescription on its own.
+        add(conditioning("stairmill_climbing", "Stair Climbing", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.CALVES), "stairmill",
+            "Steady pace you could just about talk at — breathing hard, not gasping.\n" +
+                "Stand tall and drive through the whole foot; hands off the rails if you can.\n" +
+                "Last two minutes: one level up."))
+        add(conditioning("treadmill_incline_walk", "Incline Walking", MuscleGroup.GLUTES, listOf(MuscleGroup.CALVES, MuscleGroup.HAMSTRINGS), "treadmill",
+            "Incline 10–12%, a brisk walk around 5–6 km/h.\n" +
+                "Don't hold the rails — if you need them, drop the incline.\n" +
+                "Easy on recovery and still burns plenty. The best default after a heavy lift."))
+        add(conditioning("treadmill_jog", "Easy Jog", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill",
+            "Conversational pace — you should be able to speak in full sentences.\n" +
+                "1% incline. Short, quick steps rather than long strides."))
+        add(conditioning("treadmill_interval_run", "Interval Running", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill",
+            "Two minutes easy to warm up.\n" +
+                "Then 30 s fast, 60 s walking — repeat to the end of the time.\n" +
+                "Fast means hard but controlled, not a sprint you can't repeat."))
+        add(conditioning("rower_full_body", "Rowing (Full Body)", MuscleGroup.UPPER_BACK, listOf(MuscleGroup.LATS, MuscleGroup.QUADS, MuscleGroup.BICEPS), "concept2_rower",
+            "Damper 4–5. Legs, then body, then arms; reverse it on the way back.\n" +
+                "Hold 22–26 strokes a minute at a pace you can keep for the whole time.\n" +
+                "Last minute: push the split down 5 seconds."))
+        add(conditioning("airbike_intervals", "Air Bike Intervals", MuscleGroup.QUADS, listOf(MuscleGroup.FRONT_DELTS, MuscleGroup.HAMSTRINGS), "airbike",
+            "Two minutes easy.\n" +
+                "Then 20 s hard, 40 s easy — repeat to the end of the time.\n" +
+                "Hard is arms and legs together; easy is a slow spin, not a stop."))
+        add(conditioning("skierg_intervals", "SkiErg Intervals", MuscleGroup.LATS, listOf(MuscleGroup.TRICEPS, MuscleGroup.ABS), "skierg",
+            "Hinge at the hips and pull with the whole body, not just the arms.\n" +
+                "30 s strong, 30 s easy — repeat to the end of the time.\n" +
+                "Spares the legs, which makes it the finisher for a lower-body day."))
+        add(conditioning("crosstrainer_steady", "Crosstrainer", MuscleGroup.QUADS, listOf(MuscleGroup.GLUTES, MuscleGroup.FRONT_DELTS), "crosstrainer",
+            "Steady effort, breathing hard but able to talk.\n" +
+                "Push and pull the handles — the arms are half the work.\n" +
+                "Low impact: the one to pick when the knees or back are grumbling."))
 
         // ── Dual Adjustable Pulley ──
         add(exercise("cable_crossover_high", "Cable Crossover (High-to-Low)", MuscleGroup.CHEST, listOf(MuscleGroup.FRONT_DELTS), "dual_adjustable_pulley", MovementPattern.HORIZONTAL_PUSH, compound = false, fatigue = 2))
@@ -181,5 +207,30 @@ object CuratedExerciseSeed {
         fatigueCost = fatigue,
         isCompound = compound,
         defaultProgression = ProgressionRule.DOUBLE_PROGRESSION,
+    )
+
+    /**
+     * A cardio-machine finisher. Not a compound, not progressed by load — its duration is
+     * what moves, through [FinisherProgression].
+     */
+    private fun conditioning(
+        id: String,
+        name: String,
+        primary: MuscleGroup,
+        secondary: List<MuscleGroup>,
+        equipment: String,
+        instructions: String,
+    ) = ExerciseEntity(
+        id = id,
+        name = name,
+        pattern = MovementPattern.CONDITIONING,
+        primaryMuscle = primary,
+        secondaryMuscles = secondary,
+        requiredEquipmentIds = listOf(equipment),
+        complexity = Complexity.BEGINNER,
+        fatigueCost = 2,
+        isCompound = false,
+        defaultProgression = ProgressionRule.NONE,
+        instructions = instructions,
     )
 }

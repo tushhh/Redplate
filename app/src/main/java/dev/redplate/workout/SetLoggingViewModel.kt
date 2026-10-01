@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.ExerciseEntity
+import dev.redplate.data.FinisherProgression
+import dev.redplate.data.ProgressionEngine
+import dev.redplate.data.isConditioning
 import dev.redplate.data.LoadUnit
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.loadUnit
@@ -53,9 +56,21 @@ class SetLoggingViewModel @Inject constructor(
     /** Set-log row ids that were PRs when logged. Not persisted on the entity, so tracked here. */
     private val prSetIds = MutableStateFlow<Set<Long>>(emptySet())
 
+    /** The chip tapped for each set logged here, so an undo restores "Failed" as "Failed". */
+    private val loggedDifficulty = mutableMapOf<Long, Difficulty?>()
+
     private var exercise: ExerciseEntity? = null
     private var equipment: EquipmentEntity? = null
     private var slot: TemplateSlotEntity? = null
+
+    /** Conditioning: minutes, not reps; no load, no PR, no muscle volume. */
+    private var isCardio = false
+
+    /**
+     * Set while a set is being written. Two quick taps on Done used to launch two writes
+     * that both read the same set index, logging the set twice.
+     */
+    private var completing = false
 
     /** Running order of the whole session, so the screen can move on when this lift is done. */
     private var sessionSlots: List<TemplateSlotEntity> = emptyList()
@@ -92,16 +107,21 @@ class SetLoggingViewModel @Inject constructor(
             slot = sl
             equipment = eq
 
-            val repHigh = sl?.repRangeHigh ?: DEFAULT_REP_HIGH
+            // Conditioning is prescribed in minutes, whether the plan put it there as a
+            // finisher or the user picked it freestyle.
+            val cardio = sl?.isCardioFinisher == true || ex?.isConditioning == true
+            isCardio = cardio
+            val repHigh = sl?.repRangeHigh ?: if (cardio) FinisherProgression.START_MINUTES else DEFAULT_REP_HIGH
             val startLoad = resolveStartLoad(sl, eq)
 
-            val targetSets = sl?.targetSets ?: DEFAULT_TARGET_SETS
-            val repLow = sl?.repRangeLow ?: DEFAULT_REP_LOW
+            val targetSets = sl?.targetSets ?: if (cardio) 1 else DEFAULT_TARGET_SETS
+            val repLow = sl?.repRangeLow ?: if (cardio) FinisherProgression.START_MINUTES else DEFAULT_REP_LOW
 
             _state.update {
                 it.copy(
                     isLoading = false,
-                    isCardioFinisher = sl?.isCardioFinisher == true,
+                    isCardioFinisher = cardio,
+                    isFreestyle = slotIndex < 0,
                     exerciseId = exerciseId,
                     exerciseName = ex?.name ?: "Exercise",
                     primaryMuscle = ex?.primaryMuscle ?: dev.redplate.data.MuscleGroup.CHEST,
@@ -121,8 +141,13 @@ class SetLoggingViewModel @Inject constructor(
                     targetRir = sl?.targetRir,
                     headerSubtitle = buildHeaderSubtitle(1, targetSets, repLow, repHigh, targetSets),
                     coachReasoningLine = if (sl?.workingLoadKg != null) "Prescribed weight —" else "",
-                    reps = repHigh,
-                    rir = sl?.targetRir,
+                    // A lift opens at the top of its range so the stepper only ever comes
+                    // down; a finisher opens at its target minutes.
+                    reps = if (cardio) repLow else repHigh,
+                    // A finisher opens with no effort picked, so an untouched chip row is
+                    // logged as unreported and does not earn a minute. Lifts keep the
+                    // prescription pre-filled, as they always have.
+                    rir = if (cardio) null else sl?.targetRir,
                     loadKg = startLoad,
                     isPlateLoaded = eq?.loadingScheme == LoadingScheme.PLATE_LOADED,
                     // The readout says what the machine says. Bodyweight and banded work
@@ -138,7 +163,9 @@ class SetLoggingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     nextExerciseName = nextName,
-                    substitutes = ex?.let { e -> loadSubstitutes(e) }.orEmpty(),
+                    substitutes = ex?.let { e ->
+                        if (cardio) loadConditioningSwaps(e) else loadSubstitutes(e)
+                    }.orEmpty(),
                     guidanceMuscleTags = ex?.let { e ->
                         listOf(e.primaryMuscle) + e.secondaryMuscles
                     }?.map { m -> m.name.replace('_', ' ') }.orEmpty(),
@@ -181,6 +208,30 @@ class SetLoggingViewModel @Inject constructor(
                     name = candidate.name,
                     equipmentLabel = repo.getPrimaryEquipment(candidate)?.displayName
                         ?: "No equipment",
+                    overlapPercent = overlapPercent(current, candidate),
+                    startImageUri = mediaResolver.startImage(candidate.id),
+                    endImageUri = mediaResolver.endImage(candidate.id),
+                    primaryMuscle = candidate.primaryMuscle,
+                )
+            }
+    }
+
+    /**
+     * A finisher swaps for another finisher — the treadmill is taken, so the bike. Ranked
+     * by overlap like any swap, but drawn only from conditioning, so a squat can never be
+     * offered in place of ten minutes on the rower.
+     */
+    private suspend fun loadConditioningSwaps(current: ExerciseEntity): List<SubstituteOption> {
+        val alreadyInSession = sessionSlots.mapTo(mutableSetOf()) { it.exerciseId }
+        return repo.availableConditioning()
+            .filter { it.id != current.id && it.id !in alreadyInSession }
+            .sortedByDescending { overlapPercent(current, it) }
+            .take(MAX_SUBSTITUTES)
+            .map { candidate ->
+                SubstituteOption(
+                    exerciseId = candidate.id,
+                    name = candidate.name,
+                    equipmentLabel = repo.getPrimaryEquipment(candidate)?.displayName ?: "No equipment",
                     overlapPercent = overlapPercent(current, candidate),
                     startImageUri = mediaResolver.startImage(candidate.id),
                     endImageUri = mediaResolver.endImage(candidate.id),
@@ -278,11 +329,17 @@ class SetLoggingViewModel @Inject constructor(
                             setNum, ts, it.repRangeLow, it.repRangeHigh, remaining
                         ),
                         restSubtitle = buildRestSubtitle(workingCount, remaining),
-                        coachReasoningLine = buildReasoningLine(logged, previous),
+                        coachReasoningLine = it.adjustmentNote
+                            ?.takeIf { workingCount > 0 }
+                            ?.substringBefore(" — ")
+                            ?.let { note -> "$note —" }
+                            ?: buildReasoningLine(logged, previous),
                         prBadgeText = if (hasPr && lastLogged != null)
                             "Best set you've done at ${formatKg(lastLogged.loadKg)} kg."
                         else null,
-                        restCoachText = buildRestCoachText(remaining, it.loadKg, it.nextExerciseName),
+                        restCoachText = buildRestCoachText(
+                            remaining, it.loadKg, it.nextExerciseName, it.adjustmentNote,
+                        ),
                         restPrimaryAction = action,
                         restPrimaryLabel = when (action) {
                             RestAction.NEXT_SET -> "I'm ready — set $setNum"
@@ -306,8 +363,20 @@ class SetLoggingViewModel @Inject constructor(
             ?: (_state.value.loadKg - 2.5).coerceAtLeast(0.0)
     )
 
+    /**
+     * The user moved the weight themselves, so the coach's own adjustment no longer
+     * describes what is on screen. The reasoning line is recomputed against the new load
+     * on the spot — it used to wait for the next logged set and keep saying "same weight"
+     * over a weight that had just changed.
+     */
     private fun setLoad(kg: Double) {
-        _state.update { it.copy(loadKg = kg) }
+        _state.update {
+            it.copy(
+                loadKg = kg,
+                adjustmentNote = null,
+                coachReasoningLine = buildReasoningLine(it.loggedSets, it.previousSets, kg),
+            )
+        }
         recomputePlates()
     }
 
@@ -354,8 +423,8 @@ class SetLoggingViewModel @Inject constructor(
     fun commitLoadEntry() {
         val state = _state.value
         val typed = state.loadEntry?.toDoubleOrNull() ?: return
-        _state.update { it.copy(loadEntry = null, loadKg = typed.coerceAtLeast(0.0)) }
-        recomputePlates()
+        _state.update { it.copy(loadEntry = null) }
+        setLoad(typed.coerceAtLeast(0.0))
     }
 
     private fun recomputePlates() {
@@ -393,47 +462,166 @@ class SetLoggingViewModel @Inject constructor(
 
     fun completeSet() {
         val s = _state.value
-        if (exercise == null || !s.canCompleteSet) return
+        if (exercise == null || !s.canCompleteSet || completing) return
+        completing = true
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-
-            val priorBest = if (!s.isWarmup) repo.priorBestE1rm(exerciseId) else null
-            val e1rm = s.loadKg * (1 + s.reps / 30.0)
-            val isPr = !s.isWarmup &&
-                s.loadKg > 0.0 &&
-                s.reps in 1..12 &&
-                (priorBest == null || e1rm > priorBest + 1e-6)
-
-            val id = repo.logSet(
-                SetLogEntity(
-                    sessionId = sessionId,
-                    exerciseId = exerciseId,
-                    setIndex = s.loggedSets.size,
-                    loadKg = if (s.isCardioFinisher) 0.0 else s.loadKg,
-                    reps = s.reps,
-                    rir = s.rir,
-                    isWarmup = s.isWarmup,
-                    completedAt = now,
-                    // How long the user actually rested before this set, not the
-                    // prescription. This column was always written null, which made it a
-                    // column that recorded nothing.
-                    restTakenSeconds = restTakenBefore(now),
-                )
-            )
-            if (isPr) prSetIds.update { it + id }
-            lastSetCompletedAt = now
-
-            _events.tryEmit(if (isPr) WorkoutEvent.PrHit else WorkoutEvent.SetLogged)
-
-            // After a warmup, default the next set back to working.
-            if (s.isWarmup) _state.update { it.copy(isWarmup = false) }
-
-            if (s.isCardioFinisher) {
-                // Finisher is always the last slot. No rest timer needed, just complete.
-                _events.tryEmit(WorkoutEvent.SessionFinished)
-            } else {
-                startRest()
+            try {
+                logCurrentSet(s)
+            } finally {
+                completing = false
             }
+        }
+    }
+
+    private suspend fun logCurrentSet(s: SetLoggingUiState) {
+        val now = System.currentTimeMillis()
+        val cardio = isCardio
+
+        // Conditioning earns no PR: its "reps" are minutes and it carries no load, so an
+        // estimated max would be a number about nothing. It used to compare the readout's
+        // phantom 20 kg against a logged 0 and fire a PR every single finisher.
+        val priorBest = if (!s.isWarmup && !cardio) repo.priorBestE1rm(exerciseId) else null
+        val e1rm = s.loadKg * (1 + s.reps / 30.0)
+        val isPr = !cardio && !s.isWarmup &&
+            s.loadKg > 0.0 &&
+            s.reps in 1..12 &&
+            (priorBest == null || e1rm > priorBest + 1e-6)
+
+        // Decided before the write, so the rest screen that the write triggers already
+        // shows the adjusted weight rather than flickering from the old one.
+        val workingLogged = s.loggedSets.count { !it.isWarmup } + if (s.isWarmup) 0 else 1
+        val setsLeft = (s.targetSets - workingLogged).coerceAtLeast(0)
+        val advice = if (!cardio && !s.isWarmup && setsLeft > 0) adviseNextSet(s) else null
+        _state.update {
+            it.copy(
+                adjustmentNote = advice?.second,
+                loadKg = advice?.first ?: it.loadKg,
+            )
+        }
+        if (advice != null) recomputePlates()
+
+        val id = repo.logSet(
+            SetLogEntity(
+                sessionId = sessionId,
+                exerciseId = exerciseId,
+                setIndex = s.loggedSets.size,
+                loadKg = if (cardio) 0.0 else s.loadKg,
+                reps = s.reps,
+                rir = s.rir,
+                isWarmup = s.isWarmup,
+                completedAt = now,
+                // How long the user actually rested before this set, not the
+                // prescription. This column was always written null, which made it a
+                // column that recorded nothing.
+                restTakenSeconds = restTakenBefore(now),
+                countsTowardVolume = !cardio && !s.isWarmup && (s.rir == null || s.rir <= 3),
+            )
+        )
+        if (isPr) prSetIds.update { it + id }
+        lastSetCompletedAt = now
+
+        _events.tryEmit(if (isPr) WorkoutEvent.PrHit else WorkoutEvent.SetLogged)
+
+        // After a warmup, default the next set back to working.
+        if (s.isWarmup) _state.update { it.copy(isWarmup = false) }
+
+        loggedDifficulty[id] = s.difficulty
+
+        when {
+            // Freestyle: there is no running order to know this was the last thing, so it
+            // goes to the rest screen like any set, where "Finish session" is a choice and
+            // Back picks something else — a cardio warm-up must not end the session.
+            cardio && slotIndex < 0 -> startRest()
+
+            // A programmed finisher is one block of time with no rest after it: move
+            // straight on, or close the session when it is the last thing in it.
+            cardio -> _events.tryEmit(
+                if (nextSlot() != null) WorkoutEvent.AdvanceToNext else WorkoutEvent.SessionFinished,
+            )
+
+            else -> startRest()
+        }
+    }
+
+    /**
+     * COACHING.md §4: deviation is first-class. When a set lands well outside the range,
+     * the next one is adjusted now rather than at the end of the session — and the screen
+     * says why in one line.
+     *
+     * Two or more reps under the floor, or a failed rep, steps the load down one notch. Two
+     * or more over the ceiling with three or more in reserve steps it up one. Anything
+     * else leaves the weight where it is: inside the range, a hard last rep is the plan
+     * working.
+     */
+    private fun adviseNextSet(s: SetLoggingUiState): Pair<Double, String>? {
+        val sl = slot ?: return null
+        val eq = equipment
+        val load = s.loadKg
+        val unit = s.loadUnitLabel.lowercase()
+        val short = sl.repRangeLow - s.reps
+        val failed = s.difficulty == Difficulty.FAILED
+
+        if (short >= 2 || (failed && s.reps < sl.repRangeHigh)) {
+            val lighter = when {
+                eq == null -> (load - ProgressionEngine.MANUAL_STEP_KG).coerceAtLeast(0.0)
+                eq.isAssistance -> PlateMath.nextLoadUp(load, eq)
+                else -> PlateMath.nextLoadDown(load, eq)
+            }
+            if (kotlin.math.abs(lighter - load) < LOAD_EPSILON) return null
+            val why = if (short >= 2) {
+                "that set fell $short reps short of ${sl.repRangeLow}"
+            } else {
+                "that rep failed"
+            }
+            val verb = if (eq?.isAssistance == true) "More assistance" else "Down to ${formatKg(lighter)} $unit"
+            return lighter to "$verb — $why."
+        }
+
+        val over = s.reps - sl.repRangeHigh
+        if (over >= 2 && (s.rir ?: 0) >= 3) {
+            val heavier = when {
+                eq == null -> load + ProgressionEngine.MANUAL_STEP_KG
+                eq.isAssistance -> PlateMath.nextLoadDown(load, eq)
+                else -> PlateMath.nextLoadUp(load, eq)
+            }
+            if (kotlin.math.abs(heavier - load) < LOAD_EPSILON) return null
+            val verb = if (eq?.isAssistance == true) "Less assistance" else "Up to ${formatKg(heavier)} $unit"
+            return heavier to "$verb — ${s.reps} reps with ${s.rir} left is past the range."
+        }
+        return null
+    }
+
+    /**
+     * Takes back the last set of this lift. A mis-tap on Done used to be permanent: the
+     * repository could delete a set, but nothing on any screen could ask it to.
+     *
+     * The rest is cancelled and the input comes back pre-filled with what was removed,
+     * so correcting a wrong rep count is one tap and a stepper, not re-entering the set.
+     */
+    fun undoLastSet() {
+        if (completing) return
+        viewModelScope.launch {
+            val removed = repo.deleteLastSet(sessionId, exerciseId) ?: return@launch
+            prSetIds.update { it - removed.id }
+            skipRest()
+            // The next set's rest is measured from whatever came before the one removed.
+            lastSetCompletedAt = repo.getSetsForSession(sessionId)
+                .filter { it.exerciseId == exerciseId }
+                .maxOfOrNull { it.completedAt }
+            // "Failed the rep" and "All I had" both store 0 in reserve, so the chip comes
+            // back from what was tapped, not from the number.
+            val chip = loggedDifficulty.remove(removed.id)
+                ?: Difficulty.entries.firstOrNull { d -> d.rir.coerceAtLeast(0) == removed.rir }
+            _state.update {
+                it.copy(
+                    reps = removed.reps,
+                    loadKg = if (isCardio) it.loadKg else removed.loadKg,
+                    rir = removed.rir,
+                    difficulty = chip,
+                    adjustmentNote = null,
+                )
+            }
+            recomputePlates()
         }
     }
 
@@ -620,6 +808,7 @@ class SetLoggingViewModel @Inject constructor(
         group?.takeIf { it >= 1 }?.let { "SUPERSET " + ('A' + (it - 1)) }
 
     private fun buildHeaderSubtitle(setNum: Int, total: Int, repLow: Int, repHigh: Int, remaining: Int): String {
+        if (isCardio) return "FINISHER · $repLow MIN TARGET"
         return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
     }
 
@@ -636,8 +825,12 @@ class SetLoggingViewModel @Inject constructor(
      * including right after the user had changed the load — the one moment it is certainly
      * untrue. It now reads the load actually showing against the load actually logged.
      */
-    private fun buildReasoningLine(logged: List<LoggedSetLine>, previous: List<PreviousSetLine>): String {
-        val currentLoad = _state.value.loadKg
+    private fun buildReasoningLine(
+        logged: List<LoggedSetLine>,
+        previous: List<PreviousSetLine>,
+        currentLoad: Double = _state.value.loadKg,
+    ): String {
+        if (isCardio) return ""
         val lastWorking = logged.lastOrNull { !it.isWarmup }
         return when {
             lastWorking == null ->
@@ -653,10 +846,17 @@ class SetLoggingViewModel @Inject constructor(
         }
     }
 
-    private fun buildRestCoachText(remaining: Int, loadKg: Double, nextExercise: String?): String {
+    private fun buildRestCoachText(
+        remaining: Int,
+        loadKg: Double,
+        nextExercise: String?,
+        adjustment: String?,
+    ): String {
         val restLabel = ProgramGenerator.formatRest(slot?.restSeconds ?: DEFAULT_REST_SECONDS)
+        val unit = _state.value.loadUnitLabel.lowercase()
         return when {
-            remaining > 0 -> "$restLabel is the prescription. Next set: same ${formatKg(loadKg)} kg."
+            remaining > 0 && adjustment != null -> "$adjustment $restLabel rest, then go again."
+            remaining > 0 -> "$restLabel is the prescription. Next set: same ${formatKg(loadKg)} $unit."
             nextExercise != null -> "That's this lift done. $nextExercise is up next."
             else -> "Last set of the session. Nice work."
         }

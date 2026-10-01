@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.redplate.data.ExerciseDao
+import dev.redplate.data.ExerciseEntity
+import dev.redplate.data.FinisherProgression
+import dev.redplate.data.ProfileDao
+import dev.redplate.data.ProgramGenerator
+import dev.redplate.data.WorkoutRepository
+import dev.redplate.data.isConditioning
 import dev.redplate.data.MuscleGroup
 import dev.redplate.data.ProgramDao
 import dev.redplate.data.SessionDao
@@ -42,7 +48,35 @@ data class ProgramBuilderState(
     val effectSummary: String = "",
     val hasChanges: Boolean = false,
     val isLoading: Boolean = true,
+    /** The exercise picker, when it is open — for adding a lift or swapping one. */
+    val picker: PickerState? = null,
 )
+
+/** One exercise the picker can offer. */
+data class PickOption(
+    val exerciseId: String,
+    val name: String,
+    /** "CHEST PRESS MACHINE · CHEST" */
+    val detail: String,
+)
+
+data class PickerState(
+    /** Null when adding; the slot being replaced when swapping. */
+    val swapSlotId: Long?,
+    val title: String,
+    val query: String = "",
+    val options: List<PickOption> = emptyList(),
+) {
+    val visible: List<PickOption>
+        get() = if (query.isBlank()) {
+            options
+        } else {
+            options.filter {
+                it.name.contains(query.trim(), ignoreCase = true) ||
+                    it.detail.contains(query.trim(), ignoreCase = true)
+            }
+        }
+}
 
 @HiltViewModel
 class ProgramBuilderViewModel @Inject constructor(
@@ -51,6 +85,9 @@ class ProgramBuilderViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val sessionDao: SessionDao,
     private val trainingClock: TrainingClock,
+    private val profileDao: ProfileDao,
+    private val programGenerator: ProgramGenerator,
+    private val repo: WorkoutRepository,
 ) : ViewModel() {
 
     private val templateId: Long = savedStateHandle["templateId"] ?: 0L
@@ -89,6 +126,7 @@ class ProgramBuilderViewModel @Inject constructor(
                     effectSummary = summarise(effect),
                     hasChanges = rows.any { it.setsDelta != 0 },
                     isLoading = false,
+                    picker = _state.value.picker,
                 )
             }
         }
@@ -172,10 +210,14 @@ class ProgramBuilderViewModel @Inject constructor(
         )
     }
 
+    /** Sets on a lift; minutes on a finisher, which is always one block of time. */
     fun incrementSets(slotId: Long) {
         viewModelScope.launch {
             val slot = programDao.getSlotById(slotId) ?: return@launch
-            if (slot.targetSets < MAX_SETS) {
+            if (slot.isCardioFinisher) {
+                val minutes = (slot.repRangeLow + 1).coerceAtMost(FinisherProgression.MAX_MINUTES)
+                programDao.updateSlot(slot.copy(repRangeLow = minutes, repRangeHigh = minutes))
+            } else if (slot.targetSets < MAX_SETS) {
                 programDao.updateSlot(slot.copy(targetSets = slot.targetSets + 1))
             }
         }
@@ -184,17 +226,108 @@ class ProgramBuilderViewModel @Inject constructor(
     fun decrementSets(slotId: Long) {
         viewModelScope.launch {
             val slot = programDao.getSlotById(slotId) ?: return@launch
-            if (slot.targetSets > 1) {
+            if (slot.isCardioFinisher) {
+                val minutes = (slot.repRangeLow - 1).coerceAtLeast(FinisherProgression.MIN_MINUTES)
+                programDao.updateSlot(slot.copy(repRangeLow = minutes, repRangeHigh = minutes))
+            } else if (slot.targetSets > 1) {
                 programDao.updateSlot(slot.copy(targetSets = slot.targetSets - 1))
             }
         }
     }
 
-    fun deleteSlot(slotId: Long) {
+    /** Removes the slot being swapped, closing the picker. Order indices stay dense. */
+    fun removeSwappedSlot() {
+        val slotId = _state.value.picker?.swapSlotId ?: return
+        _state.value = _state.value.copy(picker = null)
         viewModelScope.launch {
             val slot = programDao.getSlotById(slotId) ?: return@launch
             programDao.deleteSlot(slot)
+            programDao.getSlots(templateId).forEachIndexed { index, s ->
+                if (s.orderIndex != index) programDao.updateSlot(s.copy(orderIndex = index))
+            }
         }
+    }
+
+    // ── Adding and swapping (plan §04: "swap exercises, change set counts") ──
+
+    /** Every lift the gym can support that is not already in this session. */
+    fun openAdd() {
+        viewModelScope.launch {
+            val inSession = _state.value.slots.mapTo(mutableSetOf()) { it.slot.exerciseId }
+            val strength = MuscleGroup.entries.flatMap { repo.availableExercisesForMuscle(it) }
+            val options = (strength + repo.availableConditioning())
+                .filter { it.id !in inSession }
+                .distinctBy { it.id }
+                .sortedWith(compareBy({ it.isConditioning }, { it.primaryMuscle.ordinal }, { it.name }))
+            _state.value = _state.value.copy(
+                picker = PickerState(
+                    swapSlotId = null,
+                    title = "Add to ${_state.value.sessionName}",
+                    options = options.map { it.toOption() },
+                ),
+            )
+        }
+    }
+
+    /**
+     * What could replace a slot: lifts for the same muscle, or other conditioning for a
+     * finisher. The slot keeps its sets and progression rule (see
+     * [ProgramGenerator.replaceSlotExercise]).
+     */
+    fun openSwap(slotId: Long) {
+        viewModelScope.launch {
+            val slot = programDao.getSlotById(slotId) ?: return@launch
+            val current = exerciseDao.getById(slot.exerciseId) ?: return@launch
+            val inSession = _state.value.slots.mapTo(mutableSetOf()) { it.slot.exerciseId }
+            val candidates = if (slot.isCardioFinisher || current.isConditioning) {
+                repo.availableConditioning()
+            } else {
+                repo.availableExercisesForMuscle(current.primaryMuscle)
+            }
+            _state.value = _state.value.copy(
+                picker = PickerState(
+                    swapSlotId = slotId,
+                    title = "Swap ${current.name}",
+                    options = candidates
+                        .filter { it.id !in inSession }
+                        .sortedWith(compareByDescending<ExerciseEntity> { it.isCompound == current.isCompound }.thenBy { it.name })
+                        .map { it.toOption() },
+                ),
+            )
+        }
+    }
+
+    fun setPickerQuery(query: String) {
+        val picker = _state.value.picker ?: return
+        _state.value = _state.value.copy(picker = picker.copy(query = query))
+    }
+
+    fun closePicker() {
+        _state.value = _state.value.copy(picker = null)
+    }
+
+    fun pick(exerciseId: String) {
+        val picker = _state.value.picker ?: return
+        _state.value = _state.value.copy(picker = null)
+        viewModelScope.launch {
+            val profile = profileDao.get() ?: return@launch
+            val swap = picker.swapSlotId
+            if (swap != null) {
+                programGenerator.replaceSlotExercise(swap, exerciseId, profile)
+            } else {
+                programGenerator.appendSlot(templateId, exerciseId, profile)
+            }
+        }
+    }
+
+    private suspend fun ExerciseEntity.toOption(): PickOption {
+        val station = repo.describeStation(this)?.uppercase()
+        val muscle = if (isConditioning) "CARDIO" else primaryMuscle.name.replace('_', ' ')
+        return PickOption(
+            exerciseId = id,
+            name = name,
+            detail = listOfNotNull(station, muscle).joinToString(" · "),
+        )
     }
 
     private companion object {

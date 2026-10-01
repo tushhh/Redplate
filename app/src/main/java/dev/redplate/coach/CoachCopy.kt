@@ -31,6 +31,12 @@ object CoachCopy {
 
         const val FIRST_SESSION_VOLUME = "Fills in as you log. Trends need three sessions."
 
+        /** COACHING.md §1: plain, once, and not alarming. */
+        const val READINESS_NOTE =
+            "You flagged something on the readiness check, so nothing under five reps is " +
+                "prescribed. Worth getting the all-clear from a doctor or physio before " +
+                "you push hard."
+
         const val REST_DAY_HEADLINE = "Rest day. You've earned it."
 
         const val REST_DAY_NOTHING_LEFT = "No more sessions scheduled this week."
@@ -42,6 +48,15 @@ object CoachCopy {
         const val SAME_PLAN = "Same plan as last time — stay focused on form."
 
         fun nextSession(label: String) = "Next session is $label."
+
+        /**
+         * Today's card shows a session other than the one usually on this weekday —
+         * because one was missed, or trained early. Says so, so it doesn't read as a bug.
+         */
+        fun rotation(label: String) =
+            "$label is next in the rotation. Your week moves when the sessions are done, " +
+                "not by the calendar — a missed day shifts things along rather than " +
+                "dropping a session."
 
         fun volumeShort(muscle: String) = "$muscle is light this week — later sessions cover it."
 

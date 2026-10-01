@@ -3,11 +3,11 @@ package dev.redplate.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.selection.selectable
@@ -31,12 +31,14 @@ enum class RedplateTab(val label: String) {
 }
 
 /**
- * Bottom tab bar, 64 dp tall to meet the minimum touch target in CLAUDE.md §4.
- * Active tab = live orange, inactive = inkMuted. Hidden during full-bleed screens.
+ * Bottom tab bar — four words, no icons (designs 9a/10a). 64 dp tall to meet the minimum
+ * touch target in CLAUDE.md §4. Active tab = live orange at semibold, inactive = inkMuted.
+ * Hidden during full-bleed screens.
  *
- * Each tab fills the bar's full height. It previously wrapped its label, so the
- * tappable area was the ~16 dp of text rather than the bar — a miss with chalky
- * hands landed on nothing at all.
+ * Each tab fills the bar's full height and an equal share of its width, so a miss with
+ * chalky hands still lands on a tab. The icons the bar used to carry were drawn in
+ * Canvas at 22 dp and said nothing the words did not; the design dropped them for the
+ * larger, more legible label.
  */
 @Composable
 fun RedplateTabBar(
@@ -50,15 +52,15 @@ fun RedplateTabBar(
             .fillMaxWidth()
             .background(colors.ground)
             .navigationBarsPadding()
-            .height(TAB_BAR_HEIGHT),
+            .height(TAB_BAR_HEIGHT)
+            .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RedplateTab.entries.forEach { tab ->
             val selected = tab == selectedTab
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
@@ -70,26 +72,18 @@ fun RedplateTabBar(
                         onClick = { onTabSelected(tab) },
                     ),
             ) {
-                val tint = if (selected) colors.live else colors.inkMuted
-                when (tab) {
-                    RedplateTab.Today -> TodayIcon(tint)
-                    RedplateTab.Plan -> PlanIcon(tint)
-                    RedplateTab.History -> HistoryIcon(tint)
-                    RedplateTab.You -> YouIcon(tint)
-                }
-                Spacer(Modifier.height(3.dp))
                 Text(
                     text = tab.label,
-                    style = RedplateType.label.copy(
-                        fontSize = 10.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    style = RedplateType.body.copy(
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     ),
-                    color = tint,
+                    color = if (selected) colors.live else colors.inkMuted,
                 )
             }
         }
     }
 }
 
-/** Still the 64 dp minimum target of CLAUDE.md §4, with room for icon over label. */
-private val TAB_BAR_HEIGHT = 68.dp
+/** CLAUDE.md §4's 64 dp minimum, and the height the design's text-only bar needs. */
+private val TAB_BAR_HEIGHT = 64.dp

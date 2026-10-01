@@ -27,4 +27,5 @@ object DatabaseModule {
     @Provides fun provideProgramDao(db: RedplateDatabase): ProgramDao = db.programDao()
     @Provides fun provideSessionDao(db: RedplateDatabase): SessionDao = db.sessionDao()
     @Provides fun provideVolumeDao(db: RedplateDatabase): VolumeDao = db.volumeDao()
+    @Provides fun provideBodyweightDao(db: RedplateDatabase): BodyweightDao = db.bodyweightDao()
 }

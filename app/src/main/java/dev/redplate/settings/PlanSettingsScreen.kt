@@ -45,6 +45,7 @@ import dev.redplate.data.TrainingClock
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
+import dev.redplate.onboarding.TrainingExperience
 import dev.redplate.ui.components.SectionLabel
 import dev.redplate.ui.components.SecondaryButton
 import dev.redplate.ui.theme.RedplateTheme
@@ -58,6 +59,7 @@ fun PlanSettingsRoute(onDone: () -> Unit) {
     PlanSettingsScreen(
         state = state,
         onSetGoal = viewModel::setGoal,
+        onSetTrainingAge = viewModel::setTrainingAge,
         onSetDays = viewModel::setDaysPerWeek,
         onSetMinutes = viewModel::setSessionMinutes,
         onSetDayStartHour = viewModel::setDayStartHour,
@@ -84,6 +86,7 @@ fun PlanSettingsRoute(onDone: () -> Unit) {
 fun PlanSettingsScreen(
     state: PlanSettingsState,
     onSetGoal: (Goal) -> Unit = {},
+    onSetTrainingAge: (Int) -> Unit = {},
     onSetDays: (Int) -> Unit = {},
     onSetMinutes: (Int) -> Unit = {},
     onSetDayStartHour: (Int) -> Unit = {},
@@ -143,6 +146,19 @@ fun PlanSettingsScreen(
                 consequence = ::goalConsequence,
                 onSelect = onSetGoal,
             )
+            Spacer(Modifier.height(22.dp))
+
+            SectionLabel(text = "How long you've been lifting")
+            Spacer(Modifier.height(8.dp))
+            val experience = TrainingExperience.entries
+            val current = experience.minByOrNull { kotlin.math.abs(it.months - draft.trainingAgeMonths) }
+            ChipRow(
+                labels = listOf("<6 mo", "6–12 mo", "1–3 yr", "3+ yr"),
+                selectedIndex = experience.indexOf(current),
+                onSelect = { onSetTrainingAge(experience[it].months) },
+            )
+            Spacer(Modifier.height(6.dp))
+            Caption("Under a year: a set less on the big lifts and a shorter finisher.")
             Spacer(Modifier.height(22.dp))
 
             SectionLabel(text = "Days a week")
@@ -564,14 +580,14 @@ private val PRIORITY_MUSCLES = listOf(
 private fun goalLabel(goal: Goal): String = when (goal) {
     Goal.STRENGTH -> "Get stronger"
     Goal.HYPERTROPHY -> "Build muscle"
-    Goal.LEAN -> "Lean and conditioned"
+    Goal.LEAN -> "Leaner and stronger"
     Goal.GENERAL -> "Generally fitter"
 }
 
 private fun goalConsequence(goal: Goal): String = when (goal) {
     Goal.STRENGTH -> "Low reps, long rests, small weekly jumps"
     Goal.HYPERTROPHY -> "Moderate reps close to failure"
-    Goal.LEAN -> "Same reps, shorter rests, denser sessions"
+    Goal.LEAN -> "Heavy 5–8 rep compounds, dense accessories, a cardio finisher"
     Goal.GENERAL -> "A middle rep range for both"
 }
 
@@ -592,6 +608,7 @@ private fun patternLabel(pattern: MovementPattern): String = when (pattern) {
     MovementPattern.CARRY -> "Carry"
     MovementPattern.ISOLATION -> "Isolation"
     MovementPattern.CORE -> "Core"
+    MovementPattern.CONDITIONING -> "Cardio"
 }
 
 // ── Previews ────────────────────────────────────────────────────────

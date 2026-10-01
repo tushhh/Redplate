@@ -3,7 +3,11 @@ package dev.redplate.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.redplate.data.BodyweightDao
+import dev.redplate.data.BodyweightEntryEntity
 import dev.redplate.data.DatabaseSeeder
+import dev.redplate.data.RedplateDatabase
+import androidx.room.withTransaction
 import dev.redplate.data.EquipmentCategory
 import dev.redplate.data.EquipmentDao
 import dev.redplate.data.EquipmentEntity
@@ -28,6 +32,8 @@ class IntakeViewModel @Inject constructor(
     private val equipmentDao: EquipmentDao,
     private val programGenerator: ProgramGenerator,
     private val seeder: DatabaseSeeder,
+    private val bodyweightDao: BodyweightDao,
+    private val db: RedplateDatabase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(IntakeState())
@@ -67,6 +73,46 @@ class IntakeViewModel @Inject constructor(
     fun setDaysPerWeek(days: Int) = _state.update { it.copy(daysPerWeek = days) }
 
     fun setSessionMinutes(minutes: Int) = _state.update { it.copy(sessionMinutes = minutes) }
+
+    // ── About you ──
+
+    fun setExperience(experience: TrainingExperience) = _state.update { it.copy(experience = experience) }
+
+    fun setReadiness(flagged: Boolean) = _state.update { it.copy(readinessFlagged = flagged) }
+
+    fun bodyweightUp() = stepBodyweight(+BODYWEIGHT_STEP)
+
+    fun bodyweightDown() = stepBodyweight(-BODYWEIGHT_STEP)
+
+    /** The steppers start from a typical weight the first time, then walk half a kilo. */
+    private fun stepBodyweight(delta: Double) = _state.update {
+        val from = it.bodyweightKg ?: BODYWEIGHT_STEPPER_START
+        it.copy(bodyweightKg = (from + delta).coerceIn(BODYWEIGHT_RANGE))
+    }
+
+    fun startBodyweightEntry() = _state.update { it.copy(bodyweightEntry = "") }
+
+    fun cancelBodyweightEntry() = _state.update { it.copy(bodyweightEntry = null) }
+
+    fun appendBodyweightDigit(key: Char) = _state.update { state ->
+        val current = state.bodyweightEntry ?: return@update state
+        val next = when {
+            key.isDigit() -> current + key
+            key == '.' && !current.contains('.') -> if (current.isEmpty()) "0." else "$current."
+            else -> current
+        }
+        if (next.length > MAX_BODYWEIGHT_DIGITS) state else state.copy(bodyweightEntry = next)
+    }
+
+    fun backspaceBodyweightEntry() = _state.update { state ->
+        state.copy(bodyweightEntry = state.bodyweightEntry?.dropLast(1))
+    }
+
+    fun commitBodyweightEntry() = _state.update { state ->
+        val typed = state.bodyweightEntry?.toDoubleOrNull()?.takeIf { it in BODYWEIGHT_RANGE }
+            ?: return@update state
+        state.copy(bodyweightKg = typed, bodyweightEntry = null)
+    }
 
     fun toggleEquipment(equipmentId: String) {
         _state.update { state ->
@@ -118,9 +164,34 @@ class IntakeViewModel @Inject constructor(
      */
     fun finishIntake(onComplete: () -> Unit) {
         if (_state.value.isSaving) return
-        _state.update { it.copy(isSaving = true) }
+        _state.update { it.copy(isSaving = true, saveError = null) }
 
         viewModelScope.launch {
+            // A failure here used to leave the button disabled for good and the profile
+            // unwritten — stuck in onboarding with no way forward. Now it says so and the
+            // button comes back.
+            val result = runCatching { saveIntake() }
+            _state.update {
+                it.copy(
+                    isSaving = false,
+                    saveError = result.exceptionOrNull()?.let {
+                        "The plan couldn't be built. Nothing was saved — try again, and if " +
+                            "it keeps failing, untick a piece of equipment and retry."
+                    },
+                )
+            }
+            if (result.isSuccess) onComplete()
+        }
+    }
+
+    fun consumeSaveError() = _state.update { it.copy(saveError = null) }
+
+    /**
+     * One transaction, so the error sheet's "nothing was saved" is true: a failure leaves
+     * no half-applied inventory, no orphan plan, and no first weigh-in to duplicate on retry.
+     */
+    private suspend fun saveIntake() {
+        db.withTransaction {
             val s = _state.value
             // The same [PlanSettings] the "Your plan" screen edits, normalised by the same
             // rules. Intake and Settings write one shape of answer, not two.
@@ -128,14 +199,16 @@ class IntakeViewModel @Inject constructor(
                 goal = s.goal ?: Goal.HYPERTROPHY,
                 daysPerWeek = s.daysPerWeek,
                 sessionCeilingMinutes = s.sessionMinutes,
+                trainingAgeMonths = s.experience?.months ?: 0,
             ).normalised()
             val profile = plan.applyTo(
                 ProfileEntity(
-                    trainingAgeMonths = s.trainingAgeMonths,
+                    trainingAgeMonths = s.experience?.months ?: 0,
                     daysPerWeek = plan.daysPerWeek,
                     sessionCeilingMinutes = plan.sessionCeilingMinutes,
                     goal = plan.goal,
-                    bodyweightKg = s.bodyweightKg,
+                    bodyweightKg = s.bodyweightKg ?: 0.0,
+                    readinessFlagged = s.readinessFlagged == true,
                 )
             )
 
@@ -160,13 +233,24 @@ class IntakeViewModel @Inject constructor(
                 programGenerator.generate(profile)
             }
 
+            // The answer to "what do you weigh?" is the first point on the trend.
+            s.bodyweightKg?.let {
+                bodyweightDao.insert(
+                    BodyweightEntryEntity(measuredAt = System.currentTimeMillis(), weightKg = it),
+                )
+            }
+
             // Written last: the profile row is what MainScaffold watches to leave intake,
             // so anything the first screen needs must already exist when it appears.
             profileDao.upsert(profile)
-
-            _state.update { it.copy(isSaving = false) }
-            onComplete()
         }
+    }
+
+    private companion object {
+        const val BODYWEIGHT_STEP = 0.5
+        const val BODYWEIGHT_STEPPER_START = 80.0
+        val BODYWEIGHT_RANGE = 30.0..300.0
+        const val MAX_BODYWEIGHT_DIGITS = 5
     }
 }
 
@@ -174,17 +258,29 @@ data class IntakeState(
     val goal: Goal? = null,
     val daysPerWeek: Int = 4,
     val sessionMinutes: Int = 60,
-    val trainingAgeMonths: Int = 0,
-    val bodyweightKg: Double = 80.0,
+    /** Null until answered: a default here is how every user became an 80 kg beginner. */
+    val experience: TrainingExperience? = null,
+    val bodyweightKg: Double? = null,
+    /** Digits on the bodyweight keypad, or null when it is closed. */
+    val bodyweightEntry: String? = null,
+    /** The one-time readiness screen (COACHING.md §1). Null until answered. */
+    val readinessFlagged: Boolean? = null,
     val allEquipment: List<EquipmentEntity> = emptyList(),
     val selectedEquipmentIds: Set<String> = emptySet(),
-    val dumbbellStep: DumbbellStep = DumbbellStep.TWO_POINT_FIVE,
+    /**
+     * Opens on the rack as itemised. The seed transcribes the real gym — 10 to 40 kg in
+     * 2 kg steps — and defaulting to "2.5 kg steps" silently rewrote it into dumbbells
+     * that are not on the rack.
+     */
+    val dumbbellStep: DumbbellStep = DumbbellStep.AS_RACKED,
     val planChoice: PlanChoice = PlanChoice.GIVE_ME_A_PLAN,
     val equipmentFilter: EquipmentFilter = EquipmentFilter.ALL,
     val equipmentSearch: String = "",
     val selectedPresetId: String? = null,
     /** Guards the finish button: generating a plan writes a lot of rows. */
     val isSaving: Boolean = false,
+    /** Said plainly when building the plan failed; the button is usable again. */
+    val saveError: String? = null,
 ) {
     val selectedEquipmentCount: Int get() = selectedEquipmentIds.size
 

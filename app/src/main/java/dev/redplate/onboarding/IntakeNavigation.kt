@@ -8,7 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import dev.redplate.workout.LoadEntrySheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +37,7 @@ import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
 
 /**
- * The intake — designs 2c → 2d → 2e → 3a, and 3b when a plan is asked for.
+ * The intake — designs 2c → 2d → about you → 2e → 3a, and 3b when a plan is asked for.
  *
  * One question per screen, no keyboard, and every answer states its consequence. Nothing
  * is written until the last screen commits, so backing out of intake leaves no trace.
@@ -61,8 +67,35 @@ fun IntakeFlow(
                 consequence = state.consequence,
                 onSelectDays = viewModel::setDaysPerWeek,
                 onSelectMinutes = viewModel::setSessionMinutes,
+                onNext = { navController.navigate("aboutYou") },
+            )
+        }
+
+        composable("aboutYou") {
+            AboutYouScreen(
+                experience = state.experience,
+                bodyweightKg = state.bodyweightKg,
+                readinessFlagged = state.readinessFlagged,
+                onSelectExperience = viewModel::setExperience,
+                onBodyweightDown = viewModel::bodyweightDown,
+                onBodyweightUp = viewModel::bodyweightUp,
+                onEditBodyweight = viewModel::startBodyweightEntry,
+                onSetReadiness = viewModel::setReadiness,
                 onNext = { navController.navigate("equipment") },
             )
+            state.bodyweightEntry?.let { entry ->
+                LoadEntrySheet(
+                    entry = entry,
+                    unitLabel = "KG",
+                    allowsDecimal = true,
+                    canCommit = entry.toDoubleOrNull()?.let { it in 30.0..300.0 } == true,
+                    onDigit = viewModel::appendBodyweightDigit,
+                    onBackspace = viewModel::backspaceBodyweightEntry,
+                    onCommit = viewModel::commitBodyweightEntry,
+                    onDismiss = viewModel::cancelBodyweightEntry,
+                    title = "WHAT DO YOU WEIGH?",
+                )
+            }
         }
 
         // The first screen that reads seeded rows. Asking about an inventory that has not
@@ -126,6 +159,45 @@ fun IntakeFlow(
                 // Tapping a card selects it; the primary bar commits.
                 onSelectPreset = viewModel::selectPreset,
                 onConfirm = { viewModel.finishIntake(onIntakeComplete) },
+            )
+        }
+    }
+
+    state.saveError?.let { message ->
+        IntakeErrorSheet(message = message, onDismiss = viewModel::consumeSaveError)
+    }
+}
+
+/** Building the plan failed. Says what happened and what to try, then gets out of the way. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IntakeErrorSheet(message: String, onDismiss: () -> Unit) {
+    val colors = RedplateTheme.colors
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.surface,
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+        ) {
+            Column(Modifier.padding(horizontal = 22.dp)) {
+                MonoLabel(text = "THAT DIDN'T WORK")
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                    color = colors.inkSecondary,
+                )
+                Spacer(Modifier.height(14.dp))
+            }
+            PrimaryBar(
+                label = "Back to setup",
+                onClick = onDismiss,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
     }

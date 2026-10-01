@@ -8,6 +8,8 @@ import dev.redplate.data.EquipmentAvailability
 import dev.redplate.data.EquipmentEntity
 import dev.redplate.data.carriesLoad
 import dev.redplate.data.ExerciseEntity
+import dev.redplate.data.SessionEstimate
+import dev.redplate.data.isConditioning
 import dev.redplate.data.MediaResolver
 import dev.redplate.data.MuscleGroup
 import dev.redplate.data.ProfileDao
@@ -176,8 +178,10 @@ class ExercisePickerViewModel @Inject constructor(
     ): GeneratedSessionState {
         val slots = repo.getSlotsForTemplate(templateId)
         val weekly = repo.weeklyHardSetsPerMuscle()
-        val totalSets = slots.sumOf { it.targetSets }
-        val minutes = totalSets * MINUTES_PER_SET
+        val totalSets = slots.filterNot { it.isCardioFinisher }.sumOf { it.targetSets }
+        // The same estimate Today and the generator use — rest included, a finisher at
+        // its minutes — so the card and the session agree about how long this takes.
+        val minutes = SessionEstimate.minutes(slots)
 
         val rows = slots.map { slot ->
             val exercise = repo.getExercise(slot.exerciseId)
@@ -188,12 +192,22 @@ class ExercisePickerViewModel @Inject constructor(
                 orderIndex = slot.orderIndex + 1,
                 exerciseId = slot.exerciseId,
                 name = exercise?.name ?: slot.exerciseId,
-                prescription = buildString {
-                    append("${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh}")
-                    if (load != null) append(" · ${formatKg(load)} KG")
-                    append(" · ${slot.targetRir} RIR")
+                prescription = if (slot.isCardioFinisher || exercise?.isConditioning == true) {
+                    "${slot.repRangeLow} MIN · FINISHER"
+                } else {
+                    buildString {
+                        append("${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh}")
+                        if (load != null) append(" · ${formatKg(load)} KG")
+                        append(" · ${slot.targetRir} RIR")
+                    }
                 },
-                reason = exercise?.let { reasonFor(it, weekly) },
+                reason = exercise?.let {
+                    if (it.isConditioning) {
+                        "Conditioning to finish — hard, with something left."
+                    } else {
+                        reasonFor(it, weekly)
+                    }
+                },
             )
         }
 
@@ -375,15 +389,27 @@ class ExercisePickerViewModel @Inject constructor(
 
             val intent = browseIntent
             val scopeMuscle = when (intent) {
+                // A finisher's "muscle" is incidental; any conditioning will do.
                 is BrowseIntent.Swap -> all.firstOrNull { it.id == intent.currentExerciseId }
+                    ?.takeIf { !it.isConditioning }
                     ?.primaryMuscle
 
                 else -> _pickedMuscles.value.firstOrNull()
             }
 
+            // Swaps stay on their side of the line: a lift swaps for a lift, a finisher for
+            // a finisher. Otherwise a quads swap offered Easy Jog, and picking it turned a
+            // strength slot into a ten-minute treadmill block in the middle of the session.
+            val swapping = (intent as? BrowseIntent.Swap)
+                ?.let { swap -> all.firstOrNull { it.id == swap.currentExerciseId } }
+            val conditioningScope = swapping?.isConditioning
+
             val filters = _browser.value.activeFilters
             val query = _searchQuery.value.trim()
             val visible = all.filter { exercise ->
+                if (conditioningScope != null && exercise.isConditioning != conditioningScope) {
+                    return@filter false
+                }
                 val matchesQuery = query.isEmpty() ||
                     exercise.name.contains(query, ignoreCase = true)
                 val matchesKit = BrowseFilter.MY_KIT !in filters || isAvailable(exercise, equipment)
@@ -521,7 +547,6 @@ class ExercisePickerViewModel @Inject constructor(
     }
 
     private companion object {
-        const val MINUTES_PER_SET = 3
         const val KEY_SESSION_ID = "activeSessionId"
         const val KEY_TEMPLATE_ID = "generatedTemplateId"
     }

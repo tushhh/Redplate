@@ -154,6 +154,11 @@ screen. These are not suggestions.
 
 Steps 3 and 4 are the project. If set logging feels wrong at rep 8, nothing downstream matters.
 
+### Added after v1 (at the user's request)
+- **Leaner & stronger** goal with a conditioning finisher — COACHING.md §3.
+- **Bodyweight/waist trend** — logged and shown as 7-day averages beside the strength trend.
+  Never a target: no goal weight, BMI or calories (COACHING.md §1).
+
 ### Explicitly out of scope
 Social feed, program sharing, hosted video, cloud sync, LLM coaching, S Pen integration,
 Wear OS (until v1 is being used weekly).

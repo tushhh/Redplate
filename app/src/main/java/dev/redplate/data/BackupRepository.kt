@@ -44,6 +44,7 @@ class BackupRepository @Inject constructor(
             setLogs = db.sessionDao().getAllSetLogs(),
             volumeSnapshots = db.volumeDao().getAllSnapshots(),
             volumeLandmarks = db.volumeDao().getAllLandmarks(),
+            bodyweightEntries = db.bodyweightDao().getAll(),
         )
         return json.encodeToString(data)
     }
@@ -152,6 +153,7 @@ class BackupRepository @Inject constructor(
             db.programDao().deleteAllMesocycles()
             db.volumeDao().deleteAllSnapshots()
             db.volumeDao().deleteAllLandmarks()
+            db.bodyweightDao().deleteAll()
             db.exerciseDao().deleteAll()
             db.equipmentDao().deleteAll()
             db.profileDao().deleteAll()
@@ -166,6 +168,7 @@ class BackupRepository @Inject constructor(
             db.sessionDao().insertSetLogs(data.setLogs)
             db.volumeDao().upsertSnapshots(data.volumeSnapshots)
             db.volumeDao().upsertLandmarks(data.volumeLandmarks)
+            db.bodyweightDao().insertAll(data.bodyweightEntries)
         }
     }
 

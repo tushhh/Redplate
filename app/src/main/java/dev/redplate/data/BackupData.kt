@@ -16,6 +16,8 @@ data class BackupData(
     val setLogs: List<SetLogEntity> = emptyList(),
     val volumeSnapshots: List<VolumeSnapshotEntity> = emptyList(),
     val volumeLandmarks: List<VolumeLandmarkEntity> = emptyList(),
+    /** Added after v1 shipped. Defaulted, so a backup written before it still restores. */
+    val bodyweightEntries: List<BodyweightEntryEntity> = emptyList(),
 ) {
     companion object {
         /**

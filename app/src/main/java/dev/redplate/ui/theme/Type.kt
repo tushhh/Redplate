@@ -52,13 +52,17 @@ object RedplateType {
         textAlign = TextAlign.Center
     )
 
-    /** Working load. The single largest thing on the set screen after the timer. */
+    /**
+     * Working load. The single largest thing on the set screen after the timer — 64 sp,
+     * as design 8a draws it. The token said 56 while the set screen patched it to 64 in
+     * place, so every other readout using the token was a size the design never drew.
+     */
     val load = TextStyle(
         fontFamily = PlexCondensed,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 56.sp,
-        lineHeight = 58.sp,
-        letterSpacing = (-0.015).em,
+        fontSize = 64.sp,
+        lineHeight = 64.sp,
+        letterSpacing = (-0.02).em,
         fontFeatureSettings = "tnum"
     )
 

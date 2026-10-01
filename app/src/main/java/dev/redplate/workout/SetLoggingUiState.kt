@@ -11,6 +11,8 @@ import dev.redplate.data.PlateMath
 data class SetLoggingUiState(
     val isLoading: Boolean = true,
     val isCardioFinisher: Boolean = false,
+    /** No running order: a body-map or freestyle pick rather than a programmed day. */
+    val isFreestyle: Boolean = false,
 
     // ── Read-only prescription (top zone) ──
     val exerciseId: String = "",
@@ -52,6 +54,12 @@ data class SetLoggingUiState(
 
     /** Coach reasoning line above the load: "Same weight as your last set —" */
     val coachReasoningLine: String = "",
+
+    /**
+     * The in-session adjustment, when the last set landed outside the range:
+     * "Down to 57.5 kg — that set fell 3 reps short of 8." Null when the weight holds.
+     */
+    val adjustmentNote: String? = null,
 
     // ── Readout (signature element) ──
     val loadKg: Double = 20.0,
@@ -103,6 +111,9 @@ data class SetLoggingUiState(
     val restPrimaryAction: RestAction = RestAction.NEXT_SET,
 ) {
     val canCompleteSet: Boolean get() = !isLoading && reps >= 1
+
+    /** Something of this lift has been logged in this session, so it can be taken back. */
+    val canUndo: Boolean get() = loggedSets.isNotEmpty()
 
     val isEnteringLoad: Boolean get() = loadEntry != null
 
@@ -184,4 +195,7 @@ sealed interface WorkoutEvent {
     data object PrHit : WorkoutEvent
     data object RestComplete : WorkoutEvent
     data object SessionFinished : WorkoutEvent
+
+    /** A block of conditioning is done and something follows it: move straight on. */
+    data object AdvanceToNext : WorkoutEvent
 }

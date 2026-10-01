@@ -55,6 +55,18 @@ interface ExerciseDao {
     @Query("UPDATE exercises SET hasBeenIntroduced = 1 WHERE id = :id")
     suspend fun markIntroduced(id: String)
 
+    /**
+     * Removes seeded exercises that have left the seed, but only those nothing points at.
+     * One with logged sets or a slot in any plan is kept, so history never loses a name.
+     */
+    @Query("""
+        DELETE FROM exercises
+        WHERE id IN (:ids) AND isCustom = 0
+          AND id NOT IN (SELECT DISTINCT exerciseId FROM set_logs)
+          AND id NOT IN (SELECT DISTINCT exerciseId FROM template_slots)
+    """)
+    suspend fun deleteUnreferenced(ids: List<String>)
+
     /** Wipe (import only — must run inside the import transaction). */
     @Query("DELETE FROM exercises")
     suspend fun deleteAll()

@@ -16,7 +16,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.redplate.body.BodyweightRoute
 import dev.redplate.history.HistoryRoute
+import dev.redplate.plan.StartingWeightsRoute
 import dev.redplate.onboarding.IntakeFlow
 import dev.redplate.plan.ProgramBuilderRoute
 import dev.redplate.plan.WeekPlanRoute
@@ -65,6 +67,8 @@ private fun MainContent() {
         && currentRoute != "backup"
         && currentRoute != "equipment"
         && currentRoute != "plan-settings"
+        && currentRoute != "bodyweight"
+        && currentRoute != "startingWeights"
 
     // Derived from the back stack rather than assigned inside each composable{} block.
     // Writing state during composition is what that did before, and it left the
@@ -77,6 +81,8 @@ private fun MainContent() {
         currentRoute.startsWith("you") ||
             currentRoute == "backup" ||
             currentRoute == "equipment" ||
+            currentRoute == "bodyweight" ||
+            currentRoute == "startingWeights" ||
             currentRoute == "plan-settings" -> RedplateTab.You
 
         currentRoute.startsWith("plan") || currentRoute.startsWith("programBuilder") ->
@@ -124,6 +130,7 @@ private fun MainContent() {
                         onSeeSummary = { sessionId ->
                             navController.navigate("sessionSummary/$sessionId")
                         },
+                        onSetStartingWeights = { navController.navigate("startingWeights") },
                     )
                 }
 
@@ -229,7 +236,19 @@ private fun MainContent() {
                         // one screen that owns both.
                         onNavigateToEquipment = { navController.navigate("equipment") },
                         onNavigateToPlan = { navController.navigate("plan-settings") },
+                        onNavigateToBodyweight = { navController.navigate("bodyweight") },
+                        onNavigateToStartingWeights = { navController.navigate("startingWeights") },
                     )
+                }
+
+                // ── Leaner & stronger: bodyweight and waist beside the strength trend ──
+                composable("bodyweight") {
+                    BodyweightRoute(onBack = { navController.popBackStack() })
+                }
+
+                // ── What each lift opens at ──
+                composable("startingWeights") {
+                    StartingWeightsRoute(onDone = { navController.popBackStack() })
                 }
 
                 // ── Your plan (goal, days, session length, weekdays) ──

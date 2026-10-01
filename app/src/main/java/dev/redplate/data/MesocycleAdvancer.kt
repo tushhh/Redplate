@@ -160,7 +160,9 @@ class MesocycleAdvancer @Inject constructor(
         // logged volume is, so the ceiling is measured in the units it was written in.
         val planned = mutableMapOf<MuscleGroup, Double>()
         for (slot in slots) {
+            if (slot.isCardioFinisher) continue
             val exercise = exercises[slot.exerciseId] ?: continue
+            if (exercise.isConditioning) continue
             planned.merge(exercise.primaryMuscle, slot.targetSets * VolumeCredit.PRIMARY_CREDIT, Double::plus)
             exercise.secondaryMuscles.forEach {
                 planned.merge(it, slot.targetSets * VolumeCredit.SECONDARY_CREDIT, Double::plus)
@@ -173,7 +175,10 @@ class MesocycleAdvancer @Inject constructor(
 
         db.withTransaction {
             for (slot in slots) {
+                // A finisher progresses by minutes, per session, and never gains sets.
+                if (slot.isCardioFinisher) continue
                 val exercise = exercises[slot.exerciseId] ?: continue
+                if (exercise.isConditioning) continue
                 val logged = setsByExercise[slot.exerciseId].orEmpty()
                 val assessment = StrengthAssessment.assess(slot.exerciseId, logged, slot)
 
@@ -293,6 +298,9 @@ class MesocycleAdvancer @Inject constructor(
         db.withTransaction {
             for (template in templates) {
                 for (slot in programDao.getSlots(template.id)) {
+                    // The finisher keeps its minutes through a deload: it is already
+                    // short, and it is not what the deload is resting.
+                    if (slot.isCardioFinisher) continue
                     val equipment = exercises[slot.exerciseId]?.let { loadSourceFor(it) }
                     val deloadedLoad = slot.workingLoadKg?.let { load ->
                         equipment?.let { PlateMath.deload(load, DELOAD_FRACTION, it) }
@@ -346,12 +354,22 @@ class MesocycleAdvancer @Inject constructor(
         return BlockAdvance.BlockComplete(nextId)
     }
 
-    /** The heaviest working set logged per exercise in a block — what the next one starts from. */
+    /**
+     * What the next block starts each lift from: the heaviest load handled for real work
+     * in the block's accumulation weeks.
+     *
+     * "Real work" is a set of [MIN_SEED_REPS] or more. This used to take the heaviest load
+     * of any set at all, so one test single at a weight that could never be repeated for
+     * five became the next block's working load. Deload-week sessions are left out too —
+     * their loads are 20% down on purpose.
+     */
     private suspend fun achievedLoads(mesocycle: MesocycleEntity): Map<String, Double> {
         val sessions = sessionDao.getSessionsForMesocycle(mesocycle.id)
+            .filter { it.phase != BlockPhase.DELOAD }
         if (sessions.isEmpty()) return emptyMap()
+        val conditioning = exerciseDao.getAll().filter { it.isConditioning }.mapTo(mutableSetOf()) { it.id }
         return sessionDao.getSetsForSessions(sessions.map { it.id })
-            .filter { !it.isWarmup }
+            .filter { !it.isWarmup && it.reps >= MIN_SEED_REPS && it.exerciseId !in conditioning }
             .groupBy { it.exerciseId }
             .mapValues { (_, sets) -> sets.maxOf { it.loadKg } }
     }
@@ -361,6 +379,7 @@ class MesocycleAdvancer @Inject constructor(
         db.withTransaction {
             for (template in programDao.getAllTemplates().filter { it.mesocycleId == mesocycleId }) {
                 for (slot in programDao.getSlots(template.id)) {
+                    if (slot.isCardioFinisher) continue
                     val load = achieved[slot.exerciseId] ?: continue
                     programDao.updateSlot(slot.copy(workingLoadKg = load))
                 }
@@ -383,8 +402,17 @@ class MesocycleAdvancer @Inject constructor(
 
 
     companion object {
-        /** A started week that has not finished in this long has run out; move the block on. */
-        const val STALE_WEEK_DAYS = 7L
+        /**
+         * A started week that has not finished in this long has run out; move the block on.
+         *
+         * Ten days rather than seven so a four-session week trained at three sessions a
+         * calendar week still completes: the fourth session lands on day eight or nine,
+         * and Today offers it rather than the next week's opener (see TodayViewModel).
+         */
+        const val STALE_WEEK_DAYS = 10L
+
+        /** A set needs at least this many reps to count as what a lift can be worked at. */
+        const val MIN_SEED_REPS = 3
 
         /** No slot climbs past this however much headroom the muscle has. */
         const val MAX_SETS_PER_SLOT = 6

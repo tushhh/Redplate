@@ -14,10 +14,16 @@ enum class MuscleGroup {
     ABS, OBLIQUES, TRAPS, NECK
 }
 
+/**
+ * [CONDITIONING] is cardio work — a rower, a bike, a treadmill. It is a pattern of its own
+ * because it is prescribed in minutes, not reps, and nothing about it is a strength set:
+ * it earns no PR, credits no muscle volume, and is only ever swapped for other
+ * conditioning. Stored by name through [Converters], so adding it is not a schema change.
+ */
 @Serializable
 enum class MovementPattern {
     HORIZONTAL_PUSH, VERTICAL_PUSH, HORIZONTAL_PULL, VERTICAL_PULL,
-    SQUAT, HINGE, LUNGE, CARRY, ISOLATION, CORE
+    SQUAT, HINGE, LUNGE, CARRY, ISOLATION, CORE, CONDITIONING
 }
 
 @Serializable
@@ -78,9 +84,12 @@ val EquipmentEntity.loadUnit: LoadUnit
  * What the user is training for. Drives rep ranges, rest and volume distribution.
  *
  * Stored as its name through [Converters], so adding a value is not a schema change.
- * LEAN exists because the intake offers it as a distinct answer (design 2c); it is the
- * hypertrophy prescription with shorter rests, never a diet setting — COACHING.md §1
- * rules out weight targets entirely.
+ *
+ * LEAN is "leaner and stronger": strength-biased compounds (5–8 reps, load progression)
+ * so the bar keeps moving while bodyweight comes down, moderate-rep accessories on short
+ * rests, and a short conditioning finisher every session. It is a training prescription,
+ * never a diet setting — the app logs bodyweight as a trend but sets no calorie or
+ * weight targets (COACHING.md §1).
  */
 @Serializable
 enum class Goal { STRENGTH, HYPERTROPHY, LEAN, GENERAL }
@@ -138,7 +147,14 @@ data class ProfileEntity(
      * its first "week" as four days. This is the user's week, not the calendar's.
      */
     @ColumnInfo(defaultValue = "0")
-    val weekStartsOn: Int = TrainingClock.DEFAULT_WEEK_STARTS_ON
+    val weekStartsOn: Int = TrainingClock.DEFAULT_WEEK_STARTS_ON,
+    /**
+     * Whether Today may interrupt with the stall screen (design 9c). The You tab's
+     * "Deload prompts" switch used to live only in a ViewModel, so it reset on every
+     * launch and never reached the screen it claimed to control.
+     */
+    @ColumnInfo(defaultValue = "1")
+    val stallPromptsEnabled: Boolean = true,
 )
 
 // ---------------------------------------------------------------------------
@@ -290,6 +306,10 @@ data class ExerciseEntity(
     val isExcluded: Boolean = false              // injury / dislike
 )
 
+/** Cardio, prescribed in minutes rather than reps. See [MovementPattern.CONDITIONING]. */
+val ExerciseEntity.isConditioning: Boolean
+    get() = pattern == MovementPattern.CONDITIONING
+
 // ---------------------------------------------------------------------------
 // Programming: Mesocycle -> Week -> Session template -> prescribed slots
 // ---------------------------------------------------------------------------
@@ -375,12 +395,13 @@ data class TemplateSlotEntity(
     val workingLoadKg: Double? = null,
     val supersetGroup: Int? = null,
     /**
-     * True when this slot is a cardio finisher rather than a strength set.
+     * True when this slot is a conditioning finisher rather than a strength set.
      *
-     * When true: [repRangeLow]/[repRangeHigh] = target duration in minutes (not reps),
-     * [workingLoadKg] is ignored (no weight), [restSeconds] = 0 (always last slot).
-     * The set logging screen shows a duration stepper and effort chips instead of the
-     * load readout and RIR chips.
+     * When true: [repRangeLow] and [repRangeHigh] both hold the target duration in
+     * minutes, [targetSets] is 1, [workingLoadKg] is null, [restSeconds] is 0 and the
+     * slot sits last. Duration is what progresses — see [FinisherProgression] — and the
+     * set it logs earns no PR and no muscle volume. The set logging screen shows a
+     * duration stepper and effort chips instead of the load readout and RIR chips.
      */
     @ColumnInfo(defaultValue = "0")
     val isCardioFinisher: Boolean = false,
@@ -454,6 +475,23 @@ data class VolumeSnapshotEntity(
     val mev: Int,
     val mav: Int,
     val mrv: Int
+)
+
+/**
+ * One weigh-in. The "leaner" half of leaner-and-stronger, logged as a trend and never as a
+ * target: there is no goal weight, no BMI and no calorie figure anywhere in the app.
+ *
+ * [waistCm] is optional because a tape measure is not always to hand, and it is the more
+ * honest of the two numbers — bodyweight moves with water and food, a waist moves with fat.
+ */
+@Serializable
+@Entity(tableName = "bodyweight_entries", indices = [Index("measuredAt")])
+data class BodyweightEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Epoch millis UTC, like every timestamp in the database. */
+    val measuredAt: Long,
+    val weightKg: Double,
+    val waistCm: Double? = null,
 )
 
 @Serializable
