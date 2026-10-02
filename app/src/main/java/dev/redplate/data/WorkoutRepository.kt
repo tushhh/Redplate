@@ -1,5 +1,6 @@
 package dev.redplate.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -12,6 +13,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WorkoutRepository @Inject constructor(
+    private val db: RedplateDatabase,
     private val sessionDao: SessionDao,
     private val exerciseDao: ExerciseDao,
     private val equipmentDao: EquipmentDao,
@@ -19,6 +21,7 @@ class WorkoutRepository @Inject constructor(
     private val volumeRecorder: VolumeRecorder,
     private val trainingClock: TrainingClock,
     private val databaseCheckpoint: DatabaseCheckpoint,
+    private val progressionApplier: ProgressionApplier,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -54,18 +57,30 @@ class WorkoutRepository @Inject constructor(
 
     suspend fun getSession(id: Long): SessionEntity? = sessionDao.getSessionById(id)
 
+    suspend fun getSetsForSession(sessionId: Long): List<SetLogEntity> =
+        sessionDao.getSetsForSession(sessionId)
+
     /**
-     * Stamps the finish time and refreshes the block week's volume snapshot. A session
-     * without a finish time is still in progress.
+     * Stamps the finish time, writes what the session earned into the plan, and refreshes
+     * the block week's volume snapshot. A session without a finish time is still in
+     * progress.
      *
-     * The snapshot write lives here rather than on the summary screen because a session
-     * can be finished without the summary ever being opened, and `volume_snapshots` is
-     * what every volume readout in the app reads from.
+     * All three live here rather than on the summary screen because a session can be
+     * finished without the summary ever being opened. Progression is applied only the
+     * first time a session ends: finishing it again must not re-decide a lift whose load
+     * the weekly assessment has since moved.
      */
     suspend fun endSession(sessionId: Long, endedAt: Long) {
         val session = sessionDao.getSessionById(sessionId) ?: return
         val finished = if (session.endedAt == null) {
-            session.copy(endedAt = endedAt).also { sessionDao.updateSession(it) }
+            // One transaction: a session is never "finished" without its progression
+            // written, so the first-end-only rule can never strand a session's result.
+            db.withTransaction {
+                session.copy(endedAt = endedAt).also {
+                    sessionDao.updateSession(it)
+                    progressionApplier.applyOnFinish(it)
+                }
+            }
         } else {
             session
         }
@@ -86,13 +101,12 @@ class WorkoutRepository @Inject constructor(
      * squat to the half rack: a `BODYWEIGHT` fixture with no bar weight and no plates, so
      * no plate stack and progression stepping in the wrong increment.
      */
-    suspend fun getPrimaryEquipment(exercise: ExerciseEntity): EquipmentEntity? {
-        val declared = exercise.requiredEquipmentIds.mapNotNull { equipmentDao.getById(it) }
-        return declared.firstOrNull { it.carriesLoad && it.isAvailable }
-            ?: declared.firstOrNull { it.carriesLoad }
-            ?: declared.firstOrNull { it.isAvailable }
-            ?: declared.firstOrNull()
-    }
+    suspend fun getPrimaryEquipment(exercise: ExerciseEntity): EquipmentEntity? =
+        exercise.loadSource(
+            exercise.requiredEquipmentIds
+                .mapNotNull { equipmentDao.getById(it) }
+                .associateBy { it.id },
+        )
 
     /**
      * Where the lift happens, in the gym's own words: "Half Rack · Barbell".
@@ -119,6 +133,19 @@ class WorkoutRepository @Inject constructor(
     suspend fun logSet(set: SetLogEntity): Long = sessionDao.insertSetLog(set)
 
     suspend fun deleteSet(set: SetLogEntity) = sessionDao.deleteSetLog(set)
+
+    /**
+     * Takes back the most recent set of one lift in a session — the mis-tap undo. Returns
+     * the removed row, or null when there was nothing to remove.
+     */
+    suspend fun deleteLastSet(sessionId: Long, exerciseId: String): SetLogEntity? {
+        val last = sessionDao.getSetsForSession(sessionId)
+            .filter { it.exerciseId == exerciseId }
+            .maxByOrNull { it.completedAt }
+            ?: return null
+        sessionDao.deleteSetLog(last)
+        return last
+    }
 
     /**
      * Opens a session against a template — either a programmed day or the one the body
@@ -190,11 +217,23 @@ class WorkoutRepository @Inject constructor(
     suspend fun workingSetCountsByExercise(): Map<String, Int> =
         sessionDao.workingSetCountsByExercise().associate { it.exerciseId to it.setCount }
 
-    /** One-shot list of exercises for a muscle that the available equipment can support. */
+    /**
+     * One-shot list of strength exercises for a muscle that the available equipment can
+     * support. Conditioning is left out: an easy jog trains quads, but it is not a swap
+     * for a leg press.
+     */
     suspend fun availableExercisesForMuscle(muscle: MuscleGroup): List<ExerciseEntity> {
         val available = availableEquipmentIds()
         return exerciseDao.getAll()
-            .filter { it.primaryMuscle == muscle && !it.isExcluded }
+            .filter { it.primaryMuscle == muscle && !it.isExcluded && !it.isConditioning }
+            .filter { EquipmentAvailability.canPerform(it, available) }
+    }
+
+    /** Every conditioning option the gym can support — the swap list for a finisher. */
+    suspend fun availableConditioning(): List<ExerciseEntity> {
+        val available = availableEquipmentIds()
+        return exerciseDao.getAll()
+            .filter { it.isConditioning && !it.isExcluded }
             .filter { EquipmentAvailability.canPerform(it, available) }
     }
 

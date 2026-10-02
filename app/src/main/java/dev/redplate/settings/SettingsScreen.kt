@@ -16,6 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -29,7 +33,6 @@ import dev.redplate.ui.components.ConsequenceRow
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PillToggle
 import dev.redplate.ui.components.SectionLabel
-import dev.redplate.ui.components.SegmentedToggle
 import dev.redplate.ui.theme.RedplateTheme
 import dev.redplate.ui.theme.RedplateType
 
@@ -44,27 +47,42 @@ fun SettingsRoute(
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
     onNavigateToPlan: () -> Unit = {},
+    onNavigateToBodyweight: () -> Unit = {},
+    onNavigateToStartingWeights: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // A weigh-in or a plan change happens on another screen; this tab summarises both.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     SettingsScreen(
         state = state,
-        onToggleUnits = viewModel::toggleUnits,
         onSetDeloadPrompts = viewModel::setDeloadPrompts,
         onNavigateToBackup = onNavigateToBackup,
         onNavigateToEquipment = onNavigateToEquipment,
         onNavigateToPlan = onNavigateToPlan,
+        onNavigateToBodyweight = onNavigateToBodyweight,
+        onNavigateToStartingWeights = onNavigateToStartingWeights,
     )
 }
 
 @Composable
 fun SettingsScreen(
     state: SettingsState,
-    onToggleUnits: () -> Unit = {},
     onSetDeloadPrompts: (Boolean) -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToEquipment: () -> Unit = {},
     onNavigateToPlan: () -> Unit = {},
+    onNavigateToBodyweight: () -> Unit = {},
+    onNavigateToStartingWeights: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -95,14 +113,30 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionLabel(text = "Your plan")
+        SectionLabel(text = "Leaner and stronger")
         Spacer(Modifier.height(8.dp))
         ConsequenceRow(
-            label = "Goal, days and session length",
-            detail = "The answers your program is built from",
-            value = state.planSummary,
-            onClick = onNavigateToPlan,
+            label = "Bodyweight and waist",
+            detail = state.bodyweightDetail,
+            onClick = onNavigateToBodyweight,
         )
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel(text = "Your plan")
+        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ConsequenceRow(
+                label = "Goal, days and session length",
+                detail = "The answers your program is built from",
+                value = state.planSummary,
+                onClick = onNavigateToPlan,
+            )
+            ConsequenceRow(
+                label = "Starting weights",
+                detail = "What each lift opens at",
+                onClick = onNavigateToStartingWeights,
+            )
+        }
         Spacer(Modifier.height(24.dp))
 
         SectionLabel(text = "Gets the numbers wrong if wrong")
@@ -115,19 +149,6 @@ fun SettingsScreen(
                 detail = state.plateSummary,
                 value = state.equipmentSummary,
                 onClick = onNavigateToEquipment,
-            )
-            ConsequenceRow(
-                label = "Units",
-                detail = "Converts history, never re-rounds it",
-                onClick = null,
-                trailing = {
-                    SegmentedToggle(
-                        options = listOf("KG", "LB"),
-                        selectedIndex = if (state.useMetric) 0 else 1,
-                        onOptionSelected = { onToggleUnits() },
-                        segmentSize = 44.dp,
-                    )
-                },
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -201,7 +222,6 @@ private fun SettingsPreview() {
                 bodyweightLabel = "82.4 kg",
                 planSummary = "Build muscle · 4 days · 60 min",
                 plateSummary = "25·20·15·10·5·2.5·1.25",
-                useMetric = true,
                 equipmentSummary = "18 items",
                 restSummary = "Set by your plan",
                 deloadPromptsEnabled = true,

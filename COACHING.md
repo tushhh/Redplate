@@ -36,6 +36,15 @@ here does not get asked.
 - **Body-fat %, goal weight, calorie targets, BMI.** This is a training app, not a diet app.
   Do not display BMI, do not set weight-loss targets, do not gamify body composition.
   Progress is measured in load, reps and consistency.
+
+### Bodyweight and waist: a trend, never a target
+The user asked for "leaner" to be tracked, so bodyweight (and optionally waist) is logged —
+as a trend read beside the strength trend, never as a goal:
+- Every figure is built from 7-day averages; a single weigh-in is never interpreted.
+- The rate is stated as kg and % of bodyweight per week, with one rule of thumb: losing
+  more than ~1% a week usually costs strength. No calorie, macro or target figure anywhere.
+- The screen pairs it with how many lifts' e1RM rose, held or fell over the last four weeks,
+  because "leaner and stronger" is working when the average falls and the lifts keep rising.
 - Age and sex are optional and used only to widen default recovery assumptions. Never used to
   scale down prescriptions by default.
 
@@ -127,6 +136,19 @@ A set counts toward volume only if logged at **0–3 RIR**. Secondary muscles ge
 | Strength | 3–6 @ 1–3 RIR | 6–10 | 180–300 s | 90–120 s |
 | Hypertrophy | 6–10 @ 1–3 RIR | 10–15 | 120–180 s | 60–120 s |
 | General | 5–10 | 10–15 | 120–180 s | 60–90 s |
+| Leaner & stronger | 5–8 @ 2 RIR, load progression | 10–15 | 150 s | 75 s |
+
+**Leaner & stronger** (`Goal.LEAN`) keeps the compounds heavy — the load on the bar is what
+holds muscle while bodyweight drops — runs accessories dense, and ends every session with a
+**conditioning finisher**:
+- Picked from the gym's cardio machines to suit the day: after a lower-body day it spares the
+  legs (SkiErg, rower, crosstrainer); after an upper-body day it uses them (incline walk, air
+  bike, stairs). Varied across the week.
+- Prescribed in minutes (8 for novices, 10 otherwise, capped at 15) with an effort cue, never
+  reps or kilos. It earns no PR and credits no muscle volume.
+- Progresses by +1 minute when completed with effort reported and something left; holds when
+  it took everything. Never trimmed to fit the session ceiling — accessories go first.
+- Opting out: exclude the "Cardio" movement on the plan screen.
 
 Rest timer auto-starts on set completion, pre-loaded with the prescribed interval and freely
 adjustable. Evidence basis: rests under 60 s consistently blunt strength gains and reduce load
@@ -211,6 +233,13 @@ degrade silently if no handler exists.
 - **Load progression** (default for strength compounds): fixed increment per session while
   RIR target is met; two consecutive misses → 10% deload on that lift, ramp back.
 - **RIR autoregulation:** working load is scaled by the gap between prescribed and reported RIR.
+- **Load progression detail:** a set counts as clean when it makes the bottom of the range with
+  no more than one rep harder than the target RIR. An easy set steps the load; a grinder at
+  0 RIR repeats it.
+- **In-session adjustment:** a set 2+ reps under the range (or a failed rep) drops the next set
+  one equipment step; 2+ reps over the range at 3+ RIR raises it. The screen says why.
+- **When it is written:** progression is applied once, when the session is finished — not when
+  the summary is opened.
 - **Plateau detection:** no e1RM improvement across 3 consecutive sessions → flag, offer a swap,
   a load deload, or a volume adjustment. Do not silently keep prescribing the same thing.
 

@@ -7,6 +7,7 @@ import dev.redplate.data.LoadUnit
 import dev.redplate.data.LoadingScheme
 import dev.redplate.data.PlateMath
 import dev.redplate.data.carriesLoad
+import dev.redplate.data.isConditioning
 import dev.redplate.data.limbMultiplier
 import dev.redplate.data.loadUnit
 import org.junit.Assert.assertEquals
@@ -52,12 +53,12 @@ class ExerciseEquipmentMappingTest {
         val bodyweight = setOf(
             "bench_tricep_dip",
             "decline_sit_up", "hyperextension", "glute_focused_extension", "push_up",
-            "plank", "bodyweight_squat", "stairmill_climbing", "treadmill_incline_walk",
-            "treadmill_jog", "treadmill_interval_run",
-            "rower_full_body",
+            "plank", "bodyweight_squat",
         )
         for (exercise in exercises) {
             if (exercise.id in bodyweight || exercise.requiredEquipmentIds.isEmpty()) continue
+            // Conditioning is timed on a machine that carries no load: minutes, not kilos.
+            if (exercise.isConditioning) continue
             val source = exercise.requiredEquipmentIds
                 .mapNotNull { equipment[it] }
                 .firstOrNull { it.carriesLoad }

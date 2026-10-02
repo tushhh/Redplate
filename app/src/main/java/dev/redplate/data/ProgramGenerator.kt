@@ -68,7 +68,7 @@ class ProgramGenerator @Inject constructor(
                 )
                 programDao.insertSlots(
                     day.slots.mapIndexed { order, filled ->
-                        filled.toSlot(templateId, order, profile.goal)
+                        filled.toSlot(templateId, order, profile)
                     }
                 )
             }
@@ -137,7 +137,7 @@ class ProgramGenerator @Inject constructor(
             val slots = mutableListOf<TemplateSlotEntity>()
             val planned = mutableListOf<Pair<Int, Int>>()
             for ((exercise, compound) in chosen) {
-                val rx = Prescription.of(profile.goal, compound)
+                val rx = Prescription.of(profile.goal, compound, profile.readinessFlagged)
                 val sets = if (compound) 3 else 2
 
                 // Rest is most of a session's length, so the budget has to count it.
@@ -158,7 +158,7 @@ class ProgramGenerator @Inject constructor(
                     repRangeHigh = rx.repHigh,
                     targetRir = rx.targetRir,
                     restSeconds = rx.restSeconds,
-                    progression = ProgressionRule.DOUBLE_PROGRESSION,
+                    progression = progressionFor(profile.goal, compound),
                 )
             }
             programDao.insertSlots(slots)
@@ -220,22 +220,31 @@ class ProgramGenerator @Inject constructor(
                 val slots = programDao.getSlots(template.id).toMutableList()
                 var touched = false
 
-                while (slots.size > MIN_EXERCISES &&
+                // The finisher is never trimmed and always stays last.
+                while (slots.count { !it.isCardioFinisher } > MIN_EXERCISES &&
                     SessionEstimate.minutes(slots) > profile.sessionCeilingMinutes
                 ) {
                     val isolation = slots.indexOfLast {
-                        exercises[it.exerciseId]?.isCompound == false
+                        !it.isCardioFinisher && exercises[it.exerciseId]?.isCompound == false
                     }
-                    programDao.deleteSlot(slots.removeAt(if (isolation >= 0) isolation else slots.lastIndex))
+                    val lastLift = slots.indexOfLast { !it.isCardioFinisher }
+                    programDao.deleteSlot(slots.removeAt(if (isolation >= 0) isolation else lastLift))
                     touched = true
                 }
 
                 val present = slots.mapTo(mutableSetOf()) { it.exerciseId }
+                val hasFinisher = slots.any { it.isCardioFinisher }
                 for (candidate in fullPlan.getOrNull(index)?.slots.orEmpty()) {
                     if (candidate.exercise.id in present) continue
-                    val addition = candidate.toSlot(template.id, slots.size, profile.goal)
+                    // One finisher a day: a swapped finisher must not be joined by the
+                    // one the generator would have picked.
+                    if (candidate.isCardioFinisher && hasFinisher) continue
+                    val addition = candidate.toSlot(template.id, slots.size, profile)
                     if (SessionEstimate.minutes(slots + addition) > profile.sessionCeilingMinutes) break
-                    slots += addition.copy(id = programDao.insertSlot(addition))
+                    val at = slots.indexOfFirst { it.isCardioFinisher }
+                        .takeIf { it >= 0 && !addition.isCardioFinisher }
+                        ?: slots.size
+                    slots.add(at, addition.copy(id = programDao.insertSlot(addition)))
                     present += candidate.exercise.id
                     touched = true
                 }
@@ -295,6 +304,8 @@ class ProgramGenerator @Inject constructor(
         db.withTransaction {
             for (template in templates) {
                 for (slot in programDao.getSlots(template.id)) {
+                    // A finisher has minutes, not a load.
+                    if (slot.isCardioFinisher) continue
                     if (slot.workingLoadKg != null && !overwrite) continue
                     val load = sessionDao.getLatestWorkingSet(slot.exerciseId)?.loadKg ?: continue
                     programDao.updateSlot(slot.copy(workingLoadKg = load))
@@ -325,6 +336,7 @@ class ProgramGenerator @Inject constructor(
             // back compound with "Rowing (Full Body), 3 × 6–10 at 2 in reserve" — a
             // prescription that cannot be followed on a Concept2.
             .filterNot { exercise -> exercise.requiredEquipmentIds.any { it in cardio } }
+            .filterNot { it.isConditioning }
             // Sort by the load-bearing equipment's selectionPriority so dedicated machines
             // (priority 10) are scheduled before cables (40) and dumbbells (30). Fixtures
             // and benches carry no load so they are skipped; the first load-bearing piece
@@ -340,16 +352,11 @@ class ProgramGenerator @Inject constructor(
             ))
     }
 
-    private suspend fun cardioPool(available: Set<String>): List<ExerciseEntity> {
-        val cardioIds = equipmentDao.getAll()
-            .filter { it.category == EquipmentCategory.CARDIO_MACHINE }
-            .mapTo(mutableSetOf()) { it.id }
-
-        return exerciseDao.getAll()
-            .filter { !it.isExcluded }
+    /** Conditioning the gym can actually support — the finisher pool. */
+    private suspend fun cardioPool(available: Set<String>): List<ExerciseEntity> =
+        exerciseDao.getAll()
+            .filter { !it.isExcluded && it.isConditioning }
             .filter { EquipmentAvailability.canPerform(it, available) }
-            .filter { exercise -> exercise.requiredEquipmentIds.any { it in cardioIds } }
-    }
 
     // ── Editing a template in place (8c: swap a row, add a row) ─────────
 
@@ -367,22 +374,36 @@ class ProgramGenerator @Inject constructor(
     ): TemplateSlotEntity? {
         val exercise = exerciseDao.getById(exerciseId) ?: return null
         val existing = programDao.getSlots(templateId)
+        // A finisher stays last: a lift added by hand goes in front of it, not after it.
+        val finisherIndex = existing.indexOfFirst { it.isCardioFinisher }
+        val orderIndex = if (finisherIndex >= 0 && !exercise.isConditioning) finisherIndex else existing.size
         val slot = prescribe(
             templateId = templateId,
             exercise = exercise,
-            orderIndex = existing.size,
-            goal = profile.goal,
+            orderIndex = orderIndex,
+            profile = profile,
         )
-        return slot.copy(id = programDao.insertSlot(slot))
+        return db.withTransaction {
+            if (orderIndex < existing.size) {
+                existing.drop(orderIndex).forEach {
+                    programDao.updateSlot(it.copy(orderIndex = it.orderIndex + 1))
+                }
+            }
+            slot.copy(id = programDao.insertSlot(slot))
+        }
     }
 
     /**
      * Swaps the exercise in an existing slot, re-prescribing for the new movement.
      *
      * A compound cannot inherit an isolation's rep range and still make sense, so the
-     * whole prescription is rebuilt. The working load is dropped deliberately: it belongs
+     * rep range and rest are rebuilt. The working load is dropped deliberately: it belongs
      * to the lift that was there, and carrying it over would put someone under a bar at a
-     * weight they have never lifted on that movement.
+     * weight they have never lifted on that movement. The weeks of set accumulation are
+     * kept, and so is the slot's progression rule — a swap used to quietly turn a strength
+     * lift's load progression into double progression, because it read the exercise's
+     * default instead of the plan's choice. A finisher swapped for another finisher keeps
+     * its minutes.
      */
     suspend fun replaceSlotExercise(
         slotId: Long,
@@ -395,31 +416,96 @@ class ProgramGenerator @Inject constructor(
             templateId = slot.templateId,
             exercise = exercise,
             orderIndex = slot.orderIndex,
-            goal = profile.goal,
+            profile = profile,
+            previous = slot,
+            previousWasCompound = exerciseDao.getById(slot.exerciseId)?.isCompound,
         ).copy(id = slot.id, supersetGroup = slot.supersetGroup)
         programDao.updateSlot(replacement)
         return replacement
+    }
+
+    /**
+     * Writes a starting load onto every slot of the active block that trains [exerciseId].
+     * The "what do you already lift?" answer — so the first session opens at a real weight
+     * instead of an empty bar the user has to type over.
+     */
+    suspend fun setStartingLoad(exerciseId: String, loadKg: Double?): Int {
+        val active = programDao.getActiveMesocycle() ?: return 0
+        var written = 0
+        db.withTransaction {
+            programDao.getAllTemplates()
+                .filter { it.mesocycleId == active.id }
+                .forEach { template ->
+                    programDao.getSlots(template.id)
+                        .filter { it.exerciseId == exerciseId && !it.isCardioFinisher }
+                        .forEach {
+                            programDao.updateSlot(it.copy(workingLoadKg = loadKg))
+                            written++
+                        }
+                }
+        }
+        return written
     }
 
     private fun prescribe(
         templateId: Long,
         exercise: ExerciseEntity,
         orderIndex: Int,
-        goal: Goal,
+        profile: ProfileEntity,
+        previous: TemplateSlotEntity? = null,
+        previousWasCompound: Boolean? = null,
     ): TemplateSlotEntity {
-        val rx = Prescription.of(goal, exercise.isCompound)
+        if (exercise.isConditioning) {
+            val minutes = previous?.takeIf { it.isCardioFinisher }?.repRangeLow
+                ?: startingFinisherMinutes(profile)
+            return finisherSlot(templateId, exercise.id, orderIndex, minutes)
+        }
+
+        val rx = Prescription.of(profile.goal, exercise.isCompound, profile.readinessFlagged)
+        // Only a like-for-like swap inherits anything: compound for compound, isolation
+        // for isolation. Across that line the defaults for the new movement are right.
+        val likeForLike = previous != null && !previous.isCardioFinisher &&
+            previousWasCompound == exercise.isCompound
+        val keptSets = previous?.targetSets?.takeIf { likeForLike }
+        val keptRule = previous?.progression?.takeIf { likeForLike && it != ProgressionRule.NONE }
         return TemplateSlotEntity(
             templateId = templateId,
             exerciseId = exercise.id,
             orderIndex = orderIndex,
-            targetSets = if (exercise.isCompound) 3 else 2,
+            targetSets = keptSets ?: if (exercise.isCompound) 3 else 2,
             repRangeLow = rx.repLow,
             repRangeHigh = rx.repHigh,
             targetRir = rx.targetRir,
             restSeconds = rx.restSeconds,
-            progression = exercise.defaultProgression,
+            progression = keptRule ?: progressionFor(profile.goal, exercise.isCompound),
         )
     }
+
+    private fun finisherSlot(
+        templateId: Long,
+        exerciseId: String,
+        orderIndex: Int,
+        minutes: Int,
+    ) = TemplateSlotEntity(
+        templateId = templateId,
+        exerciseId = exerciseId,
+        orderIndex = orderIndex,
+        targetSets = 1,
+        repRangeLow = minutes,
+        repRangeHigh = minutes,
+        targetRir = FINISHER_TARGET_RIR,
+        restSeconds = 0,
+        progression = ProgressionRule.NONE,
+        workingLoadKg = null,
+        isCardioFinisher = true,
+    )
+
+    private fun startingFinisherMinutes(profile: ProfileEntity): Int =
+        if (profile.trainingAgeMonths < NOVICE_MONTHS) {
+            FinisherProgression.NOVICE_START_MINUTES
+        } else {
+            FinisherProgression.START_MINUTES
+        }
 
     // ── Plan assembly ───────────────────────────────────────────────────
 
@@ -448,36 +534,50 @@ class ProgramGenerator @Inject constructor(
                 FilledSlot(spec, exercise, setsFor(spec, profile), profile.goal)
             }.toMutableList()
 
-            if (profile.goal == Goal.LEAN && cardioPool.isNotEmpty()) {
-                val finisherPreference = listOf(
-                    "treadmill_incline_walk",
-                    "treadmill_jog",
-                    "treadmill_interval_run",
-                    "rower_full_body",
-                    "stairmill_climbing",
-                )
-                
-                val candidates = cardioPool
-                    .sortedBy { finisherPreference.indexOf(it.id).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-                
-                val unusedCandidates = candidates.filter { it.id !in usedThisWeek }
-                val finisher = unusedCandidates.firstOrNull() ?: candidates.firstOrNull()
-                
-                if (finisher != null) {
+            // Excluding "Cardio" on the plan screen is how a lean-goal user opts out.
+            if (profile.goal == Goal.LEAN &&
+                MovementPattern.CONDITIONING !in profile.excludedPatterns &&
+                cardioPool.isNotEmpty()
+            ) {
+                pickFinisher(day, cardioPool, usedThisWeek)?.let { finisher ->
                     usedToday += finisher.id
                     usedThisWeek += finisher.id
-                    filled.add(FilledSlot(
-                        spec = SlotSpec(finisher.primaryMuscle, finisher.pattern, false),
-                        exercise = finisher,
-                        sets = 1,
-                        goal = profile.goal,
-                        isCardioFinisher = true
-                    ))
+                    filled.add(
+                        FilledSlot(
+                            spec = SlotSpec(finisher.primaryMuscle, finisher.pattern, false),
+                            exercise = finisher,
+                            sets = 1,
+                            goal = profile.goal,
+                            isCardioFinisher = true,
+                            minutes = startingFinisherMinutes(profile),
+                        ),
+                    )
                 }
             }
 
             PlannedDay(day.label, ceilingMinutes?.let { trimToTimeBudget(filled, it) } ?: filled)
         }
+    }
+
+    /**
+     * The day's conditioning finisher, chosen to suit what the day just did.
+     *
+     * After a lower-body day the legs have done their work, so the finisher leans on the
+     * upper body or spares the legs (SkiErg, rower, crosstrainer). After an upper-body day
+     * the legs are fresh, so it uses them (incline walk, air bike, stairs). Variety across
+     * the week first, then preference order.
+     */
+    private fun pickFinisher(
+        day: DaySpec,
+        pool: List<ExerciseEntity>,
+        usedThisWeek: Set<String>,
+    ): ExerciseEntity? {
+        val legDay = day.slots.count { it.muscle in LOWER_BODY } * 2 >= day.slots.size
+        val preference = if (legDay) LEG_DAY_FINISHERS else UPPER_DAY_FINISHERS
+        val ranked = pool.sortedBy { e ->
+            preference.indexOf(e.id).takeIf { it >= 0 } ?: Int.MAX_VALUE
+        }
+        return ranked.firstOrNull { it.id !in usedThisWeek } ?: ranked.firstOrNull()
     }
 
     /**
@@ -531,17 +631,21 @@ class ProgramGenerator @Inject constructor(
      */
     private fun trimToTimeBudget(slots: List<FilledSlot>, ceilingMinutes: Int): List<FilledSlot> {
         val kept = slots.toMutableList()
-        // Never drop the cardio finisher when trimming for time; drop isolation lifts before it.
-        while (kept.size > MIN_EXERCISES && estimateMinutes(kept) > ceilingMinutes) {
+        // The finisher is never the thing that goes: it is the "leaner" half of the goal.
+        // Isolation lifts go first, then the last lift — never the finisher behind it.
+        while (kept.count { !it.isCardioFinisher } > MIN_EXERCISES && estimateMinutes(kept) > ceilingMinutes) {
             val lastIsolation = kept.indexOfLast { !it.spec.compound && !it.isCardioFinisher }
-            kept.removeAt(if (lastIsolation >= 0) lastIsolation else kept.lastIndex)
+            val lastLift = kept.indexOfLast { !it.isCardioFinisher }
+            kept.removeAt(if (lastIsolation >= 0) lastIsolation else lastLift)
         }
         return kept
     }
 
     private fun estimateMinutes(slots: List<FilledSlot>): Int =
         SessionEstimate.minutesOf(
-            slots.map { it.sets to Prescription.of(it.goal, it.spec.compound).restSeconds }
+            slots.filterNot { it.isCardioFinisher }
+                .map { it.sets to Prescription.of(it.goal, it.spec.compound).restSeconds },
+            extraMinutes = slots.filter { it.isCardioFinisher }.sumOf { it.minutes },
         )
 
     // ── Prescription per goal (COACHING.md §3) ──────────────────────────
@@ -549,27 +653,11 @@ class ProgramGenerator @Inject constructor(
     private fun FilledSlot.toSlot(
         templateId: Long,
         orderIndex: Int,
-        goal: Goal,
+        profile: ProfileEntity,
     ): TemplateSlotEntity {
-        val rx = Prescription.of(goal, spec.compound)
-        
-        if (isCardioFinisher) {
-            return TemplateSlotEntity(
-                templateId = templateId,
-                exerciseId = exercise.id,
-                orderIndex = orderIndex,
-                targetSets = 1,
-                // Duration in minutes
-                repRangeLow = 10,
-                repRangeHigh = 10,
-                targetRir = 2,
-                restSeconds = 0,
-                progression = ProgressionRule.DOUBLE_PROGRESSION,
-                workingLoadKg = null,
-                isCardioFinisher = true,
-            )
-        }
-        
+        if (isCardioFinisher) return finisherSlot(templateId, exercise.id, orderIndex, minutes)
+
+        val rx = Prescription.of(profile.goal, spec.compound, profile.readinessFlagged)
         return TemplateSlotEntity(
             templateId = templateId,
             exerciseId = exercise.id,
@@ -579,15 +667,24 @@ class ProgramGenerator @Inject constructor(
             repRangeHigh = rx.repHigh,
             targetRir = rx.targetRir,
             restSeconds = rx.restSeconds,
-            progression = if (goal == Goal.STRENGTH && spec.compound) {
-                ProgressionRule.LOAD_PROGRESSION
-            } else {
-                ProgressionRule.DOUBLE_PROGRESSION
-            },
+            progression = progressionFor(profile.goal, spec.compound),
             workingLoadKg = null, // set from the first session's actual performance
             isCardioFinisher = false,
         )
     }
+
+    /**
+     * Strength-biased goals move compounds by load at fixed low reps; everything else
+     * climbs reps inside a range first. "Leaner and stronger" is strength-biased on
+     * purpose: keeping the load on the bar climbing is what holds muscle while
+     * bodyweight comes down.
+     */
+    private fun progressionFor(goal: Goal, compound: Boolean): ProgressionRule =
+        if (compound && (goal == Goal.STRENGTH || goal == Goal.LEAN)) {
+            ProgressionRule.LOAD_PROGRESSION
+        } else {
+            ProgressionRule.DOUBLE_PROGRESSION
+        }
 
     private data class Prescription(
         val repLow: Int,
@@ -596,7 +693,20 @@ class ProgramGenerator @Inject constructor(
         val restSeconds: Int,
     ) {
         companion object {
-            fun of(goal: Goal, compound: Boolean): Prescription = when (goal) {
+            /**
+             * [readinessFlagged] comes from the one-time readiness screen: with a flag
+             * raised, nothing under five reps is auto-prescribed (COACHING.md §1).
+             */
+            fun of(goal: Goal, compound: Boolean, readinessFlagged: Boolean = false): Prescription {
+                val rx = base(goal, compound)
+                return if (readinessFlagged && rx.repLow < SAFE_REP_FLOOR) {
+                    rx.copy(repLow = SAFE_REP_FLOOR, repHigh = maxOf(rx.repHigh, SAFE_REP_FLOOR + 3))
+                } else {
+                    rx
+                }
+            }
+
+            private fun base(goal: Goal, compound: Boolean): Prescription = when (goal) {
                 Goal.STRENGTH -> if (compound) {
                     Prescription(3, 6, 2, 240)
                 } else {
@@ -609,12 +719,15 @@ class ProgramGenerator @Inject constructor(
                     Prescription(10, 15, 1, 90)
                 }
 
-                // Same stimulus as hypertrophy, shorter rests. Nothing here is a calorie
-                // target: the only lever the engine has is how the training is arranged.
+                // Leaner and stronger. Compounds stay heavy — 5–8 reps with full rests —
+                // because the load on the bar is the signal that keeps muscle while
+                // bodyweight drops. Accessories run moderate reps on short rests to keep
+                // the session dense, and the finisher does the conditioning. Nothing here
+                // is a calorie target: the only lever the engine has is the training.
                 Goal.LEAN -> if (compound) {
-                    Prescription(6, 12, 2, 105)
+                    Prescription(5, 8, 2, 150)
                 } else {
-                    Prescription(12, 18, 1, 60)
+                    Prescription(10, 15, 1, 75)
                 }
 
                 Goal.GENERAL -> if (compound) {
@@ -623,6 +736,8 @@ class ProgramGenerator @Inject constructor(
                     Prescription(10, 15, 2, 75)
                 }
             }
+
+            private const val SAFE_REP_FLOOR = 5
         }
     }
 
@@ -633,6 +748,8 @@ class ProgramGenerator @Inject constructor(
         /** Carried so the time estimate can read the rest this slot will be prescribed. */
         val goal: Goal,
         val isCardioFinisher: Boolean = false,
+        /** A finisher's duration. Unused for lifts. */
+        val minutes: Int = 0,
     )
 
     private data class PlannedDay(val label: String, val slots: List<FilledSlot>)
@@ -644,6 +761,26 @@ class ProgramGenerator @Inject constructor(
         private const val MIN_EXERCISES = 3
         private const val NOVICE_MONTHS = 12
 
+        /** "Hard, with something left" — the effort a finisher is pitched at. */
+        private const val FINISHER_TARGET_RIR = 2
+
+        private val LOWER_BODY = setOf(
+            MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES,
+            MuscleGroup.CALVES, MuscleGroup.ADDUCTORS,
+        )
+
+        /** Spare the legs after they have done the day's work. */
+        private val LEG_DAY_FINISHERS = listOf(
+            "skierg_intervals", "rower_full_body", "crosstrainer_steady",
+            "treadmill_incline_walk", "airbike_intervals",
+        )
+
+        /** Use the legs while they are fresh. */
+        private val UPPER_DAY_FINISHERS = listOf(
+            "treadmill_incline_walk", "airbike_intervals", "stairmill_climbing",
+            "treadmill_interval_run", "crosstrainer_steady", "rower_full_body",
+        )
+
         /** Parks ad-hoc templates outside the Mon–Sun grid so the Plan tab ignores them. */
         private const val AD_HOC_DAY_INDEX = -1
         private const val FREESTYLE_BLOCK = "Freestyle"
@@ -653,11 +790,20 @@ class ProgramGenerator @Inject constructor(
          * always be able to answer "why am I doing this?" without a network call.
          */
         fun explainSlot(slot: TemplateSlotEntity, exerciseName: String, goal: Goal): String {
+            if (slot.isCardioFinisher) {
+                return "$exerciseName: ${slot.repRangeLow} min, hard but with something left — " +
+                    "conditioning that burns plenty without eating into tomorrow's lifting. " +
+                    "A minute is added each time it goes well, up to ${FinisherProgression.MAX_MINUTES}."
+            }
             val rest = formatRest(slot.restSeconds)
             val why = when (goal) {
                 Goal.STRENGTH -> "heavy, low reps and long rests are what move a max"
                 Goal.HYPERTROPHY -> "moderate reps close to failure is what drives growth"
-                Goal.LEAN -> "the same reps with shorter rests keeps the work density up"
+                Goal.LEAN -> if (slot.progression == ProgressionRule.LOAD_PROGRESSION) {
+                    "heavy work keeps strength climbing while you lean out"
+                } else {
+                    "moderate reps on short rests keep the session dense"
+                }
                 Goal.GENERAL -> "a middle rep range keeps strength and size both moving"
             }
             return "$exerciseName: ${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} " +

@@ -21,6 +21,11 @@ data class PlanSettings(
     /** Chosen weekdays, 0 = Monday. Null means "use the split's own layout". */
     val trainingDays: List<Int>? = null,
     val dayStartHour: Int = TrainingClock.DEFAULT_DAY_START_HOUR,
+    /**
+     * How long the user has been lifting. Intake never asked, so every existing install
+     * reads 0 — a beginner — until it is set here.
+     */
+    val trainingAgeMonths: Int = 0,
 ) {
 
     /**
@@ -46,6 +51,7 @@ data class PlanSettings(
             excludedPatterns = excludedPatterns.distinct(),
             trainingDays = chosen,
             dayStartHour = dayStartHour.coerceIn(TrainingClock.DAY_START_HOURS),
+            trainingAgeMonths = trainingAgeMonths.coerceAtLeast(0),
         )
     }
 
@@ -57,10 +63,14 @@ data class PlanSettings(
         excludedPatterns = excludedPatterns,
         trainingDays = trainingDays,
         dayStartHour = dayStartHour,
+        trainingAgeMonths = trainingAgeMonths,
     )
 
     /**
      * Whether moving from [previous] to this needs the block rebuilt.
+     *
+     * Training age only changes a prescription across the novice line, so moving within
+     * either side of it is a settings change, not a rebuild.
      *
      * Anything that changes which exercises are programmed or on how many days does; the
      * session ceiling does not (see [needsRefit]), and neither does the day-start hour,
@@ -70,7 +80,8 @@ data class PlanSettings(
         goal != previous.goal ||
             daysPerWeek != previous.daysPerWeek ||
             priorityMuscles != previous.priorityMuscles ||
-            excludedPatterns != previous.excludedPatterns
+            excludedPatterns != previous.excludedPatterns ||
+            isNovice != previous.isNovice
 
     /** Only the session ceiling changed: re-fit the block in place instead. */
     fun needsRefit(previous: PlanSettings): Boolean =
@@ -87,6 +98,9 @@ data class PlanSettings(
     fun needsReschedule(previous: PlanSettings): Boolean =
         !needsRebuild(previous) && weekdayIndices() != previous.weekdayIndices()
 
+    /** Under a year of consistent lifting — fewer compound sets, a shorter finisher. */
+    val isNovice: Boolean get() = trainingAgeMonths < NOVICE_MONTHS
+
     /** Which weekdays a session lands on, falling back to the split's own layout. */
     fun weekdayIndices(): List<Int> =
         trainingDays ?: Split.forDays(daysPerWeek).weekdayIndices
@@ -96,6 +110,7 @@ data class PlanSettings(
         val WEEKDAY_RANGE = 0..6
         val SESSION_MINUTES = listOf(30, 45, 60, 75, 90)
         const val MAX_PRIORITY_MUSCLES = 2
+        const val NOVICE_MONTHS = 12
     }
 }
 
@@ -107,6 +122,7 @@ fun ProfileEntity.planSettings(): PlanSettings = PlanSettings(
     excludedPatterns = excludedPatterns,
     trainingDays = trainingDays,
     dayStartHour = dayStartHour,
+    trainingAgeMonths = trainingAgeMonths,
 )
 
 /** What applying a plan change actually did, so the UI can say so plainly. */

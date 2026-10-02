@@ -85,6 +85,7 @@ fun SetLoggingRoute(
                 // happens whether or not this screen is up. Vibrating here as well would
                 WorkoutEvent.RestComplete -> Unit
                 WorkoutEvent.SessionFinished -> viewModel.finishSession(onSessionFinished)
+                WorkoutEvent.AdvanceToNext -> viewModel.goToNextExercise(onNextExercise)
             }
         }
     }
@@ -116,6 +117,7 @@ fun SetLoggingRoute(
         onSubRest = { viewModel.adjustRest(-15) },
         onAddRest = { viewModel.adjustRest(30) },
         onAddShortRest = { viewModel.adjustRest(15) },
+        onUndoSet = viewModel::undoLastSet,
         modifier = modifier,
     )
 
@@ -205,6 +207,7 @@ fun SetLoggingScreen(
     onAddRest: () -> Unit,
     onAddShortRest: () -> Unit,
     modifier: Modifier = Modifier,
+    onUndoSet: () -> Unit = {},
 ) {
     val resting = state.rest is RestState.Running
 
@@ -221,6 +224,7 @@ fun SetLoggingScreen(
                 onAdd = onAddRest,
                 onAddShort = onAddShortRest,
                 onPrimary = onRestPrimary,
+                onUndo = onUndoSet,
                 modifier = modifier,
             )
         } else {
@@ -317,7 +321,7 @@ private fun InputScreen(
                 ) {
                     Text(
                         text = state.reps.toString(),
-                        style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
+                        style = RedplateType.load,
                         color = colors.ink,
                     )
                     Spacer(Modifier.width(8.dp))
@@ -326,6 +330,16 @@ private fun InputScreen(
                         style = RedplateType.mono.copy(fontSize = 14.sp),
                         color = colors.inkMuted,
                         modifier = Modifier.padding(bottom = 9.dp),
+                    )
+                }
+                // How hard, not just how long: "10 minutes on the bike" is not a
+                // prescription until it says what the minutes should feel like.
+                state.instructionSteps.take(2).forEach { step ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = step,
+                        style = RedplateType.body.copy(fontSize = 13.5.sp, lineHeight = 19.sp),
+                        color = colors.inkSecondary,
                     )
                 }
             } else {
@@ -360,7 +374,7 @@ private fun InputScreen(
                 ) {
                     Text(
                         text = formatKg(state.loadKg),
-                        style = RedplateType.load.copy(fontSize = 64.sp, lineHeight = 64.sp),
+                        style = RedplateType.load,
                         color = colors.ink,
                     )
                     Spacer(Modifier.width(8.dp))
@@ -451,7 +465,12 @@ private fun InputScreen(
         }
 
         PrimaryBar(
-            label = "Done — start rest",
+            // A finisher has no rest after it, so the bar says where it actually goes.
+            label = when {
+                !state.isCardioFinisher || state.isFreestyle -> "Done — start rest"
+                state.nextExerciseName != null -> "Done — next lift"
+                else -> "Done — finish session"
+            },
             onClick = onCompleteSet,
             enabled = state.canCompleteSet,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -471,6 +490,7 @@ private fun RestScreen(
     onAdd: () -> Unit,
     onAddShort: () -> Unit,
     onPrimary: () -> Unit,
+    onUndo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = RedplateTheme.colors
@@ -578,6 +598,32 @@ private fun RestScreen(
 
             if (state.loggedSets.any { !it.isWarmup }) {
                 SetHistoryCard(sets = state.loggedSets)
+            }
+
+            // Mis-tapped Done, or the rep count was wrong: take it back and fix it.
+            // A visible button, never a swipe on the history row — sweat makes gestures
+            // unreliable (CLAUDE.md §4).
+            if (state.canUndo) {
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(onClick = onUndo)
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "Undo the last set and edit it"
+                            role = Role.Button
+                        },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text(
+                        text = "↶  Undo that set",
+                        style = RedplateType.body.copy(fontSize = 14.sp),
+                        color = colors.inkMuted,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
             }
         }
 

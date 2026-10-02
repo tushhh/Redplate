@@ -21,17 +21,30 @@ object SessionEstimate {
     /** Time under the bar for one set, setup included. Rest is counted separately. */
     const val WORK_SECONDS_PER_SET = 45
 
+    /**
+     * A conditioning finisher is charged its prescribed minutes, not a set of work plus
+     * rest — it used to be estimated as one 45-second set, so ten minutes on the bike
+     * vanished from the budget and sessions ran past the ceiling the user chose.
+     */
     fun minutes(slots: List<TemplateSlotEntity>): Int =
-        minutesOf(slots.map { it.targetSets to it.restSeconds })
+        minutesOf(
+            slots.filterNot { it.isCardioFinisher }.map { it.targetSets to it.restSeconds },
+            extraMinutes = slots.filter { it.isCardioFinisher }
+                .sumOf { it.repRangeHigh * it.targetSets.coerceAtLeast(1) },
+        )
 
-    /** [setsAndRest] is one `sets to restSeconds` pair per exercise, in running order. */
-    fun minutesOf(setsAndRest: List<Pair<Int, Int>>): Int {
+    /**
+     * [setsAndRest] is one `sets to restSeconds` pair per lift, in running order.
+     * [extraMinutes] is fixed-duration work — a finisher — added on top.
+     */
+    fun minutesOf(setsAndRest: List<Pair<Int, Int>>, extraMinutes: Int = 0): Int {
         val working = setsAndRest.filter { (sets, _) -> sets > 0 }
-        if (working.isEmpty()) return 0
+        if (working.isEmpty()) return extraMinutes.coerceAtLeast(0)
 
         val seconds = working.sumOf { (sets, rest) -> sets * (WORK_SECONDS_PER_SET + rest) }
         val trailingRest = working.last().second
-        return ((seconds - trailingRest) / 60.0).roundToInt().coerceAtLeast(1)
+        val lifting = ((seconds - trailingRest) / 60.0).roundToInt().coerceAtLeast(1)
+        return lifting + extraMinutes.coerceAtLeast(0)
     }
 
     /**

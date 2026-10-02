@@ -35,16 +35,31 @@ class DatabaseSeeder @Inject constructor(
     /** Gate anything that reads exercises on this reaching [SeedState.Ready]. */
     val state: StateFlow<SeedState> = _state.asStateFlow()
 
+    /**
+     * Brings the bundled seed into the database on every launch, not just the first.
+     *
+     * This used to insert only into an empty table, so an installed copy never saw a seed
+     * change again: new exercises never appeared, machine priorities stayed at their
+     * migration default, and lifts removed from the seed lived on. Now the seed is merged:
+     *
+     * - New rows are inserted as seeded.
+     * - Existing rows take the seed's *description* — names, muscles, patterns, which
+     *   equipment a lift needs, selection priority — but keep everything the user owns:
+     *   availability, the loads and plates they confirmed, exclusions, whether guidance
+     *   has been shown, their own form video.
+     * - Seeded exercises that have left the seed are deleted only when nothing points at
+     *   them. One with logged sets or a place in a plan stays, so history keeps its names.
+     *
+     * Only rows that actually differ are written, so a launch with nothing new is a read.
+     */
     suspend fun seedIfNeeded() {
         val result = runCatching {
-            if (db.exerciseDao().count() == 0) {
-                val exercises = CuratedExerciseSeed.seed()
-                val equipment = GymEquipmentSeed.seed()
-
-                db.withTransaction {
-                    db.equipmentDao().insertAll(equipment)
-                    db.exerciseDao().insertAll(exercises)
-                }
+            db.withTransaction {
+                syncEquipment(GymEquipmentSeed.seed())
+                syncExercises(CuratedExerciseSeed.seed())
+                // Plans written before conditioning was its own pattern.
+                db.programDao().convertConditioningSlots(FinisherProgression.START_MINUTES)
+                db.programDao().normaliseFinisherSlots()
             }
         }
 
@@ -63,5 +78,44 @@ class DatabaseSeeder @Inject constructor(
     suspend fun retry() {
         _state.value = SeedState.Seeding
         seedIfNeeded()
+    }
+
+    private suspend fun syncEquipment(seed: List<EquipmentEntity>) {
+        val existing = db.equipmentDao().getAll().associateBy { it.id }
+        val firstRun = existing.isEmpty()
+        val changed = seed.mapNotNull { seeded ->
+            // A machine new to the seed arrives switched off on an existing install: the
+            // user has not said they have it. Fail closed, never guess open (COACHING §2).
+            val current = existing[seeded.id]
+                ?: return@mapNotNull if (firstRun) seeded else seeded.copy(isAvailable = false)
+            current.copy(
+                displayName = seeded.displayName,
+                category = seeded.category,
+                selectionPriority = seeded.selectionPriority,
+                perLimb = seeded.perLimb,
+                isAssistance = seeded.isAssistance,
+            ).takeIf { it != current }
+        }
+        if (changed.isNotEmpty()) db.equipmentDao().insertAll(changed)
+    }
+
+    private suspend fun syncExercises(seed: List<ExerciseEntity>) {
+        val dao = db.exerciseDao()
+        val existing = dao.getAll().associateBy { it.id }
+        val changed = seed.mapNotNull { seeded ->
+            val current = existing[seeded.id] ?: return@mapNotNull seeded
+            seeded.copy(
+                instructions = seeded.instructions ?: current.instructions,
+                imageAssetPaths = current.imageAssetPaths.ifEmpty { seeded.imageAssetPaths },
+                userFormVideoUri = current.userFormVideoUri,
+                hasBeenIntroduced = current.hasBeenIntroduced,
+                isExcluded = current.isExcluded,
+            ).takeIf { it != current }
+        }
+        if (changed.isNotEmpty()) dao.insertAll(changed)
+
+        val seedIds = seed.mapTo(mutableSetOf()) { it.id }
+        val retired = existing.values.filter { !it.isCustom && it.id !in seedIds }.map { it.id }
+        if (retired.isNotEmpty()) dao.deleteUnreferenced(retired)
     }
 }

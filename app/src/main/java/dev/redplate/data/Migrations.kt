@@ -499,9 +499,44 @@ object Migrations {
         }
     }
 
+    /**
+     * 13 → 14: the bodyweight log, and a persisted switch for the stall prompt.
+     *
+     * - `bodyweight_entries` — one row per weigh-in, optionally with a waist measurement.
+     *   New table, nothing to copy.
+     * - `profile.stallPromptsEnabled` — the You tab's "Deload prompts" switch, which used
+     *   to live only in memory. Defaults on, which is what the app did before.
+     *
+     * The profile's stored bodyweight is deliberately *not* copied into the log. Intake
+     * never asked for it, so on every install made before this version it is the 80 kg
+     * placeholder, and a trend that starts from an invented number is worse than an
+     * empty one that asks for a real weigh-in.
+     */
+    val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `bodyweight_entries` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `measuredAt` INTEGER NOT NULL,
+                    `weightKg` REAL NOT NULL,
+                    `waistCm` REAL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_bodyweight_entries_measuredAt` " +
+                    "ON `bodyweight_entries` (`measuredAt`)"
+            )
+            db.execSQL(
+                "ALTER TABLE `profile` ADD COLUMN `stallPromptsEnabled` INTEGER NOT NULL DEFAULT 1"
+            )
+        }
+    }
+
     val ALL = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-        MIGRATION_11_12, MIGRATION_12_13,
+        MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
     )
 }

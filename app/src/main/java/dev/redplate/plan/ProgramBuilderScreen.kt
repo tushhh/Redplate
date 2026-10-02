@@ -57,11 +57,23 @@ fun ProgramBuilderRoute(
         state = state,
         onIncrementSets = viewModel::incrementSets,
         onDecrementSets = viewModel::decrementSets,
+        onSwap = viewModel::openSwap,
+        onAdd = viewModel::openAdd,
         onSave = {
             viewModel.commit()
             onBack()
         },
     )
+
+    state.picker?.let { picker ->
+        ExercisePickSheet(
+            state = picker,
+            onQueryChange = viewModel::setPickerQuery,
+            onPick = viewModel::pick,
+            onRemove = viewModel::removeSwappedSlot,
+            onDismiss = viewModel::closePicker,
+        )
+    }
 }
 
 @Composable
@@ -69,6 +81,8 @@ fun ProgramBuilderScreen(
     state: ProgramBuilderState,
     onIncrementSets: (Long) -> Unit = {},
     onDecrementSets: (Long) -> Unit = {},
+    onSwap: (Long) -> Unit = {},
+    onAdd: () -> Unit = {},
     onSave: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
@@ -107,18 +121,21 @@ fun ProgramBuilderScreen(
                     row = row,
                     onIncrement = { onIncrementSets(row.slot.id) },
                     onDecrement = { onDecrementSets(row.slot.id) },
+                    onSwap = { onSwap(row.slot.id) },
                 )
             }
 
-            // Adding a slot needs an exercise picker scoped to this template, which does
-            // not exist yet. The row is drawn as the design has it but says so rather
-            // than opening nothing.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .border(1.dp, colors.line, RoundedCornerShape(18.dp))
+                    .clickable(onClick = onAdd)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "Add an exercise to ${state.sessionName}"
+                        role = Role.Button
+                    }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -137,9 +154,9 @@ fun ProgramBuilderScreen(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Adding exercises is coming",
+                    text = "Add an exercise",
                     style = RedplateType.body.copy(fontSize = 14.5.sp),
-                    color = colors.inkSubtle,
+                    color = colors.inkSecondary,
                 )
             }
 
@@ -193,9 +210,11 @@ private fun SlotRow(
     row: SlotRow,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
+    onSwap: () -> Unit,
 ) {
     val colors = RedplateTheme.colors
     val changed = row.setsDelta != 0
+    val finisher = row.slot.isCardioFinisher
 
     Row(
         modifier = Modifier
@@ -205,34 +224,66 @@ private fun SlotRow(
             .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        // The name is the swap control: tap it to replace the lift (rack taken, machine
+        // you don't like). A visible chevron says it leads somewhere.
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onSwap)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Swap ${row.exerciseName} or remove it"
+                    role = Role.Button
+                }
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = row.exerciseName,
+                    style = RedplateType.body.copy(fontSize = 15.sp),
+                    color = colors.ink,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = when {
+                        changed ->
+                            "${row.slot.targetSets - row.setsDelta} → ${row.slot.targetSets} SETS · JUST CHANGED"
+                        finisher -> "FINISHER · MINUTES"
+                        else -> "${row.slot.repRangeLow}–${row.slot.repRangeHigh} REPS · " +
+                            row.slot.progression.name.replace('_', ' ')
+                    },
+                    style = RedplateType.mono.copy(fontSize = 10.5.sp),
+                    color = if (changed) colors.live else colors.inkMuted,
+                )
+            }
             Text(
-                text = row.exerciseName,
+                text = "⇄",
                 style = RedplateType.body.copy(fontSize = 15.sp),
-                color = colors.ink,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = if (changed) {
-                    "${row.slot.targetSets - row.setsDelta} → ${row.slot.targetSets} SETS · JUST CHANGED"
-                } else {
-                    "${row.slot.repRangeLow}–${row.slot.repRangeHigh} REPS · " +
-                        row.slot.progression.name.replace('_', ' ')
-                },
-                style = RedplateType.mono.copy(fontSize = 10.5.sp),
-                color = if (changed) colors.live else colors.inkMuted,
+                color = colors.inkMuted,
+                modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SetStepper("−", "Fewer sets of ${row.exerciseName}", onDecrement, changed)
+            SetStepper(
+                "−",
+                if (finisher) "A minute less of ${row.exerciseName}" else "Fewer sets of ${row.exerciseName}",
+                onDecrement,
+                changed,
+            )
             Text(
-                text = row.slot.targetSets.toString(),
+                text = if (finisher) row.slot.repRangeLow.toString() else row.slot.targetSets.toString(),
                 style = RedplateType.figure.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
                 color = if (changed) colors.live else colors.ink,
                 modifier = Modifier.width(26.dp),
             )
-            SetStepper("+", "More sets of ${row.exerciseName}", onIncrement, changed)
+            SetStepper(
+                "+",
+                if (finisher) "A minute more of ${row.exerciseName}" else "More sets of ${row.exerciseName}",
+                onIncrement,
+                changed,
+            )
         }
     }
 }

@@ -50,7 +50,11 @@ private data class GoalOption(
 private val goalOptions = listOf(
     GoalOption(Goal.STRENGTH, "Get stronger", "Heavy compounds, 3–6 reps, long rests"),
     GoalOption(Goal.HYPERTROPHY, "Build muscle", "6–15 reps near failure, volume climbs weekly"),
-    GoalOption(Goal.LEAN, "Lean out, keep muscle", "Same lifting, shorter rests, optional finisher"),
+    GoalOption(
+        Goal.LEAN,
+        "Leaner and stronger",
+        "Heavy 5–8 rep compounds, dense accessories, a short cardio finisher every session",
+    ),
     GoalOption(Goal.GENERAL, "Just be fit and healthy", "Full body, moderate reps, nothing brutal"),
 )
 
@@ -112,8 +116,8 @@ fun GoalScreen(
 
             Spacer(Modifier.height(16.dp))
             InfoNote(
-                text = "No weight targets, no calories, no BMI. This app measures load, " +
-                    "reps and turning up.",
+                text = "No calories, no BMI, no goal weight. Bodyweight is tracked as a " +
+                    "trend, never a target — progress is load, reps and turning up.",
             )
             Spacer(Modifier.height(16.dp))
         }

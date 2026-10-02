@@ -53,6 +53,16 @@ data class VolumeRow(
     val target: Int,
 )
 
+/** One day of the 7-day strip under Today's card. Status is never colour alone. */
+enum class StripStatus { DONE, PLANNED, MISSED, REST }
+
+data class WeekStripDay(
+    /** "M", "T", "W" … */
+    val label: String,
+    val isToday: Boolean,
+    val status: StripStatus,
+)
+
 sealed interface TodayState {
     data object Loading : TodayState
 
@@ -73,6 +83,12 @@ sealed interface TodayState {
          * was to open a second one beside it.
          */
         val resumeSessionId: Long? = null,
+        val weekStrip: List<WeekStripDay> = emptyList(),
+        /**
+         * Lifts in the block with no starting weight yet. Before the first session the
+         * card offers to fill them in, so set one opens at a real weight.
+         */
+        val liftsWithoutLoad: Int = 0,
     ) : TodayState
 
     data class RestDay(
@@ -80,6 +96,13 @@ sealed interface TodayState {
         val headline: String,
         val coachBody: String,
         val nextSessionLabel: String?,
+        /**
+         * The next session still owed this week, offered as a secondary "train anyway".
+         * A week trained on three days instead of four is not a missed week — the rotation
+         * just carries on from wherever it is.
+         */
+        val trainAnywayLabel: String? = null,
+        val weekStrip: List<WeekStripDay> = emptyList(),
     ) : TodayState
 
     /**
@@ -117,6 +140,9 @@ sealed interface TodayState {
         val sessionId: Long,
         /** Training again today is possible, but deliberate: a secondary action. */
         val templateId: Long,
+        /** "Also do Lower A today" — the next session owed, or the same one again. */
+        val trainAgainLabel: String = "Train again today",
+        val weekStrip: List<WeekStripDay> = emptyList(),
     ) : TodayState
 
     /**
@@ -156,6 +182,9 @@ class TodayViewModel @Inject constructor(
 
     /** An unfinished session against today's template, so the primary action can resume it. */
     private var resumableSessionId: Long? = null
+
+    /** The session the rest-day card's "train anyway" starts. */
+    private var trainAnywayTemplateId: Long? = null
 
     /** "Push on" holds for the life of this ViewModel — never a recurring nag. */
     private var stallDismissed = false
@@ -213,31 +242,54 @@ class TodayViewModel @Inject constructor(
         }
 
         val todaysSessions = sessionsOn(today, dayStartHour)
+        val scheduled = scheduled(templates).sortedBy { it.dayIndex }
+        val owed = owedTemplates(meso, scheduled)
+        val strip = buildWeekStrip(profile, scheduled, today)
+        val todayIndex = trainingClock.weekdayIndex(today)
+        val isTrainingWeekday = scheduled.any { it.dayIndex == todayIndex }
 
-        // Determine which template is today based on rotation
-        val todayTemplate = findTodayTemplate(meso, templates, today)
+        pendingMesoId = meso.id
+        pendingMesoWeek = meso.currentWeek
+        trainAnywayTemplateId = owed.firstOrNull()?.id
+
+        // What today is, in order of precedence:
+        //  1. A session started today and not finished — walk back into it.
+        //  2. A programmed session finished today — say so.
+        //  3. A training weekday — the next session owed this week, in rotation order.
+        //     A week is the four sessions, not four fixed weekdays: miss Tuesday and
+        //     Thursday offers Lower A rather than skipping it for Upper B, so a three-day
+        //     week shifts the rotation instead of dropping a session every time.
+        //  4. Otherwise a rest day, with that same next session offered as "train anyway".
+        val open = todaysSessions.lastOrNull { session ->
+            session.endedAt == null && scheduled.any { it.id == session.templateId }
+        }
+        val finished = todaysSessions.lastOrNull { session ->
+            session.endedAt != null && scheduled.any { it.id == session.templateId }
+        }
+
+        if (open == null && finished != null) {
+            val template = scheduled.first { it.id == finished.templateId }
+            _state.value = completedState(meso, owed, scheduled, today, eyebrow, template, finished, strip)
+            return
+        }
+
+        val todayTemplate = when {
+            open != null -> scheduled.first { it.id == open.templateId }
+            isTrainingWeekday -> owed.firstOrNull()
+            else -> null
+        }
 
         if (todayTemplate == null) {
-            _state.value = restDayState(meso, templates, today, eyebrow, todaysSessions)
+            _state.value = restDayState(meso, owed, scheduled, today, eyebrow, todaysSessions, strip)
             return
         }
 
         pendingTemplateId = todayTemplate.id
-        pendingMesoId = meso.id
-        pendingMesoWeek = meso.currentWeek
-
-        val forTemplate = todaysSessions.filter { it.templateId == todayTemplate.id }
-        val finished = forTemplate.lastOrNull { it.endedAt != null }
-        resumableSessionId = forTemplate.firstOrNull { it.endedAt == null }?.id
-
-        if (finished != null) {
-            _state.value = completedState(meso, templates, today, eyebrow, todayTemplate, finished)
-            return
-        }
+        resumableSessionId = open?.id
 
         // A stall takes over the whole screen — the session is still there behind it,
         // but the decision in front of the user is what to do about the flat lift.
-        if (!stallDismissed) {
+        if (!stallDismissed && profile.stallPromptsEnabled && open == null) {
             detectStall(todayTemplate.id)?.let {
                 _state.value = it
                 return
@@ -255,12 +307,16 @@ class TodayViewModel @Inject constructor(
             ExerciseRow(
                 orderIndex = slot.orderIndex + 1,
                 name = exercise?.name ?: slot.exerciseId,
-                prescription = "${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} · $loadText",
-                loadNote = loadDeltaFor(slot),
+                prescription = if (slot.isCardioFinisher) {
+                    "${slot.repRangeLow} MIN · FINISHER"
+                } else {
+                    "${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh} · $loadText"
+                },
+                loadNote = if (slot.isCardioFinisher) null else loadDeltaFor(slot),
             )
         }
 
-        val totalSets = slots.sumOf { it.targetSets }
+        val totalSets = slots.filterNot { it.isCardioFinisher }.sumOf { it.targetSets }
         // The real number, rest included, and no longer clamped to the ceiling — reporting
         // the ceiling when the session runs past it is just a lie with extra steps.
         val estimatedMinutes = SessionEstimate.minutes(slots)
@@ -284,12 +340,16 @@ class TodayViewModel @Inject constructor(
             } else {
                 "${todayTemplate.label}. About ${SessionEstimate.spokenMinutes(estimatedMinutes)} minutes."
             },
-            coachBody = if (isFirst) {
-                CoachCopy.Today.FIRST_SESSION_BODY
-            } else {
+            coachBody = when {
+                isFirst && profile.readinessFlagged ->
+                    CoachCopy.Today.FIRST_SESSION_BODY + " " + CoachCopy.Today.READINESS_NOTE
+                isFirst -> CoachCopy.Today.FIRST_SESSION_BODY
+                // Not today's usual session: say why it is the one on the card.
+                open == null && todayTemplate.dayIndex != todayIndex ->
+                    CoachCopy.Today.rotation(todayTemplate.label)
                 // What the block concluded from the week just trained outranks a bare
                 // statement of today's load: it is the reason today's load is what it is.
-                meso.assessmentNote ?: buildCoachBody(slots)
+                else -> meso.assessmentNote ?: buildCoachBody(slots)
             },
             sessionCard = SessionCard(
                 label = todayTemplate.label,
@@ -313,7 +373,63 @@ class TodayViewModel @Inject constructor(
             },
             isFirstSession = isFirst,
             resumeSessionId = resumableSessionId,
+            weekStrip = strip,
+            liftsWithoutLoad = if (isFirst) liftsWithoutLoad(meso.id) else 0,
         )
+    }
+
+    /** Scheduled templates not yet finished in the block's current week, in day order. */
+    private suspend fun owedTemplates(
+        meso: MesocycleEntity,
+        scheduled: List<SessionTemplateEntity>,
+    ): List<SessionTemplateEntity> {
+        val done = sessionDao.getSessionsForBlockWeek(meso.id, meso.currentWeek)
+            .filter { it.endedAt != null }
+            .mapNotNullTo(mutableSetOf()) { it.templateId }
+        return scheduled.filter { it.id !in done }
+    }
+
+    /** Distinct lifts in the block that would open at the empty-bar fallback. */
+    private suspend fun liftsWithoutLoad(mesoId: Long): Int =
+        programDao.getAllTemplates()
+            .filter { it.mesocycleId == mesoId && it.dayIndex >= 0 }
+            .flatMap { programDao.getSlots(it.id) }
+            .filter { !it.isCardioFinisher && it.workingLoadKg == null }
+            .map { it.exerciseId }
+            .distinct()
+            .size
+
+    /**
+     * The user's week at a glance: what was trained, what is still planned, and which
+     * planned days went by without a session. Status is carried by a symbol as well as
+     * by colour (CLAUDE.md §3).
+     */
+    private suspend fun buildWeekStrip(
+        profile: ProfileEntity,
+        scheduled: List<SessionTemplateEntity>,
+        today: LocalDate,
+    ): List<WeekStripDay> {
+        val weekStart = trainingClock.weekStart(today, profile.weekStartsOn)
+        val bounds = trainingClock.weekBounds(weekStart, profile.dayStartHour)
+        val trainedDates = sessionDao.getSessionsStartedBetween(bounds.first, bounds.last + 1)
+            .filter { it.endedAt != null }
+            .mapTo(mutableSetOf()) { trainingClock.trainingDate(it.startedAt, profile.dayStartHour) }
+        val plannedWeekdays = scheduled.mapTo(mutableSetOf()) { it.dayIndex }
+
+        return (0 until TrainingClock.DAYS_IN_WEEK).map { offset ->
+            val date = weekStart.plusDays(offset.toLong())
+            val weekday = trainingClock.weekdayIndex(date)
+            WeekStripDay(
+                label = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                isToday = date == today,
+                status = when {
+                    date in trainedDates -> StripStatus.DONE
+                    weekday !in plannedWeekdays -> StripStatus.REST
+                    date < today -> StripStatus.MISSED
+                    else -> StripStatus.PLANNED
+                },
+            )
+        }
     }
 
     private suspend fun notStartedState(
@@ -356,12 +472,14 @@ class TodayViewModel @Inject constructor(
      */
     private suspend fun restDayState(
         meso: MesocycleEntity,
-        templates: List<SessionTemplateEntity>,
+        owed: List<SessionTemplateEntity>,
+        scheduled: List<SessionTemplateEntity>,
         today: LocalDate,
         eyebrow: String,
         todaysSessions: List<SessionEntity>,
+        strip: List<WeekStripDay>,
     ): TodayState {
-        val nextTemplate = findNextTemplate(meso, templates, today)
+        val next = owed.firstOrNull()
         val logged = todaysSessions.lastOrNull { it.endedAt != null }
 
         if (logged != null) {
@@ -372,43 +490,54 @@ class TodayViewModel @Inject constructor(
                 summaryLine = summaryLine(outcome),
                 volumeRows = buildVolumeRows(meso.id, meso.currentWeek),
                 volumeCoachLine = CoachCopy.Today.UNSCHEDULED_SESSION_VOLUME,
-                nextSessionLabel = nextSessionLabel(nextTemplate, today),
+                nextSessionLabel = nextSessionLabel(next, scheduled, today),
                 sessionId = logged.id,
-                templateId = logged.templateId ?: 0L,
+                templateId = next?.id ?: logged.templateId ?: 0L,
+                trainAgainLabel = next?.let { "Also do ${it.label} today" } ?: "Train again today",
+                weekStrip = strip,
             )
         }
 
         return TodayState.RestDay(
             eyebrow = eyebrow,
             headline = CoachCopy.Today.REST_DAY_HEADLINE,
-            coachBody = if (nextTemplate != null) {
-                CoachCopy.Today.nextSession(nextTemplate.label)
+            coachBody = if (next != null) {
+                CoachCopy.Today.nextSession(next.label)
             } else {
                 CoachCopy.Today.REST_DAY_NOTHING_LEFT
             },
-            nextSessionLabel = nextTemplate?.label,
+            nextSessionLabel = nextSessionLabel(next, scheduled, today)?.removePrefix("Next: "),
+            trainAnywayLabel = next?.let { "Train anyway — ${it.label}" },
+            weekStrip = strip,
         )
     }
 
     private suspend fun completedState(
         meso: MesocycleEntity,
-        templates: List<SessionTemplateEntity>,
+        owed: List<SessionTemplateEntity>,
+        scheduled: List<SessionTemplateEntity>,
         today: LocalDate,
         eyebrow: String,
         template: SessionTemplateEntity,
         session: SessionEntity,
+        strip: List<WeekStripDay>,
     ): TodayState.Completed {
         val outcome = outcomeReader.read(session)
         val volumeRows = buildVolumeRows(meso.id, meso.currentWeek)
+        val next = owed.firstOrNull()
         return TodayState.Completed(
             eyebrow = eyebrow,
             headline = "${template.label}. Done.",
             summaryLine = summaryLine(outcome),
             volumeRows = volumeRows,
             volumeCoachLine = buildVolumeCoachLine(volumeRows),
-            nextSessionLabel = nextSessionLabel(findNextTemplate(meso, templates, today), today),
+            nextSessionLabel = nextSessionLabel(next, scheduled, today),
             sessionId = session.id,
-            templateId = template.id,
+            // Training twice in a day is a decision, so it is the secondary action — and
+            // it offers the next session owed rather than repeating the one just done.
+            templateId = next?.id ?: template.id,
+            trainAgainLabel = next?.let { "Also do ${it.label} today" } ?: "Train again today",
+            weekStrip = strip,
         )
     }
 
@@ -419,10 +548,27 @@ class TodayViewModel @Inject constructor(
         outcome.prCount.takeIf { it > 0 }?.let { "$it PR${plural(it)}" },
     ).joinToString(" · ")
 
-    private fun nextSessionLabel(next: SessionTemplateEntity?, today: LocalDate): String? {
+    /**
+     * "Next: Lower A, Thursday" — the next session owed, on the next training weekday
+     * after today. Rotation decides *what*; the weekdays decide *when*.
+     */
+    private fun nextSessionLabel(
+        next: SessionTemplateEntity?,
+        scheduled: List<SessionTemplateEntity>,
+        today: LocalDate,
+    ): String? {
         if (next == null) return null
-        val day = DayOfWeek.of(next.dayIndex + 1)
-            .getDisplayName(TextStyle.FULL, Locale.getDefault())
+        val todayIndex = trainingClock.weekdayIndex(today)
+        val days = scheduled.map { it.dayIndex }.distinct()
+        val nextDay = (1..TrainingClock.DAYS_IN_WEEK)
+            .map { (todayIndex + it) % TrainingClock.DAYS_IN_WEEK }
+            .firstOrNull { it in days }
+            ?: next.dayIndex
+        val day = if (nextDay == (todayIndex + 1) % TrainingClock.DAYS_IN_WEEK) {
+            "tomorrow"
+        } else {
+            DayOfWeek.of(nextDay + 1).getDisplayName(TextStyle.FULL, Locale.getDefault())
+        }
         return "Next: ${next.label}, $day"
     }
 
@@ -451,6 +597,12 @@ class TodayViewModel @Inject constructor(
 
             onNavigate(openSession(templateId), slots.first().exerciseId)
         }
+    }
+
+    /** The rest-day card's "train anyway": opens the next session owed this week. */
+    fun startTrainAnyway(onNavigate: (Long, String) -> Unit) {
+        val templateId = trainAnywayTemplateId ?: return
+        startAnotherSession(templateId, onNavigate)
     }
 
     /**
@@ -557,9 +709,9 @@ class TodayViewModel @Inject constructor(
             .map { (_, weekSets) -> weekSets.maxOf { it.estimated1Rm() } }
     }
 
+    /** The load source — the barbell, not the rack — or deloads step in the wrong increment. */
     private suspend fun equipmentFor(exercise: ExerciseEntity): EquipmentEntity? =
-        exercise.requiredEquipmentIds
-            .firstNotNullOfOrNull { equipmentDao.getById(it) }
+        exercise.loadSource(equipmentDao.getAll().associateBy { it.id })
             ?.takeIf { it.isAvailable }
 
     /**
@@ -580,30 +732,6 @@ class TodayViewModel @Inject constructor(
     fun pushOnThroughStall() {
         stallDismissed = true
         refresh()
-    }
-
-    private fun findTodayTemplate(
-        meso: MesocycleEntity,
-        templates: List<SessionTemplateEntity>,
-        today: LocalDate,
-    ): SessionTemplateEntity? {
-        // dayIndex maps to weekday: 0=MON, 1=TUE, ... 6=SUN
-        val todayIndex = today.dayOfWeek.value - 1 // DayOfWeek.MONDAY = 1
-        return scheduled(templates).find { it.dayIndex == todayIndex }
-    }
-
-    private fun findNextTemplate(
-        meso: MesocycleEntity,
-        templates: List<SessionTemplateEntity>,
-        today: LocalDate,
-    ): SessionTemplateEntity? {
-        val todayIndex = today.dayOfWeek.value - 1
-        val scheduled = scheduled(templates)
-        // Look for the next template after today
-        return scheduled
-            .filter { it.dayIndex > todayIndex }
-            .minByOrNull { it.dayIndex }
-            ?: scheduled.minByOrNull { it.dayIndex } // wrap to next week
     }
 
     /**

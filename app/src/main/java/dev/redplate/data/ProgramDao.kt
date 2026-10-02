@@ -81,6 +81,31 @@ interface ProgramDao {
     @Query("SELECT * FROM template_slots ORDER BY id ASC")
     suspend fun getAllSlots(): List<TemplateSlotEntity>
 
+    /**
+     * Brings older slots into line with the conditioning model.
+     *
+     * Before conditioning was its own pattern, a rower could be swapped into a back slot
+     * and prescribed as 3 × 8 with a load; and the first finishers were written on double
+     * progression, which "earned" a treadmill 1.25 kg. Both become proper finishers:
+     * one block of [minutes], no load, no rule but the minutes one.
+     */
+    @Query("""
+        UPDATE template_slots
+        SET isCardioFinisher = 1, targetSets = 1, repRangeLow = :minutes, repRangeHigh = :minutes,
+            restSeconds = 0, progression = 'NONE', workingLoadKg = NULL
+        WHERE isCardioFinisher = 0
+          AND exerciseId IN (SELECT id FROM exercises WHERE pattern = 'CONDITIONING')
+    """)
+    suspend fun convertConditioningSlots(minutes: Int): Int
+
+    @Query("""
+        UPDATE template_slots
+        SET progression = 'NONE', workingLoadKg = NULL, restSeconds = 0
+        WHERE isCardioFinisher = 1
+          AND (progression != 'NONE' OR workingLoadKg IS NOT NULL OR restSeconds != 0)
+    """)
+    suspend fun normaliseFinisherSlots(): Int
+
     // ── Wipe (import only — must run inside the import transaction) ──
 
     @Query("DELETE FROM template_slots")

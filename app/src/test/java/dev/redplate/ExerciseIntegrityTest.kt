@@ -159,7 +159,8 @@ class ExerciseIntegrityTest {
             setOf(
                 "stairmill_climbing", "treadmill_incline_walk",
                 "treadmill_jog", "treadmill_interval_run",
-                "rower_full_body",
+                "rower_full_body", "airbike_intervals", "skierg_intervals",
+                "crosstrainer_steady",
             ),
             onCardio,
         )
