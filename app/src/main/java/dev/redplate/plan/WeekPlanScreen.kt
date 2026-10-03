@@ -21,6 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import dev.redplate.ui.components.PrimaryBar
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -55,9 +60,30 @@ import dev.redplate.ui.theme.RedplateType
 @Composable
 fun WeekPlanRoute(
     onEditTemplate: (Long) -> Unit = {},
+    onPickExercise: () -> Unit = {},
 ) {
     val viewModel: WeekPlanViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Plan changes happen on other screens (You → Your plan, Today); refresh on return.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (!state.isLoading && !state.hasPlan) {
+        NoPlanScreen(
+            isBuilding = state.isBuilding,
+            onBuildPlan = viewModel::buildPlan,
+            onPickExercise = onPickExercise,
+        )
+        return
+    }
+
     WeekPlanScreen(
         state = state,
         onEditTemplate = onEditTemplate,
@@ -81,6 +107,68 @@ fun WeekPlanRoute(
             onSave = viewModel::saveTargets,
             onReset = viewModel::resetTargetsToDefaults,
             onDismiss = viewModel::cancelEditingTargets,
+        )
+    }
+}
+
+/**
+ * The Plan tab when the user picks each session. It used to draw "Week 1 of 5 · ON TRACK"
+ * over an empty week and point back at Today — which pointed back here.
+ */
+@Composable
+fun NoPlanScreen(
+    isBuilding: Boolean,
+    onBuildPlan: () -> Unit,
+    onPickExercise: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground)
+            .statusBarsPadding(),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            SectionLabel(text = "No weekly plan")
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "You're picking each session.",
+                style = RedplateType.headline,
+                color = colors.ink,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Want the app to plan the week instead? It builds sessions from your " +
+                    "goal, days and equipment, sets every weight, and moves them on from " +
+                    "what you log. Your history and PRs come with you.",
+                style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                color = colors.inkSecondary,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Change goal, days or session length first in You → Your plan.",
+                style = RedplateType.body.copy(fontSize = 13.5.sp, lineHeight = 20.sp),
+                color = colors.inkMuted,
+            )
+        }
+        SecondaryButton(
+            label = "Pick today's workout",
+            onClick = onPickExercise,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp),
+        )
+        PrimaryBar(
+            label = if (isBuilding) "Building your plan…" else "Let the app plan my week",
+            onClick = onBuildPlan,
+            enabled = !isBuilding,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
 }
@@ -175,7 +263,7 @@ fun WeekPlanScreen(
                                 label = row.muscleName,
                                 current = row.current,
                                 target = row.target,
-                                labelWidth = 74.dp,
+                                labelWidth = 88.dp,
                                 fourWeekAverage = row.fourWeekAverage,
                             )
                         }

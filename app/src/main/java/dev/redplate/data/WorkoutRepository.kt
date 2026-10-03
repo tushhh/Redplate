@@ -22,6 +22,9 @@ class WorkoutRepository @Inject constructor(
     private val trainingClock: TrainingClock,
     private val databaseCheckpoint: DatabaseCheckpoint,
     private val progressionApplier: ProgressionApplier,
+    private val draftStore: WorkoutDraftStore,
+    private val programGenerator: ProgramGenerator,
+    private val profileDao: ProfileDao,
 ) {
     fun observeSetsForSession(sessionId: Long): Flow<List<SetLogEntity>> =
         sessionDao.observeSetsForSession(sessionId)
@@ -85,6 +88,8 @@ class WorkoutRepository @Inject constructor(
             session
         }
         volumeRecorder.recordForSession(finished)
+        // Nothing about it is in progress any more.
+        draftStore.clearSession(sessionId)
 
         // The session is now history, so make it durable in the file Auto Backup takes.
         databaseCheckpoint.checkpoint()
@@ -129,6 +134,42 @@ class WorkoutRepository @Inject constructor(
 
     /** Best estimated 1RM across prior non-warmup sets — the bar a new set must clear to be a PR. */
     suspend fun priorBestE1rm(exerciseId: String): Double? = sessionDao.getEstimated1Rm(exerciseId)
+
+    /** The bar this session's sets are measured against for a PR: everything before it. */
+    suspend fun priorBestE1rmExcludingSession(exerciseId: String, sessionId: Long): Double? =
+        sessionDao.getEstimated1RmExcludingSession(exerciseId, sessionId)
+
+    /**
+     * Adds a lift to a session that is already running ("add another exercise").
+     *
+     * A one-off body-map session gets it as a real slot, so it is prescribed like the
+     * rest. A programmed day is left alone — an extra lift today must not rewrite the plan
+     * for every week after — and the lift is logged freestyle inside the same session.
+     */
+    suspend fun addExerciseToSession(sessionId: Long, exerciseId: String) {
+        val profile = profileDao.get()
+        val session = sessionDao.getSessionById(sessionId) ?: return
+        val templateId = session.templateId ?: return
+        val template = programDao.getTemplateById(templateId) ?: return
+        if (template.dayIndex >= 0 || profile == null) return
+        if (programDao.getSlots(templateId).any { it.exerciseId == exerciseId }) return
+        programGenerator.appendSlot(templateId, exerciseId, profile)
+    }
+
+    /**
+     * Sessions started in the current training day, not yet finished, with at least one
+     * set logged — newest first. A session nobody logged anything into is not "in
+     * progress"; it is a tap that went nowhere, and it must not take over Today. (A
+     * programmed day's own open session is resumed by its training-day card regardless.)
+     */
+    suspend fun openSessionsToday(now: Long = System.currentTimeMillis()): List<SessionEntity> {
+        val dayStartHour = trainingClock.dayStartHour()
+        val bounds = trainingClock.dayBounds(trainingClock.trainingDate(now, dayStartHour), dayStartHour)
+        return sessionDao.getSessionsStartedBetween(bounds.first, bounds.last + 1)
+            .filter { it.endedAt == null }
+            .filter { sessionDao.getSetsForSession(it.id).isNotEmpty() }
+            .sortedByDescending { it.startedAt }
+    }
 
     suspend fun logSet(set: SetLogEntity): Long = sessionDao.insertSetLog(set)
 

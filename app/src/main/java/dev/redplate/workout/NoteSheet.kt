@@ -52,7 +52,8 @@ fun NoteSheet(
     var text by rememberSaveable { mutableStateOf(initial) }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        // A tap on the dimmed area above the sheet is not "throw away what I wrote".
+        onDismissRequest = { if (text != initial) onSave(text) else onDismiss() },
         sheetState = sheetState,
         containerColor = colors.surface,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),

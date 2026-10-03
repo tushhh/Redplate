@@ -72,7 +72,7 @@ fun ScheduleScreen(
                 .padding(horizontal = 22.dp)
                 .padding(top = 8.dp),
         ) {
-            MonoLabel(text = "2 OF 5")
+            MonoLabel(text = "2 of 5 · your week")
             Spacer(Modifier.height(12.dp))
 
             Text(

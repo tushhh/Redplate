@@ -134,6 +134,16 @@ object CoachCopy {
 
         const val SETTINGS_ONLY = "Saved. Your block is unchanged."
 
+        const val SAVED = "Saved."
+
+        const val SWITCHED_TO_CHOOSING =
+            "Done — you pick each session now. Your history and PRs are all kept, and you " +
+                "can hand planning back to the app any time."
+
+        const val CHOOSING_INTRO =
+            "You're picking each session. Tap the muscles you feel like training and you " +
+                "get a real session built around them. Or let the app plan the week."
+
         const val ALREADY_FITTED = "Saved. Every session already fitted."
 
         /**

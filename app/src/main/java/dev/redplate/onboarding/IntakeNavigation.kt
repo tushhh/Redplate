@@ -29,6 +29,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.redplate.coach.CoachCopy
+import dev.redplate.data.Goal
 import dev.redplate.data.SeedState
 import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
@@ -61,6 +62,7 @@ fun IntakeFlow(
         }
 
         composable("schedule") {
+            ProvideIntakeBack({ navController.popBackStack() }) {
             ScheduleScreen(
                 daysPerWeek = state.daysPerWeek,
                 sessionMinutes = state.sessionMinutes,
@@ -69,9 +71,11 @@ fun IntakeFlow(
                 onSelectMinutes = viewModel::setSessionMinutes,
                 onNext = { navController.navigate("aboutYou") },
             )
+            }
         }
 
         composable("aboutYou") {
+            ProvideIntakeBack({ navController.popBackStack() }) {
             AboutYouScreen(
                 experience = state.experience,
                 bodyweightKg = state.bodyweightKg,
@@ -96,11 +100,13 @@ fun IntakeFlow(
                     title = "WHAT DO YOU WEIGH?",
                 )
             }
+            }
         }
 
         // The first screen that reads seeded rows. Asking about an inventory that has not
         // been written yet shows an empty gym and no reason for it, so this waits.
         composable("equipment") {
+            ProvideIntakeBack({ navController.popBackStack() }) {
             when (val seed = seedState) {
                 SeedState.Seeding -> SeedWaitScreen()
 
@@ -124,9 +130,11 @@ fun IntakeFlow(
                     onNext = { navController.navigate("planFork") },
                 )
             }
+            }
         }
 
         composable("planFork") {
+            ProvideIntakeBack({ navController.popBackStack() }) {
             PlanForkScreen(
                 selectedChoice = state.planChoice,
                 onSelectChoice = viewModel::setPlanChoice,
@@ -138,10 +146,15 @@ fun IntakeFlow(
                     }
                 },
             )
+            }
         }
 
         composable("presetLibrary") {
-            val presets = remember(state.daysPerWeek) { buildPresetList(state.daysPerWeek) }
+            ProvideIntakeBack({ navController.popBackStack() }) {
+            val base = state.presetBase ?: PresetBase(state.goal ?: Goal.HYPERTROPHY, state.daysPerWeek)
+            val presets = remember(base, state.sessionMinutes) {
+                buildPresetList(base, state.sessionMinutes)
+            }
 
             // The screen opens on its best fit, as 3b draws it. Landing on a disabled
             // "pick one" bar after four answered questions reads as a dead end.
@@ -160,6 +173,7 @@ fun IntakeFlow(
                 onSelectPreset = viewModel::selectPreset,
                 onConfirm = { viewModel.finishIntake(onIntakeComplete) },
             )
+            }
         }
     }
 
@@ -278,40 +292,80 @@ message = CoachCopy.Setup.SEED_FAILED_BODY,
 }
 
 /**
- * The presets 3b offers, marked against the week the user just described. A plan that
- * needs more days than they have is still listed, labelled and dimmed — picking it moves
- * the week to suit, which is the user's call to make.
+ * The presets 3b offers. The first is always "your answers" — the plan the five
+ * questions describe, changing nothing — and it is the best fit by definition. The others
+ * are alternatives, and each card says what picking it would change.
  */
-private fun buildPresetList(daysPerWeek: Int): List<PresetPlan> = listOf(
-    PresetPlan(
-        id = PRESET_UPPER_LOWER,
-        name = "Upper / Lower",
-        daysRequired = 4,
-        durationRange = "55–65 MIN",
-        volumeDescription = "4 DAYS · 55–65 MIN · 10–14 SETS PER MUSCLE / WEEK",
-        description = "Everything trained twice a week with two clear rest days. The most " +
-            "reliable structure at four days.",
-        isBestFit = daysPerWeek in 3..5,
-    ),
-    PresetPlan(
-        id = PRESET_STRENGTH,
-        name = "Strength — heavy triples",
-        daysRequired = 4,
-        durationRange = "60–75 MIN",
-        volumeDescription = "3–4 DAYS · 60–75 MIN · 2–3 SETS PER LIFT @ ~80% 1RM",
-        description = "Squat, bench, deadlift, press first while you’re fresh. Long rests, " +
-            "low reps, small weekly jumps.",
-        isBestFit = daysPerWeek == 2,
-    ),
-    PresetPlan(
-        id = PRESET_PPL,
-        name = "Push / Pull / Legs",
-        daysRequired = 6,
-        durationRange = "50–60 MIN",
-        volumeDescription = "6 DAYS · 50–60 MIN · 14–20 SETS PER MUSCLE / WEEK",
-        description = "More volume than you need right now, and only if six days is " +
-            "genuinely realistic.",
-        isBestFit = daysPerWeek == 6,
-        mismatchWarning = if (daysPerWeek < 6) "NEEDS 6 DAYS" else null,
-    ),
-)
+private fun buildPresetList(base: PresetBase, sessionMinutes: Int): List<PresetPlan> = buildList {
+    val split = when (base.daysPerWeek) {
+        2 -> "Full body, twice a week"
+        3 -> "Full body, three times a week"
+        4 -> "Upper / Lower, twice each"
+        5 -> "Upper / Lower / Push / Pull / Legs"
+        else -> "Push / Pull / Legs, twice each"
+    }
+    add(
+        PresetPlan(
+            id = PRESET_ANSWERS,
+            name = split,
+            daysRequired = base.daysPerWeek,
+            durationRange = "$sessionMinutes MIN",
+            volumeDescription = "${base.daysPerWeek} DAYS · UP TO $sessionMinutes MIN · ${goalTag(base.goal)}",
+            description = "Built from your answers. " + goalSummary(base.goal),
+            isBestFit = true,
+        ),
+    )
+    if (base.goal != Goal.STRENGTH) {
+        add(
+            PresetPlan(
+                id = PRESET_STRENGTH,
+                name = "Strength focus",
+                daysRequired = base.daysPerWeek,
+                durationRange = "$sessionMinutes MIN",
+                volumeDescription = "${base.daysPerWeek} DAYS · HEAVY 3–6 REPS · LONG RESTS",
+                description = "Switches your goal to Get stronger: heavier, fewer reps, longer " +
+                    "rests." + if (base.goal == Goal.LEAN) " Drops the cardio finisher." else "",
+                mismatchWarning = "CHANGES YOUR GOAL",
+            ),
+        )
+    }
+    if (base.daysPerWeek != 6) {
+        add(
+            PresetPlan(
+                id = PRESET_PPL,
+                name = "Push / Pull / Legs",
+                daysRequired = 6,
+                durationRange = "50–60 MIN",
+                volumeDescription = "6 DAYS · 50–60 MIN · MORE WEEKLY VOLUME",
+                description = "Only if six days a week is genuinely realistic — it moves your " +
+                    "week from ${base.daysPerWeek} days to 6.",
+                mismatchWarning = "NEEDS 6 DAYS",
+            ),
+        )
+    }
+}
+
+private fun goalTag(goal: Goal): String = when (goal) {
+    Goal.STRENGTH -> "STRENGTH"
+    Goal.HYPERTROPHY -> "MUSCLE"
+    Goal.LEAN -> "LEANER & STRONGER"
+    Goal.GENERAL -> "GENERAL FITNESS"
+}
+
+private fun goalSummary(goal: Goal): String = when (goal) {
+    Goal.STRENGTH -> "Heavy compounds, low reps, long rests."
+    Goal.HYPERTROPHY -> "Moderate reps close to failure, volume climbing week to week."
+    Goal.LEAN -> "Heavy 5–8 rep compounds, dense accessories and a short cardio finisher."
+    Goal.GENERAL -> "A middle rep range, nothing brutal."
+}
+
+/**
+ * The back affordance for intake screens after the first. They had none: system Back was
+ * the only way, and nothing on screen said it existed.
+ */
+val LocalIntakeBack = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
+
+@Composable
+private fun ProvideIntakeBack(onBack: () -> Unit, content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalIntakeBack provides onBack, content = content)
+}

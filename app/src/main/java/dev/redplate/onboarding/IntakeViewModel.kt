@@ -68,9 +68,14 @@ class IntakeViewModel @Inject constructor(
         }
     }
 
-    fun setGoal(goal: Goal) = _state.update { it.copy(goal = goal) }
+    // Changing an answer again forgets any preset tried on top of the old one.
+    fun setGoal(goal: Goal) = _state.update {
+        it.copy(goal = goal, selectedPresetId = null, presetBase = null)
+    }
 
-    fun setDaysPerWeek(days: Int) = _state.update { it.copy(daysPerWeek = days) }
+    fun setDaysPerWeek(days: Int) = _state.update {
+        it.copy(daysPerWeek = days, selectedPresetId = null, presetBase = null)
+    }
 
     fun setSessionMinutes(minutes: Int) = _state.update { it.copy(sessionMinutes = minutes) }
 
@@ -124,35 +129,60 @@ class IntakeViewModel @Inject constructor(
 
     fun setDumbbellStep(step: DumbbellStep) = _state.update { it.copy(dumbbellStep = step) }
 
-    fun setPlanChoice(choice: PlanChoice) = _state.update { it.copy(planChoice = choice) }
+    /**
+     * Presets only belong to the "give me a plan" path. Switching to picking each day
+     * restores the answers a preset tried on had changed, rather than saving them.
+     */
+    fun setPlanChoice(choice: PlanChoice) = _state.update { state ->
+        val base = state.presetBase
+        if (choice == PlanChoice.I_CHOOSE && base != null) {
+            state.copy(
+                planChoice = choice,
+                goal = base.goal,
+                daysPerWeek = base.daysPerWeek,
+                selectedPresetId = null,
+                presetBase = null,
+            )
+        } else {
+            state.copy(planChoice = choice)
+        }
+    }
 
     fun setEquipmentFilter(filter: EquipmentFilter) = _state.update { it.copy(equipmentFilter = filter) }
 
     fun setEquipmentSearch(query: String) = _state.update { it.copy(equipmentSearch = query) }
 
     /**
-     * A preset is a structure, so choosing one sets the inputs that structure implies —
-     * days per week, and for the strength plan the goal too. The generator reads those
-     * fields; the preset id itself never reaches the database.
+     * A preset is a structure, so choosing one sets the inputs that structure implies.
+     *
+     * The first card is always the user's own answers and changes nothing. This used to
+     * auto-select an "Upper / Lower" card that forced four days — so a three-day user was
+     * moved to four just by opening the screen — and a strength card that replaced the
+     * goal without saying so. Now every other card says on its face what it changes, and
+     * going back to "your answers" restores them exactly.
      */
     fun selectPreset(presetId: String) = _state.update { state ->
+        val base = state.presetBase ?: PresetBase(state.goal ?: Goal.HYPERTROPHY, state.daysPerWeek)
         when (presetId) {
             PRESET_STRENGTH -> state.copy(
                 selectedPresetId = presetId,
-                daysPerWeek = 4,
+                presetBase = base,
+                daysPerWeek = base.daysPerWeek,
                 goal = Goal.STRENGTH,
             )
 
             PRESET_PPL -> state.copy(
                 selectedPresetId = presetId,
+                presetBase = base,
                 daysPerWeek = 6,
-                goal = state.goal ?: Goal.HYPERTROPHY,
+                goal = base.goal,
             )
 
             else -> state.copy(
                 selectedPresetId = presetId,
-                daysPerWeek = 4,
-                goal = state.goal ?: Goal.HYPERTROPHY,
+                presetBase = base,
+                daysPerWeek = base.daysPerWeek,
+                goal = base.goal,
             )
         }
     }
@@ -277,6 +307,8 @@ data class IntakeState(
     val equipmentFilter: EquipmentFilter = EquipmentFilter.ALL,
     val equipmentSearch: String = "",
     val selectedPresetId: String? = null,
+    /** The answers as given, before any preset was tried on top of them. */
+    val presetBase: PresetBase? = null,
     /** Guards the finish button: generating a plan writes a lot of rows. */
     val isSaving: Boolean = false,
     /** Said plainly when building the plan failed; the button is usable again. */
@@ -335,6 +367,8 @@ data class IntakeState(
     }
 }
 
+data class PresetBase(val goal: Goal, val daysPerWeek: Int)
+
 /** The three parts of 2d's consequence sentence: "$split. Around $setsPhrase, $tail" */
 data class ScheduleConsequence(
     val split: String,
@@ -372,6 +406,7 @@ enum class PlanChoice {
 }
 
 const val PRESET_UPPER_LOWER = "upper_lower"
+const val PRESET_ANSWERS = "answers"
 const val PRESET_STRENGTH = "strength"
 const val PRESET_PPL = "ppl"
 

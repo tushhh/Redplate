@@ -2,7 +2,13 @@ package dev.redplate.workout
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +74,7 @@ fun SetLoggingRoute(
     onSwapExercise: (sessionId: Long, exerciseId: String) -> Unit,
     onSessionFinished: (sessionId: Long) -> Unit,
     modifier: Modifier = Modifier,
+    onAddExercise: (sessionId: Long) -> Unit = {},
     viewModel: SetLoggingViewModel = hiltViewModel(),
 ) {
     KeepScreenOn()
@@ -92,10 +99,15 @@ fun SetLoggingRoute(
 
     var showGuidance by rememberSaveable { mutableStateOf(false) }
     var showSwap by rememberSaveable { mutableStateOf(false) }
+    var confirmLeave by rememberSaveable { mutableStateOf(false) }
+
+    // Leaving a workout is a decision, not a slip of the thumb: Back asks first, and says
+    // plainly that nothing logged is lost.
+    BackHandler(enabled = !confirmLeave) { confirmLeave = true }
 
     SetLoggingScreen(
         state = state,
-        onBack = onBack,
+        onBack = { confirmLeave = true },
         onOpenGuidance = { showGuidance = true },
         onLoadDown = viewModel::loadDown,
         onLoadUp = viewModel::loadUp,
@@ -118,8 +130,25 @@ fun SetLoggingRoute(
         onAddRest = { viewModel.adjustRest(30) },
         onAddShortRest = { viewModel.adjustRest(15) },
         onUndoSet = viewModel::undoLastSet,
+        onAddExercise = { viewModel.addAnotherExercise(onAddExercise) },
+        onFinishNow = { confirmLeave = true },
+        onSkipRest = viewModel::skipRest,
         modifier = modifier,
     )
+
+    if (confirmLeave) {
+        LeaveWorkoutSheet(
+            onKeepTraining = { confirmLeave = false },
+            onLeave = {
+                confirmLeave = false
+                onBack()
+            },
+            onFinish = {
+                confirmLeave = false
+                viewModel.finishSession(onSessionFinished)
+            },
+        )
+    }
 
     if (showGuidance) {
         GuidanceSheet(
@@ -208,8 +237,22 @@ fun SetLoggingScreen(
     onAddShortRest: () -> Unit,
     modifier: Modifier = Modifier,
     onUndoSet: () -> Unit = {},
+    onAddExercise: () -> Unit = {},
+    onFinishNow: () -> Unit = {},
+    onSkipRest: () -> Unit = {},
 ) {
-    val resting = state.rest is RestState.Running
+    // "One more set" past the plan: remembers how many sets were logged when it was asked
+    // for. Logging the extra set ends it; undoing that set keeps the input on screen so
+    // the set can be fixed rather than dropping back to "Lift done".
+    var extraFrom by rememberSaveable { mutableStateOf(-1) }
+    val extraSet = extraFrom >= 0 && state.loggedSets.size <= extraFrom
+
+    // The rest screen stays up after the countdown when the lift is finished: it is the
+    // only place Next and Finish live. It used to fall back to the input screen at 0:00,
+    // which offers neither, and the only way forward was logging a set that never happened.
+    val liftDone = state.loggedSets.any { !it.isWarmup } &&
+        state.restPrimaryAction != RestAction.NEXT_SET
+    val resting = state.rest is RestState.Running || (liftDone && !extraSet)
 
     Crossfade(
         targetState = resting,
@@ -225,6 +268,12 @@ fun SetLoggingScreen(
                 onAddShort = onAddShortRest,
                 onPrimary = onRestPrimary,
                 onUndo = onUndoSet,
+                onOneMoreSet = {
+                    onSkipRest()
+                    extraFrom = state.loggedSets.size
+                },
+                onAddExercise = onAddExercise,
+                onFinishNow = onFinishNow,
                 modifier = modifier,
             )
         } else {
@@ -345,13 +394,28 @@ private fun InputScreen(
             } else {
                 if (state.coachReasoningLine.isNotEmpty()) {
                     Text(
-                        text = state.coachReasoningLine,
+                        text = state.coachReasoningLine.removeSuffix(" —"),
                         style = RedplateType.body.copy(fontSize = 15.sp),
                         color = colors.inkSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(6.dp))
                 }
 
+                // The weight is the thing most often changed between sets, so its steppers
+                // are full 64 dp targets either side of the number. They used to be 40 dp
+                // chips tucked under the rep counter.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                StepButton(
+                    "−",
+                    if (state.loadIsAssistance) "Less assistance, harder" else "Lighter",
+                    onClick = onLoadDown,
+                )
                 // Tapping the readout types the value in directly. The steppers walk what the
                 // app believes the equipment can make; this records what it actually was.
                 Row(
@@ -392,6 +456,19 @@ private fun InputScreen(
                         modifier = Modifier.padding(bottom = 9.dp),
                     )
                 }
+                StepButton(
+                    "+",
+                    if (state.loadIsAssistance) "More assistance, easier" else "Heavier",
+                    onClick = onLoadUp,
+                )
+                }
+                Text(
+                    text = "TAP THE NUMBER TO TYPE IT",
+                    style = RedplateType.mono.copy(fontSize = 10.5.sp),
+                    color = colors.inkSubtle,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 if (state.loadIsAssistance) {
                     Text(
@@ -452,9 +529,6 @@ private fun InputScreen(
                     reps = state.reps,
                     onDown = onRepsDown,
                     onUp = onRepsUp,
-                    onLoadDown = onLoadDown,
-                    onLoadUp = onLoadUp,
-                    unitLabel = state.loadUnitLabel,
                 )
                 Spacer(Modifier.height(10.dp))
                 DifficultyChips(
@@ -491,10 +565,17 @@ private fun RestScreen(
     onAddShort: () -> Unit,
     onPrimary: () -> Unit,
     onUndo: () -> Unit,
+    onOneMoreSet: () -> Unit,
+    onAddExercise: () -> Unit,
+    onFinishNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = RedplateTheme.colors
-    val running = state.rest as? RestState.Running ?: return
+    // Null once the countdown is over but the lift is done: the screen stays, because its
+    // button is the way on to the next lift.
+    val running = state.rest as? RestState.Running
+    val liftDone = state.restPrimaryAction != RestAction.NEXT_SET
+    val canExtend = liftDone && !state.isCardioFinisher
 
     Column(
         modifier = modifier
@@ -533,7 +614,7 @@ private fun RestScreen(
                         Text(
                             text = "★ PR",
                             style = RedplateType.mono.copy(
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                             ),
                             color = colors.inkOnLight,
@@ -549,12 +630,13 @@ private fun RestScreen(
             }
 
             Text(
-                text = "REST",
-                style = RedplateType.mono.copy(fontSize = 10.5.sp),
+                text = if (running != null) "REST" else "REST'S UP",
+                style = RedplateType.mono.copy(fontSize = 11.sp),
                 color = colors.inkMuted,
             )
             Spacer(Modifier.height(2.dp))
 
+            if (running != null) {
             // 112sp, tabular — readable with the phone on the floor.
             Text(
                 text = formatClock(running.remainingSeconds),
@@ -564,14 +646,22 @@ private fun RestScreen(
                     contentDescription = "${running.remainingSeconds} seconds of rest left"
                 },
             )
+            } else {
+                Text(
+                    text = if (state.isCardioFinisher) "Done." else "Lift done.",
+                    style = RedplateType.headline.copy(fontSize = 56.sp, lineHeight = 60.sp),
+                    color = colors.ink,
+                )
+            }
 
             Spacer(Modifier.height(14.dp))
-            val progress = if (running.totalSeconds > 0) {
-                1f - (running.remainingSeconds.toFloat() / running.totalSeconds)
-            } else {
-                0f
+            val progress = when {
+                running == null -> 1f
+                running.totalSeconds > 0 ->
+                    1f - (running.remainingSeconds.toFloat() / running.totalSeconds)
+                else -> 0f
             }
-            Box(
+            if (running != null) Box(
                 Modifier
                     .fillMaxWidth()
                     .height(5.dp)
@@ -582,7 +672,7 @@ private fun RestScreen(
                     Modifier
                         .fillMaxWidth(progress.coerceIn(0f, 1f))
                         .fillMaxHeight()
-                        .background(colors.live),
+                        .background(if (running != null) colors.live else colors.inkSubtle),
                 )
             }
             Spacer(Modifier.height(20.dp))
@@ -600,46 +690,58 @@ private fun RestScreen(
                 SetHistoryCard(sets = state.loggedSets)
             }
 
-            // Mis-tapped Done, or the rep count was wrong: take it back and fix it.
-            // A visible button, never a swipe on the history row — sweat makes gestures
-            // unreliable (CLAUDE.md §4).
             if (state.canUndo) {
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable(onClick = onUndo)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = "Undo the last set and edit it"
-                            role = Role.Button
-                        },
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Text(
-                        text = "↶  Undo that set",
-                        style = RedplateType.body.copy(fontSize = 14.sp),
-                        color = colors.inkMuted,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
-                }
+                Spacer(Modifier.height(10.dp))
+                UndoLastSet(
+                    lastSet = state.loggedSets.lastOrNull(),
+                    unitLabel = state.loadUnitLabel.lowercase(),
+                    isCardio = state.isCardioFinisher,
+                    onConfirm = onUndo,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // Controls, bottom half only. Every one is a drawn, labelled button: nothing on
+        // this screen responds to a tap on empty space.
+        if (running != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                RestPill("−15s", "Take 15 seconds off the rest", onClick = onSub,
+                    modifier = Modifier.width(92.dp), mono = true)
+                RestPill("Add 30s", "Add 30 seconds to the rest", onClick = onAdd,
+                    modifier = Modifier.weight(1f))
+                RestPill("+15s", "Add 15 seconds to the rest", onClick = onAddShort,
+                    modifier = Modifier.width(92.dp), mono = true)
             }
         }
 
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            RestPill("−15s", "Take 15 seconds off the rest", onClick = onSub,
-                modifier = Modifier.width(92.dp), mono = true)
-            RestPill("Add 30s", "Add 30 seconds to the rest", onClick = onAdd,
-                modifier = Modifier.weight(1f))
-            RestPill("+15s", "Add 15 seconds to the rest", onClick = onAddShort,
-                modifier = Modifier.width(92.dp), mono = true)
+        if (liftDone) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (canExtend) {
+                    RestPill("One more set", "Log one more set of ${state.exerciseName}",
+                        onClick = onOneMoreSet, modifier = Modifier.weight(1f))
+                }
+                if (state.restPrimaryAction == RestAction.FINISH_SESSION) {
+                    RestPill("Add an exercise", "Add another exercise to this session",
+                        onClick = onAddExercise, modifier = Modifier.weight(1f))
+                } else {
+                    // Mid-session, ending early is still one deliberate tap away.
+                    RestPill("Finish now", "Finish the session here",
+                        onClick = onFinishNow, modifier = Modifier.weight(1f))
+                }
+            }
         }
 
         PrimaryBar(
@@ -647,6 +749,134 @@ private fun RestScreen(
             onClick = onPrimary,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+    }
+}
+
+/**
+ * Taking a set back, in two deliberate taps.
+ *
+ * The first version was a full-width row whose only visible part was a small label at
+ * its left edge, so a tap on the "empty" space beside it — the natural place to rest a
+ * thumb — deleted the set and cancelled the rest. Now the control is a drawn, bordered
+ * button no wider than its words, and it only asks; removing the set takes a second,
+ * explicit tap on a button that names what will go.
+ */
+@Composable
+private fun UndoLastSet(
+    lastSet: LoggedSetLine?,
+    unitLabel: String,
+    isCardio: Boolean,
+    onConfirm: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+    var confirming by rememberSaveable(lastSet?.setIndex) { mutableStateOf(false) }
+
+    if (!confirming) {
+        Box(
+            Modifier
+                .height(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, colors.line, RoundedCornerShape(16.dp))
+                .clickable { confirming = true }
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Undo the last set"
+                    role = Role.Button
+                }
+                .padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "↶  Undo last set",
+                style = RedplateType.body.copy(fontSize = 14.sp),
+                color = colors.inkSecondary,
+            )
+        }
+        return
+    }
+
+    // Unanswered, the question goes away again: a stray tap on it later must not delete.
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(UNDO_CONFIRM_TIMEOUT_MS)
+        confirming = false
+    }
+
+    val what = when {
+        lastSet == null -> "the last set"
+        isCardio -> "${lastSet.reps} min"
+        else -> "set ${lastSet.setIndex + 1} · ${formatKg(lastSet.loadKg)} $unitLabel × ${lastSet.reps}"
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.surface)
+            .padding(14.dp),
+    ) {
+        Text(
+            text = "Remove $what? It comes back on screen so you can fix it and log it again.",
+            style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 20.sp),
+            color = colors.inkBright,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RestPill("Remove it", "Remove $what", onClick = {
+                confirming = false
+                onConfirm()
+            }, modifier = Modifier.weight(1f), raised = true)
+            RestPill("Keep it", "Keep the set", onClick = { confirming = false },
+                modifier = Modifier.weight(1f), raised = true)
+        }
+    }
+}
+
+/**
+ * Back from a workout. Nothing logged is ever lost by leaving — sets are saved the moment
+ * Done is pressed — but it should be a choice, and the sheet says where to pick it up.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LeaveWorkoutSheet(
+    onKeepTraining: () -> Unit,
+    onLeave: () -> Unit,
+    onFinish: () -> Unit,
+) {
+    val colors = RedplateTheme.colors
+    ModalBottomSheet(
+        onDismissRequest = onKeepTraining,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.surface,
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+        ) {
+            Column(Modifier.padding(horizontal = 22.dp)) {
+                SectionLabel("Leaving the workout")
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Every set you've logged is saved, and so is what's on screen now. " +
+                        "Resume from Today whenever you're ready.",
+                    style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                    color = colors.inkSecondary,
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+            Column(
+                Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RestPill("Leave for now", "Leave and resume later", onClick = onLeave,
+                        modifier = Modifier.weight(1f))
+                    RestPill("Finish workout", "Finish the workout now", onClick = onFinish,
+                        modifier = Modifier.weight(1f))
+                }
+                PrimaryBar(label = "Keep training", onClick = onKeepTraining)
+            }
+        }
     }
 }
 
@@ -666,7 +896,7 @@ private fun SetHeader(
     // The station leads the subtitle: an exercise name you do not recognise is only useful
     // once you know where in the gym it happens.
     val fullSubtitle = listOfNotNull(stationLabel?.uppercase(), subtitle.ifEmpty { null })
-        .joinToString("  ·  ")
+        .joinToString("\n")
     ScreenHeader(
         title = exerciseName,
         subtitle = fullSubtitle.ifEmpty { null },
@@ -699,21 +929,14 @@ private fun SetHeader(
 }
 
 /**
- * Reps in the middle with its own steppers, and the load steppers on the outside.
- *
- * 8a draws only the rep steppers, because the engine prescribes the load. The load
- * pair is kept because COACHING.md requires an override to always be possible and the
- * plan doc is explicit that "steppers stay for overriding" — they sit outboard so the
- * rep question still reads as the primary one.
+ * Reps in the middle with their own 64 dp steppers. The load steppers sit beside the
+ * load readout instead, so each control is next to the number it changes.
  */
 @Composable
 private fun RepCounter(
     reps: Int,
     onDown: () -> Unit,
     onUp: () -> Unit,
-    onLoadDown: () -> Unit,
-    onLoadUp: () -> Unit,
-    unitLabel: String,
 ) {
     val colors = RedplateTheme.colors
     Row(
@@ -738,41 +961,10 @@ private fun RepCounter(
                 style = RedplateType.body.copy(fontSize = 12.sp),
                 color = colors.inkMuted,
             )
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Labelled in the equipment's own unit — "+ level" on a machine that
-                // prints levels, not a kilogram figure that appears nowhere on it.
-                val unit = unitLabel.lowercase()
-                LoadNudge("− $unit", "Decrease load", onLoadDown)
-                LoadNudge("+ $unit", "Increase load", onLoadUp)
-            }
+
         }
 
         StepButton("+", "Increase reps", onClick = onUp)
-    }
-}
-
-@Composable
-private fun LoadNudge(label: String, description: String, onClick: () -> Unit) {
-    val colors = RedplateTheme.colors
-    Box(
-        Modifier
-            .sizeIn(minWidth = 64.dp, minHeight = 40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(colors.surface)
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                contentDescription = description
-                role = Role.Button
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = RedplateType.mono.copy(fontSize = 11.sp),
-            color = colors.inkMuted,
-        )
     }
 }
 
@@ -806,13 +998,14 @@ private fun RestPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     mono: Boolean = false,
+    raised: Boolean = false,
 ) {
     val colors = RedplateTheme.colors
     Box(
         modifier
             .height(64.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(colors.surface)
+            .background(if (raised) colors.surfaceRaised else colors.surface)
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = description
@@ -868,6 +1061,8 @@ private fun SetHistoryCard(sets: List<LoggedSetLine>) {
         }
     }
 }
+
+private const val UNDO_CONFIRM_TIMEOUT_MS = 8_000L
 
 // ── Formatting ──────────────────────────────────────────────────────
 

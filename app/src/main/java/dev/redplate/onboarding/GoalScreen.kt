@@ -87,7 +87,7 @@ fun GoalScreen(
                 .padding(horizontal = 22.dp)
                 .padding(top = 8.dp),
         ) {
-            MonoLabel(text = "1 of 5 · about a minute")
+            MonoLabel(text = "1 of 5 · about two minutes")
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "What are you training for?",

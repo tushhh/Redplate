@@ -135,19 +135,37 @@ private fun MainContent() {
                 }
 
                 // ── Exercise picker (reachable from Today) ──
-                composable("exercises") {
+                // sessionId > 0 means "add to this running session" (set logging's
+                // "Add an exercise"); without it, the picker starts something new.
+                composable(
+                    EXERCISES_ROUTE,
+                    arguments = listOf(
+                        navArgument("sessionId") {
+                            type = NavType.LongType
+                            defaultValue = 0L
+                        },
+                    ),
+                ) { entry ->
+                    val addingTo = entry.arguments?.getLong("sessionId") ?: 0L
                     ExercisePickerRoute(
                         onExerciseSelected = { sessionId, exerciseId ->
                             navController.navigate("setLogging/$sessionId/$exerciseId") {
-                                popUpTo("exercises") { inclusive = true }
+                                // Adding replaces the finished lift's screen too, so Back
+                                // from the new one doesn't walk through the old one.
+                                if (addingTo > 0L) {
+                                    popUpTo(SET_LOGGING_ROUTE) { inclusive = true }
+                                } else {
+                                    popUpTo(EXERCISES_ROUTE) { inclusive = true }
+                                }
                             }
                         },
+                        onClose = { navController.popBackStack() },
                     )
                 }
 
                 // ── Set logging (full-bleed, hides tabs) ──
                 composable(
-                    "setLogging/{sessionId}/{exerciseId}",
+                    SET_LOGGING_ROUTE,
                     arguments = listOf(
                         navArgument("sessionId") { type = NavType.LongType },
                         navArgument("exerciseId") { type = NavType.StringType },
@@ -160,14 +178,14 @@ private fun MainContent() {
                         // walking backwards through every lift already finished.
                         onNextExercise = { sessionId, exerciseId ->
                             navController.navigate("setLogging/$sessionId/$exerciseId") {
-                                popUpTo("setLogging/{sessionId}/{exerciseId}") {
+                                popUpTo(SET_LOGGING_ROUTE) {
                                     inclusive = true
                                 }
                             }
                         },
                         onSwapExercise = { sessionId, exerciseId ->
                             navController.navigate("setLogging/$sessionId/$exerciseId") {
-                                popUpTo("setLogging/{sessionId}/{exerciseId}") {
+                                popUpTo(SET_LOGGING_ROUTE) {
                                     inclusive = true
                                 }
                             }
@@ -176,6 +194,9 @@ private fun MainContent() {
                             navController.navigate("sessionSummary/$sessionId") {
                                 popUpTo("today")
                             }
+                        },
+                        onAddExercise = { sessionId ->
+                            navController.navigate("exercises?sessionId=$sessionId")
                         },
                     )
                 }
@@ -208,6 +229,7 @@ private fun MainContent() {
                         onEditTemplate = { templateId ->
                             navController.navigate("programBuilder/$templateId")
                         },
+                        onPickExercise = { navController.navigate("exercises") },
                     )
                 }
 
@@ -294,3 +316,6 @@ private fun MainContent() {
         }
     }
 }
+
+private const val EXERCISES_ROUTE = "exercises?sessionId={sessionId}"
+private const val SET_LOGGING_ROUTE = "setLogging/{sessionId}/{exerciseId}"

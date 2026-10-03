@@ -46,6 +46,9 @@ sealed interface BrowseIntent {
 
     /** No session built yet — reached by searching from the map. */
     data object Freestyle : BrowseIntent
+
+    /** "Add another exercise" from a session already running. */
+    data object AddToSession : BrowseIntent
 }
 
 @HiltViewModel
@@ -102,6 +105,12 @@ class ExercisePickerViewModel @Inject constructor(
     private val _muscleVolume = MutableStateFlow<Map<MuscleGroup, VolumeLevel>>(emptyMap())
     val muscleVolume: StateFlow<Map<MuscleGroup, VolumeLevel>> = _muscleVolume.asStateFlow()
 
+    /**
+     * Opened from a running session's "Add an exercise": the picker goes straight to the
+     * archive and whatever is chosen joins that session rather than starting a new one.
+     */
+    val isAddingToSession: Boolean = (savedState.get<Long>(ARG_ADD_TO_SESSION) ?: 0L) > 0L
+
     init {
         refreshVolume()
     }
@@ -144,9 +153,14 @@ class ExercisePickerViewModel @Inject constructor(
      * first set. The plan is stored as a real template, so set logging reads the same
      * prescription and walks the same running order as a programmed day.
      */
+    /** Said out loud when building failed, instead of silently dropping back to the map. */
+    private val _buildError = MutableStateFlow<String?>(null)
+    val buildError: StateFlow<String?> = _buildError.asStateFlow()
+
     fun buildSession() {
         val muscles = _pickedMuscles.value
         if (muscles.isEmpty()) return
+        _buildError.value = null
 
         viewModelScope.launch {
             val profile = profileDao.get() ?: return@launch
@@ -164,6 +178,9 @@ class ExercisePickerViewModel @Inject constructor(
             if (templateId == null) {
                 generatedTemplateId = 0L
                 _phase.value = PickerPhase.MUSCLES
+                _buildError.value = "Nothing your equipment supports trains " +
+                    muscles.joinToString(" or ") { it.displayName.lowercase() } +
+                    ". Pick another muscle, or turn more kit on in You → Weights and equipment."
                 return@launch
             }
             generatedTemplateId = templateId
@@ -198,7 +215,7 @@ class ExercisePickerViewModel @Inject constructor(
                     buildString {
                         append("${slot.targetSets} × ${slot.repRangeLow}–${slot.repRangeHigh}")
                         if (load != null) append(" · ${formatKg(load)} KG")
-                        append(" · ${slot.targetRir} RIR")
+                        append(" · ${slot.targetRir} LEFT IN THE TANK")
                     }
                 },
                 reason = exercise?.let {
@@ -278,6 +295,15 @@ class ExercisePickerViewModel @Inject constructor(
      * a session they had already stepped away from.
      */
     private var browseReturnPhase: PickerPhase = PickerPhase.MUSCLES
+
+    // Declared after the browser's own state, which it needs.
+    init {
+        if (isAddingToSession) {
+            activeSessionId = savedState.get<Long>(ARG_ADD_TO_SESSION) ?: 0L
+            browseIntent = BrowseIntent.AddToSession
+            openBrowser(defaultFilters = setOf(BrowseFilter.MY_KIT))
+        }
+    }
 
     /** Tapping a row on 3d: the browser opens scoped to that slot's muscle. */
     fun browseToSwap(slotId: Long, exerciseId: String) {
@@ -368,6 +394,12 @@ class ExercisePickerViewModel @Inject constructor(
                 val sessionId = getOrCreateSession()
                 return sessionId to exerciseId
             }
+
+            BrowseIntent.AddToSession -> {
+                val sessionId = getOrCreateSession()
+                repo.addExerciseToSession(sessionId, exerciseId)
+                return sessionId to exerciseId
+            }
         }
     }
 
@@ -437,6 +469,7 @@ class ExercisePickerViewModel @Inject constructor(
                     is BrowseIntent.Swap -> "Swap in"
                     BrowseIntent.Add -> "Add"
                     BrowseIntent.Freestyle -> "Start with"
+                    BrowseIntent.AddToSession -> "Add"
                 },
                 isLoading = false,
             )
@@ -526,6 +559,7 @@ class ExercisePickerViewModel @Inject constructor(
             }
 
             BrowseIntent.Freestyle -> "Pick an exercise"
+            BrowseIntent.AddToSession -> "Add to this session"
         }
 
     private fun browserSubtitle(trainedCount: Int, archiveSize: Int): String =
@@ -539,14 +573,17 @@ class ExercisePickerViewModel @Inject constructor(
         if (kg % 1.0 == 0.0) kg.toInt().toString() else "%.1f".format(kg)
 
     suspend fun getOrCreateSession(): Long {
+        // Reused only while it is still open: a session that has been finished must not
+        // quietly collect the next workout's sets.
         val existing = activeSessionId
-        if (existing > 0L) return existing
+        if (existing > 0L && repo.getSession(existing)?.endedAt == null) return existing
         val id = repo.startFreestyleSession(System.currentTimeMillis())
         activeSessionId = id
         return id
     }
 
     private companion object {
+        const val ARG_ADD_TO_SESSION = "sessionId"
         const val KEY_SESSION_ID = "activeSessionId"
         const val KEY_TEMPLATE_ID = "generatedTemplateId"
     }
