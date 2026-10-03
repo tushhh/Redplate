@@ -74,7 +74,8 @@ fun PresetLibraryScreen(
             .background(colors.ground)
             .statusBarsPadding(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp)) {
+        IntakeProgressBar(currentStep = 5)
+        Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
             Text(
                 text = "Pick a plan",
                 style = RedplateType.headline.copy(fontSize = 30.sp, lineHeight = 33.sp),
@@ -82,7 +83,7 @@ fun PresetLibraryScreen(
             )
             Spacer(Modifier.height(5.dp))
             Text(
-                text = "$daysPerWeek days, $sessionMinutes minutes, your kit. Sorted by fit.",
+                text = "Your answers first. The others say what they would change.",
                 style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 21.sp),
                 color = colors.inkMuted,
             )

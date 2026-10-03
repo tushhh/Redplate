@@ -53,6 +53,17 @@ import dev.redplate.ui.theme.StateColor
 fun HistoryRoute() {
     val viewModel: HistoryViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // The tab is restored from saved state, so a workout logged since it was last open
+    // has to be read in again — it used to show the old numbers until the app restarted.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     HistoryScreen(
         state = state,
         onSelectExercise = viewModel::selectExercise,
@@ -224,7 +235,7 @@ private fun E1rmCard(state: HistoryState) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            SectionLabel(text = "Estimated 1RM")
+            SectionLabel(text = "Estimated one-rep max")
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = state.currentE1rmText,

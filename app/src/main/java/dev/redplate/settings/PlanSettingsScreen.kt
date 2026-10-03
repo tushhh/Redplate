@@ -46,6 +46,7 @@ import dev.redplate.ui.components.CoachHeadline
 import dev.redplate.ui.components.MonoLabel
 import dev.redplate.ui.components.PrimaryBar
 import dev.redplate.onboarding.TrainingExperience
+import dev.redplate.ui.components.ScreenHeader
 import dev.redplate.ui.components.SectionLabel
 import dev.redplate.ui.components.SecondaryButton
 import dev.redplate.ui.theme.RedplateTheme
@@ -59,6 +60,8 @@ fun PlanSettingsRoute(onDone: () -> Unit) {
     PlanSettingsScreen(
         state = state,
         onSetGoal = viewModel::setGoal,
+        onSetAppManaged = viewModel::setAppManaged,
+        onBack = onDone,
         onSetTrainingAge = viewModel::setTrainingAge,
         onSetDays = viewModel::setDaysPerWeek,
         onSetMinutes = viewModel::setSessionMinutes,
@@ -86,6 +89,8 @@ fun PlanSettingsRoute(onDone: () -> Unit) {
 fun PlanSettingsScreen(
     state: PlanSettingsState,
     onSetGoal: (Goal) -> Unit = {},
+    onSetAppManaged: (Boolean) -> Unit = {},
+    onBack: () -> Unit = {},
     onSetTrainingAge: (Int) -> Unit = {},
     onSetDays: (Int) -> Unit = {},
     onSetMinutes: (Int) -> Unit = {},
@@ -108,16 +113,20 @@ fun PlanSettingsScreen(
             .fillMaxSize()
             .background(colors.ground),
     ) {
+        // A visible way out. The tab bar is hidden here, and the only control used to be
+        // the bottom button — which, with no plan, quietly built one.
+        ScreenHeader(
+            title = "Your plan",
+            onBack = onBack,
+            modifier = Modifier.statusBarsPadding(),
+        )
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
                 .padding(horizontal = 22.dp),
         ) {
-            Spacer(Modifier.height(22.dp))
-            MonoLabel(text = "YOUR PLAN")
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             CoachHeadline(text = CoachCopy.Plan.HEADLINE)
             Spacer(Modifier.height(5.dp))
             Text(
@@ -137,6 +146,22 @@ fun PlanSettingsScreen(
                 Spacer(Modifier.height(24.dp))
                 return@Column
             }
+
+            SectionLabel(text = "Who plans your sessions")
+            Spacer(Modifier.height(8.dp))
+            ChoiceRows(
+                options = listOf(true to "The app plans my week", false to "I pick each session"),
+                selected = draft.appManaged,
+                consequence = { managed ->
+                    if (managed) {
+                        "A weekly plan that adjusts the weights and sets from what you log"
+                    } else {
+                        "Pick muscles each time and get a session built for them"
+                    }
+                },
+                onSelect = onSetAppManaged,
+            )
+            Spacer(Modifier.height(22.dp))
 
             SectionLabel(text = "What you're training for")
             Spacer(Modifier.height(8.dp))
@@ -169,7 +194,13 @@ fun PlanSettingsScreen(
                 onSelect = { onSetDays(PlanSettings.DAYS_RANGE.first + it) },
             )
             Spacer(Modifier.height(6.dp))
-            Caption("Changing this rebuilds the rest of your block.")
+            Caption(
+                if (draft.appManaged) {
+                    "Changing this rebuilds the rest of your block."
+                } else {
+                    "Used when you hand planning back to the app."
+                },
+            )
             Spacer(Modifier.height(22.dp))
 
             SectionLabel(text = "Longest a session may run")
@@ -183,6 +214,9 @@ fun PlanSettingsScreen(
             Caption("Minutes, rest included. Sessions are re-fitted, not rebuilt.")
             Spacer(Modifier.height(22.dp))
 
+            // Calendar settings only mean something with a plan behind them — and they write
+            // to the block straight away, so they wait until there is one to write to.
+            if (draft.appManaged && state.saved?.appManaged == true) {
             SectionLabel(text = "When your block starts")
             Spacer(Modifier.height(8.dp))
             StartDatePicker(
@@ -228,6 +262,7 @@ fun PlanSettingsScreen(
             if (draft.trainingDays != null) {
                 Spacer(Modifier.height(8.dp))
                 SecondaryButton(label = "Reset to the split's days", onClick = onClearTrainingDays)
+            }
             }
             Spacer(Modifier.height(22.dp))
 
@@ -280,6 +315,8 @@ fun PlanSettingsScreen(
         PrimaryBar(
             label = when {
                 state.isSaving -> "Saving…"
+                state.startsPlan -> "Build my plan"
+                state.stopsPlan -> "Switch to picking each session"
                 state.rebuildsBlock -> "Rebuild my block"
                 state.hasChanges -> "Save changes"
                 else -> "Done"

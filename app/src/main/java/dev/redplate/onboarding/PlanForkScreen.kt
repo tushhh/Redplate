@@ -76,7 +76,7 @@ fun PlanForkScreen(
                 .padding(horizontal = 22.dp)
                 .padding(top = 4.dp),
         ) {
-            MonoLabel(text = "5 OF 5 · LAST ONE")
+            MonoLabel(text = "5 of 5 · last question")
             Spacer(Modifier.height(10.dp))
 
             Text(
