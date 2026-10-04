@@ -94,6 +94,10 @@ fun TodayRoute(
         onTrainAgain = { templateId -> viewModel.startAnotherSession(templateId, onStartWorkout) },
         onTrainAnyway = { viewModel.startTrainAnyway(onStartWorkout) },
         onSetStartingWeights = onSetStartingWeights,
+        onResume = { viewModel.resume(onStartWorkout) },
+        onFinishOpen = { viewModel.finishOpenSession(onSeeSummary) },
+        onBuildPlan = viewModel::buildPlan,
+        onStartRestWalk = { viewModel.startRestDayWalk(onStartWorkout) },
     )
 }
 
@@ -110,6 +114,10 @@ fun TodayScreen(
     onTrainAgain: (Long) -> Unit = {},
     onTrainAnyway: () -> Unit = {},
     onSetStartingWeights: () -> Unit = {},
+    onResume: () -> Unit = {},
+    onFinishOpen: () -> Unit = {},
+    onBuildPlan: () -> Unit = {},
+    onStartRestWalk: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -120,7 +128,18 @@ fun TodayScreen(
                 .background(colors.ground),
         )
 
-        TodayState.NoProgramYet -> NoProgramScreen(onPickExercise = onPickExercise)
+        is TodayState.NoProgramYet -> NoProgramScreen(
+            state = state,
+            onPickExercise = onPickExercise,
+            onBuildPlan = onBuildPlan,
+            onSeeSummary = onSeeSummary,
+        )
+
+        is TodayState.InProgress -> InProgressScreen(
+            state = state,
+            onResume = onResume,
+            onFinish = onFinishOpen,
+        )
 
         is TodayState.Stalled -> StallScreen(
             state = state,
@@ -135,6 +154,7 @@ fun TodayScreen(
             onEditSession = { onEditSession(state.sessionCard.templateId) },
             onSeeFullWeek = onSeeFullWeek,
             onSetStartingWeights = onSetStartingWeights,
+            onPickExercise = onPickExercise,
         )
 
         is TodayState.Completed -> CompletedScreen(
@@ -158,8 +178,10 @@ fun TodayScreen(
 
         is TodayState.RestDay -> RestDayScreen(
             state = state,
+            onStartRestWalk = onStartRestWalk,
             onSeeFullWeek = onSeeFullWeek,
             onTrainAnyway = onTrainAnyway,
+            onPickExercise = onPickExercise,
         )
     }
 }
@@ -173,6 +195,7 @@ private fun TrainingDayScreen(
     onEditSession: () -> Unit,
     onSeeFullWeek: () -> Unit,
     onSetStartingWeights: () -> Unit,
+    onPickExercise: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -225,6 +248,10 @@ private fun TrainingDayScreen(
                 coachLine = state.volumeCoachLine,
                 onSeeFullWeek = onSeeFullWeek,
             )
+            Spacer(Modifier.height(10.dp))
+            // The plan fork promises mixing: follow the plan Monday, freestyle Saturday.
+            // This is the door that promise needed.
+            NavRow(text = "Train something else today", onClick = onPickExercise)
             Spacer(Modifier.height(16.dp))
         }
 
@@ -446,7 +473,7 @@ private fun StallScreen(
                     .background(colors.surface)
                     .padding(horizontal = 18.dp, vertical = 16.dp),
             ) {
-                SectionLabel(text = "Estimated 1RM · last ${state.e1rmWeeks.size} weeks")
+                SectionLabel(text = "Estimated one-rep max · last ${state.e1rmWeeks.size} weeks")
                 Spacer(Modifier.height(14.dp))
                 E1rmBars(weeks = state.e1rmWeeks)
             }
@@ -635,6 +662,8 @@ private fun RestDayScreen(
     state: TodayState.RestDay,
     onSeeFullWeek: () -> Unit,
     onTrainAnyway: () -> Unit = {},
+    onPickExercise: () -> Unit = {},
+    onStartRestWalk: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -671,6 +700,8 @@ private fun RestDayScreen(
                 text = state.nextSessionLabel?.let { "Next: $it" } ?: "See the full week",
                 onClick = onSeeFullWeek,
             )
+            Spacer(Modifier.height(10.dp))
+            NavRow(text = "Pick something to train", onClick = onPickExercise)
             Spacer(Modifier.height(16.dp))
         }
 
@@ -683,6 +714,14 @@ private fun RestDayScreen(
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 8.dp),
+            )
+        }
+        // A day off from lifting is the walking day: this is the one thing to do today.
+        if (state.restWalkLabel != null) {
+            PrimaryBar(
+                label = state.restWalkLabel,
+                onClick = onStartRestWalk,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
     }
@@ -792,7 +831,89 @@ private fun WeekStrip(days: List<WeekStripDay>) {
  * can be in on purpose, so it should not feel like a screen you have to get out of.
  */
 @Composable
-private fun NoProgramScreen(onPickExercise: () -> Unit) {
+private fun NoProgramScreen(
+    state: TodayState.NoProgramYet,
+    onPickExercise: () -> Unit,
+    onBuildPlan: () -> Unit,
+    onSeeSummary: (Long) -> Unit,
+) {
+    val colors = RedplateTheme.colors
+    val done = state.doneToday
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.ground)
+            .statusBarsPadding(),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Spacer(Modifier.height(22.dp))
+            MonoLabel(text = "YOU PICK EACH SESSION")
+            Spacer(Modifier.height(10.dp))
+            CoachHeadline(
+                text = if (done != null) "${done.label}. Done." else "What do you feel like training?",
+            )
+            Spacer(Modifier.height(8.dp))
+            if (done != null) {
+                Text(
+                    text = done.summaryLine,
+                    style = RedplateType.mono.copy(fontSize = 13.sp),
+                    color = colors.live,
+                )
+                Spacer(Modifier.height(12.dp))
+                NavRow(text = "See what changed", onClick = { onSeeSummary(done.sessionId) })
+            } else {
+                Text(
+                    text = "Tap the muscles you want to train and you get a real session built " +
+                        "around them — compounds first, fitted to your time, and counted " +
+                        "towards the week like anything else.",
+                    style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
+                    color = colors.inkSecondary,
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+
+            // The way back to app-managed training, from the screen you are on, rather
+            // than a tab that sent you back here.
+            BorderedCard {
+                Column {
+                    SectionLabel(text = "Rather have a plan?")
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Let the app plan your week from your goal and schedule. It sets " +
+                            "the weights and adjusts them from what you log. You can switch " +
+                            "back any time in You → Your plan.",
+                        style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 21.sp),
+                        color = colors.inkSecondary,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    SecondaryButton(label = "Let the app plan my week", onClick = onBuildPlan)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        PrimaryBar(
+            label = if (done != null) "Train again" else "Pick what to train",
+            onClick = onPickExercise,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+/** A workout left open. Resume is the answer; finishing where it stands is the other. */
+@Composable
+private fun InProgressScreen(
+    state: TodayState.InProgress,
+    onResume: () -> Unit,
+    onFinish: () -> Unit,
+) {
     val colors = RedplateTheme.colors
 
     Column(
@@ -804,29 +925,59 @@ private fun NoProgramScreen(onPickExercise: () -> Unit) {
         Column(
             modifier = Modifier
                 .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp),
-            verticalArrangement = Arrangement.Center,
         ) {
-            CoachHeadline(text = "Nothing scheduled.\nPick what you feel like.")
+            Spacer(Modifier.height(22.dp))
+            MonoLabel(text = state.eyebrow)
             Spacer(Modifier.height(10.dp))
+            CoachHeadline(text = state.headline)
+            Spacer(Modifier.height(8.dp))
             Text(
-                text = "Tap the muscles you want to train and you get a real session built " +
-                    "around them — ordered compounds first, fitted to your time, and " +
-                    "counted towards the week like anything else.",
+                text = state.summaryLine,
+                style = RedplateType.mono.copy(fontSize = 13.sp),
+                color = colors.live,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = "Everything you logged is saved, and so is the weight you had dialled " +
+                    "in. Next up: ${state.resumeExerciseName}.",
                 style = RedplateType.body.copy(fontSize = 15.sp, lineHeight = 23.sp),
                 color = colors.inkSecondary,
             )
+            if (state.loggedLines.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                ) {
+                    SectionLabel(text = "Logged so far")
+                    Spacer(Modifier.height(8.dp))
+                    state.loggedLines.forEach { line ->
+                        Text(
+                            text = line,
+                            style = RedplateType.data.copy(fontSize = 13.sp, lineHeight = 22.sp),
+                            color = colors.inkBright,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
-            Text(
-                text = "Want a full week instead? Build one from the Plan tab.",
-                style = RedplateType.body.copy(fontSize = 13.5.sp, lineHeight = 20.sp),
-                color = colors.inkMuted,
-            )
         }
 
+        SecondaryButton(
+            label = "Finish it here",
+            onClick = onFinish,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp),
+        )
         PrimaryBar(
-            label = "Pick what to train",
-            onClick = onPickExercise,
+            label = "Resume workout",
+            onClick = onResume,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
@@ -984,7 +1135,7 @@ private fun TodayCompletedPreview() {
 private fun TodayNoProgramPreview() {
     RedplateTheme {
         TodayScreen(
-            state = TodayState.NoProgramYet,
+            state = TodayState.NoProgramYet(),
             onStartWorkout = {},
             onPickExercise = {},
         )

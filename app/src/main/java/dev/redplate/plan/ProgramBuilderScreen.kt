@@ -251,7 +251,7 @@ private fun SlotRow(
                             "${row.slot.targetSets - row.setsDelta} → ${row.slot.targetSets} SETS · JUST CHANGED"
                         finisher -> "FINISHER · MINUTES"
                         else -> "${row.slot.repRangeLow}–${row.slot.repRangeHigh} REPS · " +
-                            row.slot.progression.name.replace('_', ' ')
+                            progressionLabel(row.slot.progression)
                     },
                     style = RedplateType.mono.copy(fontSize = 10.5.sp),
                     color = if (changed) colors.live else colors.inkMuted,
@@ -335,4 +335,12 @@ private fun ProgramBuilderPreview() {
             ),
         )
     }
+}
+
+/** The rule in words, not the enum: "LOAD_PROGRESSION" meant nothing to anyone. */
+private fun progressionLabel(rule: dev.redplate.data.ProgressionRule): String = when (rule) {
+    dev.redplate.data.ProgressionRule.DOUBLE_PROGRESSION -> "REPS UP, THEN WEIGHT"
+    dev.redplate.data.ProgressionRule.LOAD_PROGRESSION -> "WEIGHT UP WHEN CLEAN"
+    dev.redplate.data.ProgressionRule.RIR_AUTOREGULATED -> "WEIGHT FOLLOWS EFFORT"
+    dev.redplate.data.ProgressionRule.NONE -> "YOU PICK THE WEIGHT"
 }

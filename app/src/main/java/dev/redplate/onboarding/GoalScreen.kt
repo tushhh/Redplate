@@ -53,7 +53,8 @@ private val goalOptions = listOf(
     GoalOption(
         Goal.LEAN,
         "Leaner and stronger",
-        "Heavy 5–8 rep compounds, dense accessories, a short cardio finisher every session",
+        "Heavy 5–8 rep compounds, then an incline walk — up to 30 min after upper days, " +
+            "short after legs. Best with 90-minute sessions.",
     ),
     GoalOption(Goal.GENERAL, "Just be fit and healthy", "Full body, moderate reps, nothing brutal"),
 )
@@ -87,7 +88,7 @@ fun GoalScreen(
                 .padding(horizontal = 22.dp)
                 .padding(top = 8.dp),
         ) {
-            MonoLabel(text = "1 of 5 · about a minute")
+            MonoLabel(text = "1 of 5 · about two minutes")
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "What are you training for?",

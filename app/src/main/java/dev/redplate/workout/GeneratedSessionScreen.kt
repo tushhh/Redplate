@@ -22,6 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -72,7 +76,22 @@ fun GeneratedSessionScreen(
 ) {
     val colors = RedplateTheme.colors
 
-    if (state.isLoading) return
+    if (state.isLoading) {
+        // Building takes a moment; a blank screen read as a crash.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.ground),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Building your session…",
+                style = RedplateType.body.copy(fontSize = 15.sp),
+                color = colors.inkSecondary,
+            )
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -218,13 +237,20 @@ fun GeneratedSessionScreen(
                     .height(88.dp)
                     .clip(RoundedCornerShape(22.dp))
                     .background(colors.surface)
-                    .clickable(onClick = onSave),
+                    .clickable(onClick = onSave)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "Go back and change the muscles"
+                        role = Role.Button
+                    },
                 contentAlignment = Alignment.Center,
             ) {
+                // This goes back to the map to pick different muscles. It was labelled
+                // "Save it" and saved nothing — the one thing a button must never do.
                 Text(
-                    text = "Save it",
-                    style = RedplateType.body.copy(fontSize = 14.5.sp),
+                    text = "Change\nmuscles",
+                    style = RedplateType.body.copy(fontSize = 14.sp, lineHeight = 18.sp),
                     color = colors.inkSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
             PrimaryBar(

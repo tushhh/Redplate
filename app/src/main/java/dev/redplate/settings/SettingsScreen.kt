@@ -139,7 +139,7 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionLabel(text = "Gets the numbers wrong if wrong")
+        SectionLabel(text = "Your gym — the weights depend on it")
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // One row, not two. "Plates in your gym" and "Equipment" both opened the same

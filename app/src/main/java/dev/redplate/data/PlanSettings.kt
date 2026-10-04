@@ -26,6 +26,15 @@ data class PlanSettings(
      * reads 0 — a beginner — until it is set here.
      */
     val trainingAgeMonths: Int = 0,
+    /**
+     * Who plans the sessions: the app (an active block) or the user, day by day.
+     *
+     * Not stored on the profile — it *is* whether a block is active. It used to have no
+     * control at all: picking "I'll choose each day" at intake could only be undone by a
+     * side effect of the "Your plan" screen's Done button, and nothing could undo the
+     * reverse.
+     */
+    val appManaged: Boolean = true,
 ) {
 
     /**
@@ -129,6 +138,9 @@ fun ProfileEntity.planSettings(): PlanSettings = PlanSettings(
 sealed interface PlanRevisionResult {
     data object NoProfile : PlanRevisionResult
 
+    /** The block was set aside: the user picks each session. History is untouched. */
+    data object SwitchedToChoosing : PlanRevisionResult
+
     /** Nothing about the block changed — only settings that do not touch it. */
     data object SettingsOnly : PlanRevisionResult
 
@@ -156,7 +168,14 @@ class PlanRevision @Inject constructor(
     private val programGenerator: ProgramGenerator,
 ) {
 
-    suspend fun preview(): PlanSettings? = profileDao.get()?.planSettings()
+    suspend fun preview(): PlanSettings? =
+        profileDao.get()?.planSettings()?.copy(appManaged = programDao.getActiveMesocycle() != null)
+
+    /** The one-tap mode switch Today and the Plan tab offer. */
+    suspend fun setAppManaged(managed: Boolean, now: Long = System.currentTimeMillis()): PlanRevisionResult {
+        val current = preview() ?: return PlanRevisionResult.NoProfile
+        return apply(current.copy(appManaged = managed), now)
+    }
 
     suspend fun apply(
         settings: PlanSettings,
@@ -169,6 +188,15 @@ class PlanRevision @Inject constructor(
         profileDao.upsert(next.applyTo(profile))
         val updated = profileDao.get() ?: return PlanRevisionResult.NoProfile
         val active = programDao.getActiveMesocycle()
+
+        // Choosing each day: set the block aside — never delete it, sessions point into
+        // it — and stop. Saving other settings in this mode used to generate a whole
+        // block behind the user's back, because "no active block" read as "build one".
+        if (!next.appManaged) {
+            if (active == null) return PlanRevisionResult.SettingsOnly
+            programDao.updateMesocycle(active.copy(isActive = false, completedAt = now))
+            return PlanRevisionResult.SwitchedToChoosing
+        }
 
         if (active == null || next.needsRebuild(previous)) {
             val mesocycleId = programGenerator.generate(updated, now)

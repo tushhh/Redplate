@@ -53,6 +53,14 @@ data class VolumeRow(
     val target: Int,
 )
 
+/** A session finished today, for the no-plan Today screen. */
+data class DoneToday(
+    val label: String,
+    /** "18 sets · 47 min · 2 PRs" */
+    val summaryLine: String,
+    val sessionId: Long,
+)
+
 /** One day of the 7-day strip under Today's card. Status is never colour alone. */
 enum class StripStatus { DONE, PLANNED, MISSED, REST }
 
@@ -66,7 +74,29 @@ data class WeekStripDay(
 sealed interface TodayState {
     data object Loading : TodayState
 
-    data object NoProgramYet : TodayState
+    /**
+     * No weekly plan: the user picks each session. [doneToday] acknowledges a session
+     * already finished today — this screen used to say "Nothing scheduled" straight after
+     * a workout, as if it had not happened.
+     */
+    data class NoProgramYet(val doneToday: DoneToday? = null) : TodayState
+
+    /**
+     * A workout is open and not finished — the one thing Today must never hide. A session
+     * the user picked themselves, or a body-map session, used to be unreachable once they
+     * left it: Today offered "Pick what to train" again, which started over from nothing.
+     */
+    data class InProgress(
+        val eyebrow: String,
+        val headline: String,
+        /** "3 EXERCISES · 9 SETS SO FAR" */
+        val summaryLine: String,
+        val sessionId: Long,
+        val resumeExerciseId: String,
+        val resumeExerciseName: String,
+        /** "Machine Chest Press · 4 sets · top 55 kg × 8" — what is already logged. */
+        val loggedLines: List<String> = emptyList(),
+    ) : TodayState
 
     data class TrainingDay(
         val eyebrow: String,
@@ -103,6 +133,11 @@ sealed interface TodayState {
          */
         val trainAnywayLabel: String? = null,
         val weekStrip: List<WeekStripDay> = emptyList(),
+        /**
+         * "Start the rest-day walk · 30 min" — the day-off walk for leaner-and-stronger,
+         * or null when the goal, the equipment or an excluded "Cardio" rules it out.
+         */
+        val restWalkLabel: String? = null,
     ) : TodayState
 
     /**
@@ -170,6 +205,9 @@ class TodayViewModel @Inject constructor(
     private val mesocycleAdvancer: MesocycleAdvancer,
     private val trainingClock: TrainingClock,
     private val outcomeReader: SessionOutcomeReader,
+    private val workoutRepository: WorkoutRepository,
+    private val planRevision: PlanRevision,
+    private val programGenerator: ProgramGenerator,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<TodayState>(TodayState.Loading)
@@ -204,13 +242,28 @@ class TodayViewModel @Inject constructor(
     private suspend fun load() {
         val profile = profileDao.get()
         if (profile == null) {
-            _state.value = TodayState.NoProgramYet
+            _state.value = TodayState.NoProgramYet()
             return
         }
 
+        // A workout in progress outranks everything else on this screen — unless it is a
+        // programmed day, which the training-day card already resumes with its own card.
         val active = programDao.getActiveMesocycle()
+        val scheduledIds = active?.let { meso ->
+            programDao.getAllTemplates().filter { it.mesocycleId == meso.id && it.dayIndex >= 0 }
+                .mapTo(mutableSetOf()) { it.id }
+        }.orEmpty()
+        workoutRepository.openSessionsToday()
+            .firstOrNull { it.templateId == null || it.templateId !in scheduledIds }
+            ?.let { open ->
+                inProgressState(open)?.let {
+                    _state.value = it
+                    return
+                }
+            }
+
         if (active == null) {
-            _state.value = TodayState.NoProgramYet
+            _state.value = TodayState.NoProgramYet(doneToday = doneToday(profile))
             return
         }
 
@@ -221,7 +274,7 @@ class TodayViewModel @Inject constructor(
 
         val templates = programDao.observeTemplates(meso.id).first()
         if (templates.isEmpty()) {
-            _state.value = TodayState.NoProgramYet
+            _state.value = TodayState.NoProgramYet(doneToday = doneToday(profile))
             return
         }
 
@@ -378,6 +431,88 @@ class TodayViewModel @Inject constructor(
         )
     }
 
+    /** Where to pick an open session back up, and what to say about it. */
+    private suspend fun inProgressState(session: SessionEntity): TodayState.InProgress? {
+        val sets = sessionDao.getSetsForSession(session.id)
+        val slots = session.templateId?.let { programDao.getSlots(it) }.orEmpty()
+        val lastLogged = sets.maxByOrNull { it.completedAt }?.exerciseId
+        val resumeId = firstUnfinishedSlot(slots, sets)?.exerciseId
+            ?: lastLogged
+            ?: slots.firstOrNull()?.exerciseId
+            ?: return null
+        val label = session.templateId?.let { programDao.getTemplateById(it)?.label } ?: "Your session"
+        val working = sets.filter { !it.isWarmup }
+        val exercises = working.map { it.exerciseId }.distinct().size
+        val minutes = ((System.currentTimeMillis() - session.startedAt) / 60_000L).toInt()
+        return TodayState.InProgress(
+            eyebrow = "IN PROGRESS · STARTED ${minutes.coerceAtLeast(0)} MIN AGO",
+            headline = "$label. Pick up where you left off.",
+            summaryLine = if (working.isEmpty()) {
+                "NOTHING LOGGED YET"
+            } else {
+                "$exercises EXERCISE${if (exercises == 1) "" else "S"} · ${working.size} SET${if (working.size == 1) "" else "S"} SO FAR"
+            },
+            sessionId = session.id,
+            resumeExerciseId = resumeId,
+            resumeExerciseName = exerciseDao.getById(resumeId)?.name ?: resumeId,
+            loggedLines = working.groupBy { it.exerciseId }
+                .toList()
+                .sortedBy { (_, s) -> s.minOf { it.completedAt } }
+                .map { (id, s) ->
+                    val name = exerciseDao.getById(id)?.name ?: id
+                    val top = s.maxBy { it.loadKg * (1 + it.reps / 30.0) }
+                    val detail = if (exerciseDao.getById(id)?.isConditioning == true) {
+                        "${top.reps} min"
+                    } else {
+                        "top ${formatKg(top.loadKg)} × ${top.reps}"
+                    }
+                    "$name · ${s.size} set${if (s.size == 1) "" else "s"} · $detail"
+                },
+        )
+    }
+
+    /** The latest session finished today, for the no-plan screen to acknowledge. */
+    private suspend fun doneToday(profile: ProfileEntity): DoneToday? {
+        val today = trainingClock.trainingDate(System.currentTimeMillis(), profile.dayStartHour)
+        val finished = sessionsOn(today, profile.dayStartHour).lastOrNull { it.endedAt != null } ?: return null
+        val outcome = outcomeReader.read(finished)
+        if (outcome.isEmpty) return null
+        val label = finished.templateId?.let { programDao.getTemplateById(it)?.label } ?: "Your session"
+        return DoneToday(label = label, summaryLine = summaryLine(outcome), sessionId = finished.id)
+    }
+
+    /** Resume the open session on the lift that still has sets owing. */
+    fun resume(onNavigate: (Long, String) -> Unit) {
+        val state = _state.value as? TodayState.InProgress ?: return
+        onNavigate(state.sessionId, state.resumeExerciseId)
+    }
+
+    /** Close the open session where it stands; what was logged counts. */
+    fun finishOpenSession(onFinished: (Long) -> Unit) {
+        val state = _state.value as? TodayState.InProgress ?: return
+        viewModelScope.launch {
+            workoutRepository.endSession(state.sessionId, System.currentTimeMillis())
+            onFinished(state.sessionId)
+        }
+    }
+
+    /** "Let the app plan my week" — builds a block from the profile, keeping all history. */
+    fun buildPlan() {
+        if (building) return
+        building = true
+        viewModelScope.launch {
+            try {
+                planRevision.setAppManaged(true)
+                load()
+            } finally {
+                building = false
+            }
+        }
+    }
+
+    /** Set while a plan is being built, so a double tap does not build two. */
+    private var building = false
+
     /** Scheduled templates not yet finished in the block's current week, in day order. */
     private suspend fun owedTemplates(
         meso: MesocycleEntity,
@@ -484,9 +619,11 @@ class TodayViewModel @Inject constructor(
 
         if (logged != null) {
             val outcome = outcomeReader.read(logged)
+            val wasWalk = logged.templateId
+                ?.let { programDao.getTemplateById(it)?.label } == ProgramGenerator.REST_DAY_WALK_LABEL
             return TodayState.Completed(
                 eyebrow = eyebrow,
-                headline = CoachCopy.Today.UNSCHEDULED_SESSION_HEADLINE,
+                headline = if (wasWalk) "Walk done. Rest of the day off." else CoachCopy.Today.UNSCHEDULED_SESSION_HEADLINE,
                 summaryLine = summaryLine(outcome),
                 volumeRows = buildVolumeRows(meso.id, meso.currentWeek),
                 volumeCoachLine = CoachCopy.Today.UNSCHEDULED_SESSION_VOLUME,
@@ -509,7 +646,33 @@ class TodayViewModel @Inject constructor(
             nextSessionLabel = nextSessionLabel(next, scheduled, today)?.removePrefix("Next: "),
             trainAnywayLabel = next?.let { "Train anyway — ${it.label}" },
             weekStrip = strip,
+            restWalkLabel = restWalkLabel(),
         )
+    }
+
+    /** The rest-day walk's button, with the minutes it has built to. */
+    private suspend fun restWalkLabel(): String? {
+        val profile = profileDao.get() ?: return null
+        if (profile.goal != Goal.LEAN || MovementPattern.CONDITIONING in profile.excludedPatterns) return null
+        val walk = exerciseDao.getById("treadmill_incline_walk") ?: return null
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        if (!EquipmentAvailability.canPerform(walk, available)) return null
+        val minutes = programDao.getAllTemplates()
+            .firstOrNull { it.dayIndex < 0 && it.label == ProgramGenerator.REST_DAY_WALK_LABEL }
+            ?.let { programDao.getSlots(it.id).firstOrNull()?.repRangeLow }
+            ?: FinisherProgression.REST_DAY_START_MINUTES
+        return "Start the rest-day walk · $minutes min"
+    }
+
+    /** Opens the rest-day walk as its own session: one block of incline walking. */
+    fun startRestDayWalk(onNavigate: (Long, String) -> Unit) {
+        viewModelScope.launch {
+            val profile = profileDao.get() ?: return@launch
+            val templateId = programGenerator.restDayWalkTemplate(profile) ?: return@launch
+            val slot = programDao.getSlots(templateId).firstOrNull() ?: return@launch
+            val sessionId = workoutRepository.startTemplatedSession(templateId, System.currentTimeMillis())
+            onNavigate(sessionId, slot.exerciseId)
+        }
     }
 
     private suspend fun completedState(
@@ -590,8 +753,12 @@ class TodayViewModel @Inject constructor(
             // beside it, landing on the first lift that still has sets owing.
             resumableSessionId?.let { sessionId ->
                 val logged = sessionDao.getSetsForSession(sessionId)
-                val next = firstUnfinishedSlot(slots, logged) ?: slots.first()
-                onNavigate(sessionId, next.exerciseId)
+                // Past the planned lifts (an exercise added on top), the last thing logged
+                // is where the user was — not the first lift, long since finished.
+                val next = firstUnfinishedSlot(slots, logged)?.exerciseId
+                    ?: logged.maxByOrNull { it.completedAt }?.exerciseId
+                    ?: slots.first().exerciseId
+                onNavigate(sessionId, next)
                 return@launch
             }
 

@@ -215,8 +215,8 @@ class ProgramBuilderViewModel @Inject constructor(
         viewModelScope.launch {
             val slot = programDao.getSlotById(slotId) ?: return@launch
             if (slot.isCardioFinisher) {
-                val minutes = (slot.repRangeLow + 1).coerceAtMost(FinisherProgression.MAX_MINUTES)
-                programDao.updateSlot(slot.copy(repRangeLow = minutes, repRangeHigh = minutes))
+                val minutes = (slot.repRangeLow + 1).coerceAtMost(FinisherProgression.ABSOLUTE_MAX_MINUTES)
+                programDao.updateSlot(slot.copy(repRangeLow = minutes, repRangeHigh = maxOf(slot.repRangeHigh, minutes)))
             } else if (slot.targetSets < MAX_SETS) {
                 programDao.updateSlot(slot.copy(targetSets = slot.targetSets + 1))
             }
@@ -228,7 +228,7 @@ class ProgramBuilderViewModel @Inject constructor(
             val slot = programDao.getSlotById(slotId) ?: return@launch
             if (slot.isCardioFinisher) {
                 val minutes = (slot.repRangeLow - 1).coerceAtLeast(FinisherProgression.MIN_MINUTES)
-                programDao.updateSlot(slot.copy(repRangeLow = minutes, repRangeHigh = minutes))
+                programDao.updateSlot(slot.copy(repRangeLow = minutes))
             } else if (slot.targetSets > 1) {
                 programDao.updateSlot(slot.copy(targetSets = slot.targetSets - 1))
             }

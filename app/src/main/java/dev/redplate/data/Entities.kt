@@ -397,8 +397,9 @@ data class TemplateSlotEntity(
     /**
      * True when this slot is a conditioning finisher rather than a strength set.
      *
-     * When true: [repRangeLow] and [repRangeHigh] both hold the target duration in
-     * minutes, [targetSets] is 1, [workingLoadKg] is null, [restSeconds] is 0 and the
+     * When true: [repRangeLow] is the target duration in minutes and [repRangeHigh] the
+     * most it will build to (15 for a short finisher, 30 for the upper-day incline walk,
+     * 45 for the rest-day walk), [targetSets] is 1, [workingLoadKg] is null, [restSeconds] is 0 and the
      * slot sits last. Duration is what progresses — see [FinisherProgression] — and the
      * set it logs earns no PR and no muscle volume. The set logging screen shows a
      * duration stepper and effort chips instead of the load readout and RIR chips.

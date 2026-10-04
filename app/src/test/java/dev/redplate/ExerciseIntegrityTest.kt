@@ -158,7 +158,7 @@ class ExerciseIntegrityTest {
         assertEquals(
             setOf(
                 "stairmill_climbing", "treadmill_incline_walk",
-                "treadmill_jog", "treadmill_interval_run",
+                "treadmill_jog", "treadmill_interval_run", "treadmill_easy_walk",
                 "rower_full_body", "airbike_intervals", "skierg_intervals",
                 "crosstrainer_steady",
             ),

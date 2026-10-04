@@ -140,14 +140,20 @@ A set counts toward volume only if logged at **0–3 RIR**. Secondary muscles ge
 
 **Leaner & stronger** (`Goal.LEAN`) keeps the compounds heavy — the load on the bar is what
 holds muscle while bodyweight drops — runs accessories dense, and ends every session with a
-**conditioning finisher**:
-- Picked from the gym's cardio machines to suit the day: after a lower-body day it spares the
-  legs (SkiErg, rower, crosstrainer); after an upper-body day it uses them (incline walk, air
-  bike, stairs). Varied across the week.
-- Prescribed in minutes (8 for novices, 10 otherwise, capped at 15) with an effort cue, never
-  reps or kilos. It earns no PR and credits no muscle volume.
-- Progresses by +1 minute when completed with effort reported and something left; holds when
-  it took everything. Never trimmed to fit the session ceiling — accessories go first.
+**cardio finisher**. A 90-min session ceiling is recommended: ~60 min lifting plus the walk.
+- **After an upper-body day:** a steady incline walk (treadmill; stairs or crosstrainer as
+  alternates). Starts at 20 min (15 for novices) and grows +2 min per good session up to a
+  30-min cap. At the cap the cue says to raise the incline 1% at a time (toward ~12%) or the
+  pace instead — incline and speed are cue text, not logged fields.
+- **After a leg day** (any lower-body compound in the day): a 10–15 min easy walk (8 for
+  novices) to cool down without taxing the legs further. Grows +1 min per good session.
+- **Rest days:** an optional 30–45 min incline walk, started from Today's rest-day screen. It is
+  a reusable template, so its minutes progress like any other finisher.
+- The slot stores the current target in `repRangeLow` and the cap in `repRangeHigh`. The
+  session-length budget counts the walk at its cap, so growing the walk never pushes the
+  session past the ceiling. It earns no PR and credits no muscle volume.
+- Holds when it took everything. Never trimmed to fit the session ceiling — accessories go first.
+- Existing Leaner & stronger plans are upgraded once to this layout (ceiling → 90 min).
 - Opting out: exclude the "Cardio" movement on the plan screen.
 
 Rest timer auto-starts on set completion, pre-loaded with the prescribed interval and freely

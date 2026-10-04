@@ -37,7 +37,16 @@ data class PlanSettingsState(
 
     /** True when confirming would rebuild the rest of the block. */
     val rebuildsBlock: Boolean
-        get() = saved != null && draft != null && draft.normalised().needsRebuild(saved)
+        get() = saved != null && draft != null && saved.appManaged && draft.appManaged &&
+            draft.normalised().needsRebuild(saved)
+
+    /** Confirming builds a plan where there was none. */
+    val startsPlan: Boolean
+        get() = saved != null && draft != null && !saved.appManaged && draft.appManaged
+
+    /** Confirming sets the plan aside so the user picks each session. */
+    val stopsPlan: Boolean
+        get() = saved != null && draft != null && saved.appManaged && !draft.appManaged
 
     /** The weekday picker only makes sense once the right number of days is chosen. */
     val weekdaySelectionValid: Boolean
@@ -118,6 +127,8 @@ class PlanSettingsViewModel @Inject constructor(
 
     fun setGoal(goal: Goal) = edit { it.copy(goal = goal) }
 
+    fun setAppManaged(managed: Boolean) = edit { it.copy(appManaged = managed) }
+
     fun setTrainingAge(months: Int) = edit { it.copy(trainingAgeMonths = months) }
 
     fun setDaysPerWeek(days: Int) = edit {
@@ -190,7 +201,10 @@ class PlanSettingsViewModel @Inject constructor(
     private fun describe(result: PlanRevisionResult): String = when (result) {
         PlanRevisionResult.NoProfile -> CoachCopy.Plan.NO_PROFILE_TO_CHANGE
 
-        PlanRevisionResult.SettingsOnly -> CoachCopy.Plan.SETTINGS_ONLY
+        PlanRevisionResult.SwitchedToChoosing -> CoachCopy.Plan.SWITCHED_TO_CHOOSING
+
+        PlanRevisionResult.SettingsOnly ->
+            if (_state.value.saved?.appManaged == true) CoachCopy.Plan.SETTINGS_ONLY else CoachCopy.Plan.SAVED
 
         is PlanRevisionResult.Adjusted ->
             CoachCopy.Plan.adjusted(result.daysMoved, result.templatesRefitted)

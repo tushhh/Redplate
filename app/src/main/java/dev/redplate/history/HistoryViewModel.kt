@@ -70,18 +70,29 @@ class HistoryViewModel @Inject constructor(
     val state: StateFlow<HistoryState> = _state
 
     init {
+        refresh()
+    }
+
+    /**
+     * Reads the lift list again. Lifts trained most recently come first, and the one
+     * selected is kept if it still has history — otherwise the most recent one opens,
+     * rather than whichever the database happened to return first.
+     */
+    fun refresh() {
         viewModelScope.launch {
             // Conditioning has minutes, not a load: an estimated max of a treadmill walk is
             // a number about nothing, so it stays out of the lift list and the PRs.
             val allExercises = exerciseDao.getAll().filter { !it.isExcluded && !it.isConditioning }
-            // Start with the first exercise that has logged sets
-            val exercisesWithHistory = allExercises.filter { ex ->
-                val pr = sessionDao.getPrSet(ex.id)
-                pr != null
+            val lastTrained = allExercises.mapNotNull { ex ->
+                sessionDao.getLatestWorkingSet(ex.id)?.let { ex to it.completedAt }
             }
+            val exercisesWithHistory = lastTrained.sortedByDescending { it.second }.map { it.first }
             val displayList = exercisesWithHistory.ifEmpty { allExercises }
-            val selected = exercisesWithHistory.firstOrNull() ?: allExercises.firstOrNull()
-            _state.value = HistoryState(
+            val keep = _state.value.selectedExercise?.takeIf { current ->
+                exercisesWithHistory.any { it.id == current.id }
+            }
+            val selected = keep ?: exercisesWithHistory.firstOrNull() ?: allExercises.firstOrNull()
+            _state.value = _state.value.copy(
                 exercises = displayList,
                 selectedExercise = selected,
                 hasAnyHistory = exercisesWithHistory.isNotEmpty(),
@@ -90,6 +101,7 @@ class HistoryViewModel @Inject constructor(
             if (selected != null && exercisesWithHistory.isNotEmpty()) {
                 loadExerciseHistory(selected.id)
             }
+            if (_state.value.showingPrs) loadAllPrs()
         }
     }
 

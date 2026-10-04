@@ -19,6 +19,8 @@ import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.SetLogEntity
 import dev.redplate.data.TemplateSlotEntity
 import dev.redplate.data.WorkoutRepository
+import dev.redplate.data.WorkoutDraft
+import dev.redplate.data.WorkoutDraftStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,6 +30,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -41,6 +45,7 @@ class SetLoggingViewModel @Inject constructor(
     savedState: SavedStateHandle,
     val mediaResolver: MediaResolver,
     private val restNotifier: RestTimerNotifier,
+    private val draftStore: WorkoutDraftStore,
 ) : ViewModel() {
 
     val sessionId: Long = savedState.get<Long>(ARG_SESSION_ID) ?: 0L
@@ -53,8 +58,15 @@ class SetLoggingViewModel @Inject constructor(
     private val _events = MutableSharedFlow<WorkoutEvent>(extraBufferCapacity = 4)
     val events: SharedFlow<WorkoutEvent> = _events.asSharedFlow()
 
-    /** Set-log row ids that were PRs when logged. Not persisted on the entity, so tracked here. */
-    private val prSetIds = MutableStateFlow<Set<Long>>(emptySet())
+    /**
+     * The best estimated max for this lift before this session, read once. PR stars are
+     * worked out from the database against it, so they survive leaving the screen — they
+     * used to live in memory and vanished the moment you pressed Back.
+     */
+    private var priorSessionBest: Double? = null
+
+    /** Conditioning and assistance work have no meaningful estimated max. */
+    private var prEligible = true
 
     /** The chip tapped for each set logged here, so an undo restores "Failed" as "Failed". */
     private val loggedDifficulty = mutableMapOf<Long, Difficulty?>()
@@ -168,7 +180,7 @@ class SetLoggingViewModel @Inject constructor(
                     }.orEmpty(),
                     guidanceMuscleTags = ex?.let { e ->
                         listOf(e.primaryMuscle) + e.secondaryMuscles
-                    }?.map { m -> m.name.replace('_', ' ') }.orEmpty(),
+                    }?.map { m -> m.displayName.uppercase() }.orEmpty(),
                     instructionSteps = ex?.instructions
                         ?.split('\n')
                         ?.map(String::trim)
@@ -177,8 +189,69 @@ class SetLoggingViewModel @Inject constructor(
                 )
             }
 
+            priorSessionBest = repo.priorBestE1rmExcludingSession(exerciseId, sessionId)
+            prEligible = !cardio && eq?.isAssistance != true
+            restoreDraft(cardio)
+
             recomputePlates()
             observeSets()
+            persistDrafts()
+        }
+    }
+
+    /**
+     * Puts back what was on screen when the user left: the draft if there is one, otherwise
+     * the weight of the last set they actually logged on this lift today.
+     */
+    private suspend fun restoreDraft(cardio: Boolean) {
+        val logged = repo.getSetsForSession(sessionId).filter { it.exerciseId == exerciseId }
+        lastSetCompletedAt = logged.maxOfOrNull { it.completedAt }
+        val draft = draftStore.load(sessionId, exerciseId)
+        val lastWorking = logged.filter { !it.isWarmup }.maxByOrNull { it.completedAt }
+
+        if (draft == null) {
+            if (!cardio && lastWorking != null) _state.update { it.copy(loadKg = lastWorking.loadKg) }
+            return
+        }
+
+        val sameSet = draft.loggedCount == logged.size
+        _state.update {
+            it.copy(
+                loadKg = if (cardio) it.loadKg else draft.loadKg,
+                reps = if (sameSet) draft.reps else it.reps,
+                difficulty = if (sameSet) draft.difficulty?.let { d -> Difficulty.entries.firstOrNull { e -> e.name == d } } else it.difficulty,
+                rir = if (sameSet) draft.rir else it.rir,
+                adjustmentNote = draft.adjustmentNote.takeIf { sameSet },
+            )
+        }
+        if (sameSet && draft.restDeadlineMillis > System.currentTimeMillis()) {
+            restDeadlineMillis = draft.restDeadlineMillis
+            restTotalSeconds = draft.restTotalSeconds.coerceAtLeast(1)
+            _state.update { it.copy(rest = RestState.Running(remainingRestSeconds(), restTotalSeconds)) }
+            runRestCountdown()
+        }
+    }
+
+    private var draftJob: Job? = null
+
+    /** Writes the draft whenever anything the user could lose changes. */
+    private fun persistDrafts() {
+        draftJob = viewModelScope.launch {
+            _state
+                .map { s ->
+                    WorkoutDraft(
+                        loadKg = s.loadKg,
+                        reps = s.reps,
+                        difficulty = s.difficulty?.name,
+                        rir = s.rir,
+                        loggedCount = s.loggedSets.size,
+                        adjustmentNote = s.adjustmentNote,
+                        restDeadlineMillis = if (s.rest is RestState.Running) restDeadlineMillis else 0L,
+                        restTotalSeconds = if (s.rest is RestState.Running) restTotalSeconds else 0,
+                    )
+                }
+                .distinctUntilChanged()
+                .collect { draftStore.save(sessionId, exerciseId, it) }
         }
     }
 
@@ -276,9 +349,9 @@ class SetLoggingViewModel @Inject constructor(
             combine(
                 repo.observeSetsForSession(sessionId),
                 repo.observeHistory(exerciseId),
-                prSetIds,
-            ) { sessionSets, history, prIds ->
+            ) { sessionSets, history ->
                 val mine = sessionSets.filter { it.exerciseId == exerciseId }
+                val prIds = prSetIdsOf(mine)
                 val logged = mine.map { s ->
                     LoggedSetLine(
                         setIndex = s.setIndex,
@@ -350,6 +423,26 @@ class SetLoggingViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Sets that beat everything before them: prior sessions, then earlier sets today — the
+     * rule the haptic fires on when the set is logged, derived here rather than remembered
+     * so it survives leaving the screen.
+     */
+    private fun prSetIdsOf(sets: List<SetLogEntity>): Set<Long> {
+        if (!prEligible) return emptySet()
+        var best = priorSessionBest
+        val ids = mutableSetOf<Long>()
+        for (set in sets.filter { !it.isWarmup }.sortedBy { it.completedAt }) {
+            if (set.loadKg <= 0.0 || set.reps !in 1..12) continue
+            val e1rm = set.estimated1Rm()
+            if (best == null || e1rm > best + 1e-6) {
+                ids += set.id
+                best = e1rm
+            }
+        }
+        return ids
     }
 
     // ── Load stepper (delegates to PlateMath so we never offer an unloadable weight) ──
@@ -482,7 +575,7 @@ class SetLoggingViewModel @Inject constructor(
         // phantom 20 kg against a logged 0 and fire a PR every single finisher.
         val priorBest = if (!s.isWarmup && !cardio) repo.priorBestE1rm(exerciseId) else null
         val e1rm = s.loadKg * (1 + s.reps / 30.0)
-        val isPr = !cardio && !s.isWarmup &&
+        val isPr = prEligible && !cardio && !s.isWarmup &&
             s.loadKg > 0.0 &&
             s.reps in 1..12 &&
             (priorBest == null || e1rm > priorBest + 1e-6)
@@ -517,7 +610,6 @@ class SetLoggingViewModel @Inject constructor(
                 countsTowardVolume = !cardio && !s.isWarmup && (s.rir == null || s.rir <= 3),
             )
         )
-        if (isPr) prSetIds.update { it + id }
         lastSetCompletedAt = now
 
         _events.tryEmit(if (isPr) WorkoutEvent.PrHit else WorkoutEvent.SetLogged)
@@ -602,7 +694,6 @@ class SetLoggingViewModel @Inject constructor(
         if (completing) return
         viewModelScope.launch {
             val removed = repo.deleteLastSet(sessionId, exerciseId) ?: return@launch
-            prSetIds.update { it - removed.id }
             skipRest()
             // The next set's rest is measured from whatever came before the one removed.
             lastSetCompletedAt = repo.getSetsForSession(sessionId)
@@ -649,12 +740,16 @@ class SetLoggingViewModel @Inject constructor(
      */
     private fun startRest() {
         val seconds = slot?.restSeconds ?: DEFAULT_REST_SECONDS
-        restJob?.cancel()
         restDeadlineMillis = System.currentTimeMillis() + seconds * 1000L
         restTotalSeconds = seconds
         _state.update { it.copy(rest = RestState.Running(seconds, seconds)) }
         publishRest()
+        runRestCountdown()
+    }
 
+    /** Ticks the on-screen countdown against [restDeadlineMillis] until it runs out. */
+    private fun runRestCountdown() {
+        restJob?.cancel()
         restJob = viewModelScope.launch {
             while (true) {
                 delay(TICK_MILLIS)
@@ -717,6 +812,12 @@ class SetLoggingViewModel @Inject constructor(
         )
     }
 
+    /** "Add another exercise" on the last rest screen: rest ends, the picker opens. */
+    fun addAnotherExercise(onNavigate: (Long) -> Unit) {
+        skipRest()
+        onNavigate(sessionId)
+    }
+
     /** Moves to the next lift in the running order. No-op on a freestyle session. */
     fun goToNextExercise(onNavigate: (Long, String) -> Unit) {
         val next = nextSlot() ?: return
@@ -759,6 +860,9 @@ class SetLoggingViewModel @Inject constructor(
     /** Stamps the finish time so the session stops counting as in progress. */
     fun finishSession(onFinished: (Long) -> Unit) {
         skipRest()
+        // Nothing about this session is in progress any more; a late write would leave a
+        // draft behind the clear in endSession.
+        draftJob?.cancel()
         viewModelScope.launch {
             repo.endSession(sessionId, System.currentTimeMillis())
             onFinished(sessionId)
@@ -808,7 +912,8 @@ class SetLoggingViewModel @Inject constructor(
         group?.takeIf { it >= 1 }?.let { "SUPERSET " + ('A' + (it - 1)) }
 
     private fun buildHeaderSubtitle(setNum: Int, total: Int, repLow: Int, repHigh: Int, remaining: Int): String {
-        if (isCardio) return "FINISHER · $repLow MIN TARGET"
+        if (isCardio) return (if (slotIndex > 0) "FINISHER" else "CARDIO") + " · $repLow MIN TARGET"
+        if (setNum > total) return "SET $setNum · EXTRA · $repLow–$repHigh REPS"
         return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
     }
 

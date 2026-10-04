@@ -57,6 +57,10 @@ data class WeekPlanState(
     val splitName: String = "",
     val splitDescription: String = "",
     val phase: BlockPhase = BlockPhase.ACCUMULATION,
+    /** False when the user picks each session — the tab says so instead of a fake week. */
+    val hasPlan: Boolean = true,
+    /** Set while "Let the app plan my week" is building one. */
+    val isBuilding: Boolean = false,
     val days: List<DayCard> = emptyList(),
     /** All eleven groups, for the chart below the week list (design 10a). */
     val balance: List<VolumeTarget> = emptyList(),
@@ -87,6 +91,7 @@ class WeekPlanViewModel @Inject constructor(
     private val exerciseDao: ExerciseDao,
     private val trainingClock: TrainingClock,
     private val scheduleEditor: ScheduleEditor,
+    private val planRevision: dev.redplate.data.PlanRevision,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WeekPlanState())
@@ -100,10 +105,20 @@ class WeekPlanViewModel @Inject constructor(
         viewModelScope.launch { load() }
     }
 
+    /** Builds a block from the profile. History and loads carry over. */
+    fun buildPlan() {
+        if (_state.value.isBuilding) return
+        _state.value = _state.value.copy(isBuilding = true)
+        viewModelScope.launch {
+            planRevision.setAppManaged(true)
+            load()
+        }
+    }
+
     private suspend fun load() {
         val meso = programDao.getActiveMesocycle()
         if (meso == null) {
-            _state.value = WeekPlanState(isLoading = false)
+            _state.value = WeekPlanState(isLoading = false, hasPlan = false)
             return
         }
 

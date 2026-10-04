@@ -76,7 +76,7 @@ fun VolumeBar(
     current: Int,
     target: Int,
     modifier: Modifier = Modifier,
-    labelWidth: Dp = 62.dp,
+    labelWidth: Dp = 88.dp,
     fourWeekAverage: Int? = null,
 ) {
     val colors = RedplateTheme.colors

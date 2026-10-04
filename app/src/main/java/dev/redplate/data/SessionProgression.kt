@@ -46,21 +46,45 @@ data class FinisherOutcome(
  */
 object FinisherProgression {
 
+    /** Short finisher: the default, and lower-body days. */
     const val START_MINUTES = 10
     const val NOVICE_START_MINUTES = 8
     const val MIN_MINUTES = 5
+    /** The short finisher's cap. */
     const val MAX_MINUTES = 15
-    private const val STEP_MINUTES = 1
 
-    fun decide(sets: List<SetLogEntity>, targetMinutes: Int): FinisherOutcome {
-        val target = targetMinutes.coerceIn(MIN_MINUTES, MAX_MINUTES)
+    /**
+     * The incline walk after an upper-body day: starts at 20 and builds to 30, two minutes
+     * a session. Once it is at 30 the time holds and the incline goes up instead.
+     */
+    const val LONG_START_MINUTES = 20
+    const val NOVICE_LONG_START_MINUTES = 15
+    const val LONG_CAP_MINUTES = 30
+
+    /** The standalone rest-day walk: 30 to 45 minutes. */
+    const val REST_DAY_START_MINUTES = 30
+    const val REST_DAY_CAP_MINUTES = 45
+
+    /** Nothing in the program builder goes past this. */
+    const val ABSOLUTE_MAX_MINUTES = 60
+
+    /** Long walks build two minutes at a time; short finishers one. */
+    fun stepFor(capMinutes: Int): Int = if (capMinutes > MAX_MINUTES) 2 else 1
+
+    /**
+     * [capMinutes] is the slot's ceiling — [TemplateSlotEntity.repRangeHigh] on a finisher.
+     */
+    fun decide(sets: List<SetLogEntity>, targetMinutes: Int, capMinutes: Int = MAX_MINUTES): FinisherOutcome {
+        val cap = capMinutes.coerceIn(MIN_MINUTES, ABSOLUTE_MAX_MINUTES)
+        val target = targetMinutes.coerceIn(MIN_MINUTES, cap)
+        val step = stepFor(cap)
         val logged = sets.filter { !it.isWarmup }
         if (logged.isEmpty()) {
             return FinisherOutcome(target, 0, target, "nothing was logged")
         }
         val minutes = logged.maxOf { it.reps }
         // Doing more than prescribed moves the target up to what was done.
-        val held = minutes.coerceIn(target, MAX_MINUTES)
+        val held = minutes.coerceIn(target, cap)
         val effort = logged.mapNotNull { it.rir }.minOrNull()
 
         return when {
@@ -79,13 +103,13 @@ object FinisherProgression {
                 "$minutes min took everything you had — repeat it before adding more",
             )
 
-            minutes >= MAX_MINUTES -> FinisherOutcome(
-                target, minutes, MAX_MINUTES,
-                "at the $MAX_MINUTES-minute cap — keep the time and push the pace instead",
+            minutes >= cap -> FinisherOutcome(
+                target, minutes, cap,
+                "at the $cap-minute cap — keep the time and raise the incline or pace instead",
             )
 
             else -> {
-                val next = (minutes + STEP_MINUTES).coerceIn(MIN_MINUTES, MAX_MINUTES)
+                val next = (minutes + step).coerceIn(MIN_MINUTES, cap)
                 FinisherOutcome(target, minutes, next, "$minutes min with something left, so next time is $next")
             }
         }
@@ -96,13 +120,14 @@ object FinisherProgression {
      * now — which, after [ProgressionApplier.applyOnFinish], already holds the *next*
      * target. The summary needs the original to say what changed.
      *
-     * The write only ever produces three shapes: the logged minutes plus one (an earned
+     * The write only ever produces three shapes: the logged minutes plus a step (an earned
      * increase), the logged minutes (a hold at or above target), or an unchanged target
-     * above what was logged (cut short). Anything above `logged + 1` can only be the last
-     * of those, so it is the original; otherwise the original was at most what was logged.
+     * above what was logged (cut short). Anything above `logged + step` can only be the
+     * last of those, so it is the original; otherwise the original was at most what was
+     * logged.
      */
-    fun prescribedTarget(loggedMinutes: Int, slotMinutesNow: Int): Int =
-        if (slotMinutesNow > loggedMinutes + STEP_MINUTES) slotMinutesNow
+    fun prescribedTarget(loggedMinutes: Int, slotMinutesNow: Int, step: Int = 1): Int =
+        if (slotMinutesNow > loggedMinutes + step) slotMinutesNow
         else minOf(slotMinutesNow, loggedMinutes)
 }
 
@@ -163,9 +188,10 @@ class ProgressionApplier @Inject constructor(
                     is LiftDecision.Strength ->
                         slot.copy(workingLoadKg = decision.outcome.nextLoadKg)
 
+                    // The target moves; the cap in repRangeHigh stays where the plan put it.
                     is LiftDecision.Conditioning -> slot.copy(
                         repRangeLow = decision.outcome.nextMinutes,
-                        repRangeHigh = decision.outcome.nextMinutes,
+                        repRangeHigh = maxOf(slot.repRangeHigh, decision.outcome.nextMinutes),
                         workingLoadKg = null,
                     )
                 }
@@ -203,9 +229,12 @@ class ProgressionApplier @Inject constructor(
             if (slot?.isCardioFinisher == true || exercise.isConditioning) {
                 val logged = sets.maxOf { it.reps }
                 val stored = slot?.repRangeLow ?: logged
-                val target = if (afterWrite) FinisherProgression.prescribedTarget(logged, stored) else stored
+                // repRangeHigh is the cap; older slots wrote the target there too.
+                val cap = slot?.repRangeHigh?.takeIf { it > stored } ?: maxOf(stored, FinisherProgression.MAX_MINUTES)
+                val step = FinisherProgression.stepFor(cap)
+                val target = if (afterWrite) FinisherProgression.prescribedTarget(logged, stored, step) else stored
                 return@mapNotNull slot to LiftDecision.Conditioning(
-                    exerciseId, exercise.name, FinisherProgression.decide(sets, target),
+                    exerciseId, exercise.name, FinisherProgression.decide(sets, target, cap),
                 )
             }
 
