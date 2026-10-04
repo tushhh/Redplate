@@ -29,6 +29,7 @@ sealed interface SeedState {
 class DatabaseSeeder @Inject constructor(
     @ApplicationContext private val context: Context,
     private val db: RedplateDatabase,
+    private val programGenerator: ProgramGenerator,
 ) {
     private val _state = MutableStateFlow<SeedState>(SeedState.Seeding)
 
@@ -60,7 +61,9 @@ class DatabaseSeeder @Inject constructor(
                 // Plans written before conditioning was its own pattern.
                 db.programDao().convertConditioningSlots(FinisherProgression.START_MINUTES)
                 db.programDao().normaliseFinisherSlots()
+                db.programDao().capLegacyFinishers()
             }
+            upgradeFinisherLayout()
         }
 
         _state.value = result.fold(
@@ -72,6 +75,35 @@ class DatabaseSeeder @Inject constructor(
                 )
             },
         )
+    }
+
+    /**
+     * Once: puts an existing "leaner and stronger" block onto the walk layout — a 20→30
+     * minute incline walk after upper days, a short easy walk after legs — and opens the
+     * session limit to 90 minutes so the lifting keeps its hour. Lifts, sets, loads and
+     * history are untouched; only the finishers change, then the days are re-fitted.
+     */
+    private suspend fun upgradeFinisherLayout() {
+        val prefs = context.getSharedPreferences(UPGRADE_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_WALK_LAYOUT, false)) return
+        val profile = db.profileDao().get()
+        val active = db.programDao().getActiveMesocycle()
+        if (profile != null && active != null && profile.goal == Goal.LEAN) {
+            val updated = if (profile.sessionCeilingMinutes < WALK_LAYOUT_CEILING) {
+                profile.copy(sessionCeilingMinutes = WALK_LAYOUT_CEILING).also { db.profileDao().upsert(it) }
+            } else {
+                profile
+            }
+            programGenerator.refreshFinishers(updated, active.id)
+            programGenerator.refitToCeiling(updated, active.id)
+        }
+        prefs.edit().putBoolean(KEY_WALK_LAYOUT, true).apply()
+    }
+
+    private companion object {
+        const val UPGRADE_PREFS = "data_upgrades"
+        const val KEY_WALK_LAYOUT = "walk_layout_v1"
+        const val WALK_LAYOUT_CEILING = 90
     }
 
     /** Lets a failed first run be retried without reinstalling. */

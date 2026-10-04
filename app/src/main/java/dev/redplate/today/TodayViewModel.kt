@@ -133,6 +133,11 @@ sealed interface TodayState {
          */
         val trainAnywayLabel: String? = null,
         val weekStrip: List<WeekStripDay> = emptyList(),
+        /**
+         * "Start the rest-day walk · 30 min" — the day-off walk for leaner-and-stronger,
+         * or null when the goal, the equipment or an excluded "Cardio" rules it out.
+         */
+        val restWalkLabel: String? = null,
     ) : TodayState
 
     /**
@@ -202,6 +207,7 @@ class TodayViewModel @Inject constructor(
     private val outcomeReader: SessionOutcomeReader,
     private val workoutRepository: WorkoutRepository,
     private val planRevision: PlanRevision,
+    private val programGenerator: ProgramGenerator,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<TodayState>(TodayState.Loading)
@@ -613,9 +619,11 @@ class TodayViewModel @Inject constructor(
 
         if (logged != null) {
             val outcome = outcomeReader.read(logged)
+            val wasWalk = logged.templateId
+                ?.let { programDao.getTemplateById(it)?.label } == ProgramGenerator.REST_DAY_WALK_LABEL
             return TodayState.Completed(
                 eyebrow = eyebrow,
-                headline = CoachCopy.Today.UNSCHEDULED_SESSION_HEADLINE,
+                headline = if (wasWalk) "Walk done. Rest of the day off." else CoachCopy.Today.UNSCHEDULED_SESSION_HEADLINE,
                 summaryLine = summaryLine(outcome),
                 volumeRows = buildVolumeRows(meso.id, meso.currentWeek),
                 volumeCoachLine = CoachCopy.Today.UNSCHEDULED_SESSION_VOLUME,
@@ -638,7 +646,33 @@ class TodayViewModel @Inject constructor(
             nextSessionLabel = nextSessionLabel(next, scheduled, today)?.removePrefix("Next: "),
             trainAnywayLabel = next?.let { "Train anyway — ${it.label}" },
             weekStrip = strip,
+            restWalkLabel = restWalkLabel(),
         )
+    }
+
+    /** The rest-day walk's button, with the minutes it has built to. */
+    private suspend fun restWalkLabel(): String? {
+        val profile = profileDao.get() ?: return null
+        if (profile.goal != Goal.LEAN || MovementPattern.CONDITIONING in profile.excludedPatterns) return null
+        val walk = exerciseDao.getById("treadmill_incline_walk") ?: return null
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        if (!EquipmentAvailability.canPerform(walk, available)) return null
+        val minutes = programDao.getAllTemplates()
+            .firstOrNull { it.dayIndex < 0 && it.label == ProgramGenerator.REST_DAY_WALK_LABEL }
+            ?.let { programDao.getSlots(it.id).firstOrNull()?.repRangeLow }
+            ?: FinisherProgression.REST_DAY_START_MINUTES
+        return "Start the rest-day walk · $minutes min"
+    }
+
+    /** Opens the rest-day walk as its own session: one block of incline walking. */
+    fun startRestDayWalk(onNavigate: (Long, String) -> Unit) {
+        viewModelScope.launch {
+            val profile = profileDao.get() ?: return@launch
+            val templateId = programGenerator.restDayWalkTemplate(profile) ?: return@launch
+            val slot = programDao.getSlots(templateId).firstOrNull() ?: return@launch
+            val sessionId = workoutRepository.startTemplatedSession(templateId, System.currentTimeMillis())
+            onNavigate(sessionId, slot.exerciseId)
+        }
     }
 
     private suspend fun completedState(

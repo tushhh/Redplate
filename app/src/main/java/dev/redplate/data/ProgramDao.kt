@@ -91,7 +91,7 @@ interface ProgramDao {
      */
     @Query("""
         UPDATE template_slots
-        SET isCardioFinisher = 1, targetSets = 1, repRangeLow = :minutes, repRangeHigh = :minutes,
+        SET isCardioFinisher = 1, targetSets = 1, repRangeLow = :minutes, repRangeHigh = 15,
             restSeconds = 0, progression = 'NONE', workingLoadKg = NULL
         WHERE isCardioFinisher = 0
           AND exerciseId IN (SELECT id FROM exercises WHERE pattern = 'CONDITIONING')
@@ -105,6 +105,16 @@ interface ProgramDao {
           AND (progression != 'NONE' OR workingLoadKg IS NOT NULL OR restSeconds != 0)
     """)
     suspend fun normaliseFinisherSlots(): Int
+
+    /**
+     * Finishers written before repRangeHigh meant "cap" held the target in both columns,
+     * which would read as "already at the cap" and never progress. They get the short cap.
+     */
+    @Query("""
+        UPDATE template_slots SET repRangeHigh = 15
+        WHERE isCardioFinisher = 1 AND repRangeHigh <= repRangeLow AND repRangeLow < 15
+    """)
+    suspend fun capLegacyFinishers(): Int
 
     // ── Wipe (import only — must run inside the import transaction) ──
 

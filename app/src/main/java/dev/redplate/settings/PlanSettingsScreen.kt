@@ -624,7 +624,7 @@ private fun goalLabel(goal: Goal): String = when (goal) {
 private fun goalConsequence(goal: Goal): String = when (goal) {
     Goal.STRENGTH -> "Low reps, long rests, small weekly jumps"
     Goal.HYPERTROPHY -> "Moderate reps close to failure"
-    Goal.LEAN -> "Heavy 5–8 rep compounds, dense accessories, a cardio finisher"
+    Goal.LEAN -> "Heavy 5–8 rep compounds, then an incline walk (up to 30 min after upper days) — best at 90 min"
     Goal.GENERAL -> "A middle rep range for both"
 }
 

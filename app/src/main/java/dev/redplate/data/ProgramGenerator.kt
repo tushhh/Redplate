@@ -222,7 +222,7 @@ class ProgramGenerator @Inject constructor(
 
                 // The finisher is never trimmed and always stays last.
                 while (slots.count { !it.isCardioFinisher } > MIN_EXERCISES &&
-                    SessionEstimate.minutes(slots) > profile.sessionCeilingMinutes
+                    SessionEstimate.budgetMinutes(slots) > profile.sessionCeilingMinutes
                 ) {
                     val isolation = slots.indexOfLast {
                         !it.isCardioFinisher && exercises[it.exerciseId]?.isCompound == false
@@ -240,7 +240,7 @@ class ProgramGenerator @Inject constructor(
                     // one the generator would have picked.
                     if (candidate.isCardioFinisher && hasFinisher) continue
                     val addition = candidate.toSlot(template.id, slots.size, profile)
-                    if (SessionEstimate.minutes(slots + addition) > profile.sessionCeilingMinutes) break
+                    if (SessionEstimate.budgetMinutes(slots + addition) > profile.sessionCeilingMinutes) break
                     val at = slots.indexOfFirst { it.isCardioFinisher }
                         .takeIf { it >= 0 && !addition.isCardioFinisher }
                         ?: slots.size
@@ -456,9 +456,13 @@ class ProgramGenerator @Inject constructor(
         previousWasCompound: Boolean? = null,
     ): TemplateSlotEntity {
         if (exercise.isConditioning) {
-            val minutes = previous?.takeIf { it.isCardioFinisher }?.repRangeLow
-                ?: startingFinisherMinutes(profile)
-            return finisherSlot(templateId, exercise.id, orderIndex, minutes)
+            val kept = previous?.takeIf { it.isCardioFinisher }
+            return finisherSlot(
+                templateId, exercise.id, orderIndex,
+                minutes = kept?.repRangeLow ?: startingFinisherMinutes(profile),
+                cap = kept?.repRangeHigh?.takeIf { it > kept.repRangeLow }
+                    ?: maxOf(kept?.repRangeLow ?: 0, FinisherProgression.MAX_MINUTES),
+            )
         }
 
         val rx = Prescription.of(profile.goal, exercise.isCompound, profile.readinessFlagged)
@@ -486,13 +490,15 @@ class ProgramGenerator @Inject constructor(
         exerciseId: String,
         orderIndex: Int,
         minutes: Int,
+        /** The most this finisher builds to. Stored in repRangeHigh. */
+        cap: Int = FinisherProgression.MAX_MINUTES,
     ) = TemplateSlotEntity(
         templateId = templateId,
         exerciseId = exerciseId,
         orderIndex = orderIndex,
         targetSets = 1,
         repRangeLow = minutes,
-        repRangeHigh = minutes,
+        repRangeHigh = maxOf(cap, minutes),
         targetRir = FINISHER_TARGET_RIR,
         restSeconds = 0,
         progression = ProgressionRule.NONE,
@@ -539,7 +545,8 @@ class ProgramGenerator @Inject constructor(
                 MovementPattern.CONDITIONING !in profile.excludedPatterns &&
                 cardioPool.isNotEmpty()
             ) {
-                pickFinisher(day, cardioPool, usedThisWeek)?.let { finisher ->
+                planFinisher(day.isLegHeavy(), cardioPool, usedThisWeek, profile)?.let { plan ->
+                    val finisher = plan.exercise
                     usedToday += finisher.id
                     usedThisWeek += finisher.id
                     filled.add(
@@ -549,7 +556,8 @@ class ProgramGenerator @Inject constructor(
                             sets = 1,
                             goal = profile.goal,
                             isCardioFinisher = true,
-                            minutes = startingFinisherMinutes(profile),
+                            minutes = plan.minutes,
+                            cap = plan.cap,
                         ),
                     )
                 }
@@ -559,25 +567,110 @@ class ProgramGenerator @Inject constructor(
         }
     }
 
+    private data class FinisherPlan(val exercise: ExerciseEntity, val minutes: Int, val cap: Int)
+
     /**
-     * The day's conditioning finisher, chosen to suit what the day just did.
+     * The day's conditioning, chosen to suit what the day just did.
      *
-     * After a lower-body day the legs have done their work, so the finisher leans on the
-     * upper body or spares the legs (SkiErg, rower, crosstrainer). After an upper-body day
-     * the legs are fresh, so it uses them (incline walk, air bike, stairs). Variety across
-     * the week first, then preference order.
+     * - **No heavy leg work** (upper, push, pull): the legs are fresh, so this is the long
+     *   one — an incline walk building from 20 to 30 minutes, then the incline goes up.
+     *   It is the same walk every time on purpose: it is a progression, not a menu.
+     * - **A leg day**: the legs have done their work and need to recover, so it is a short,
+     *   easy 10–15 minutes — an easy walk first, otherwise something that spares the legs.
      */
-    private fun pickFinisher(
-        day: DaySpec,
+    private fun planFinisher(
+        legHeavy: Boolean,
         pool: List<ExerciseEntity>,
         usedThisWeek: Set<String>,
-    ): ExerciseEntity? {
-        val legDay = day.slots.count { it.muscle in LOWER_BODY } * 2 >= day.slots.size
-        val preference = if (legDay) LEG_DAY_FINISHERS else UPPER_DAY_FINISHERS
+        profile: ProfileEntity,
+    ): FinisherPlan? {
+        val novice = profile.trainingAgeMonths < NOVICE_MONTHS
+        if (!legHeavy) {
+            LONG_FINISHERS.firstNotNullOfOrNull { id -> pool.firstOrNull { it.id == id } }?.let {
+                return FinisherPlan(
+                    it,
+                    if (novice) FinisherProgression.NOVICE_LONG_START_MINUTES else FinisherProgression.LONG_START_MINUTES,
+                    FinisherProgression.LONG_CAP_MINUTES,
+                )
+            }
+        }
+        val preference = if (legHeavy) LEG_DAY_FINISHERS else UPPER_DAY_FINISHERS
         val ranked = pool.sortedBy { e ->
             preference.indexOf(e.id).takeIf { it >= 0 } ?: Int.MAX_VALUE
         }
-        return ranked.firstOrNull { it.id !in usedThisWeek } ?: ranked.firstOrNull()
+        // An easy walk after legs every time is the point, not a lack of variety.
+        val pick = (if (legHeavy) ranked.firstOrNull() else null)
+            ?: ranked.firstOrNull { it.id !in usedThisWeek }
+            ?: ranked.firstOrNull()
+            ?: return null
+        return FinisherPlan(pick, startingFinisherMinutes(profile), FinisherProgression.MAX_MINUTES)
+    }
+
+    private fun DaySpec.isLegHeavy(): Boolean = slots.any { it.compound && it.muscle in LOWER_BODY }
+
+    /**
+     * Puts the current finisher layout onto an existing block without rebuilding it: each
+     * day's finisher is replaced by the one [planFinisher] would choose now, and the lifts,
+     * sets and loads are left exactly as they are. Returns how many days changed.
+     */
+    suspend fun refreshFinishers(profile: ProfileEntity, mesocycleId: Long): Int {
+        if (profile.goal != Goal.LEAN || MovementPattern.CONDITIONING in profile.excludedPatterns) return 0
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        val pool = cardioPool(available)
+        if (pool.isEmpty()) return 0
+        val exercises = exerciseDao.getAll().associateBy { it.id }
+        val templates = programDao.getAllTemplates()
+            .filter { it.mesocycleId == mesocycleId && it.dayIndex >= 0 }
+            .sortedBy { it.dayIndex }
+
+        var changed = 0
+        val used = mutableSetOf<String>()
+        db.withTransaction {
+            for (template in templates) {
+                val slots = programDao.getSlots(template.id)
+                val lifts = slots.filterNot { it.isCardioFinisher }
+                val legHeavy = lifts.any { slot ->
+                    exercises[slot.exerciseId]?.let { it.isCompound && it.primaryMuscle in LOWER_BODY } == true
+                }
+                val plan = planFinisher(legHeavy, pool, used, profile) ?: continue
+                used += plan.exercise.id
+                val current = slots.firstOrNull { it.isCardioFinisher }
+                if (current?.exerciseId == plan.exercise.id && current.repRangeHigh == plan.cap) continue
+                slots.filter { it.isCardioFinisher }.forEach { programDao.deleteSlot(it) }
+                lifts.forEachIndexed { i, s -> if (s.orderIndex != i) programDao.updateSlot(s.copy(orderIndex = i)) }
+                programDao.insertSlot(finisherSlot(template.id, plan.exercise.id, lifts.size, plan.minutes, plan.cap))
+                changed++
+            }
+        }
+        return changed
+    }
+
+    /**
+     * The standalone walk for a day off, as a reusable one-off template. Found again on the
+     * next rest day rather than made fresh, so its slot carries the minutes it has built
+     * to — 30 at first, up to 45.
+     */
+    suspend fun restDayWalkTemplate(profile: ProfileEntity, now: Long = System.currentTimeMillis()): Long? {
+        val walk = exerciseDao.getById(REST_DAY_WALK_EXERCISE) ?: return null
+        val available = EquipmentAvailability.availableIds(equipmentDao.getAll())
+        if (!EquipmentAvailability.canPerform(walk, available)) return null
+        return db.withTransaction {
+            val mesocycleId = freestyleMesocycleId(profile, now)
+            programDao.getAllTemplates()
+                .firstOrNull { it.mesocycleId == mesocycleId && it.label == REST_DAY_WALK_LABEL }
+                ?.id
+                ?: programDao.insertTemplate(
+                    SessionTemplateEntity(mesocycleId = mesocycleId, label = REST_DAY_WALK_LABEL, dayIndex = AD_HOC_DAY_INDEX),
+                ).also { id ->
+                    programDao.insertSlot(
+                        finisherSlot(
+                            id, walk.id, 0,
+                            FinisherProgression.REST_DAY_START_MINUTES,
+                            FinisherProgression.REST_DAY_CAP_MINUTES,
+                        ),
+                    )
+                }
+        }
     }
 
     /**
@@ -645,7 +738,8 @@ class ProgramGenerator @Inject constructor(
         SessionEstimate.minutesOf(
             slots.filterNot { it.isCardioFinisher }
                 .map { it.sets to Prescription.of(it.goal, it.spec.compound).restSeconds },
-            extraMinutes = slots.filter { it.isCardioFinisher }.sumOf { it.minutes },
+            // At its cap: the session is fitted to what the walk will build to, not today.
+            extraMinutes = slots.filter { it.isCardioFinisher }.sumOf { maxOf(it.minutes, it.cap) },
         )
 
     // ── Prescription per goal (COACHING.md §3) ──────────────────────────
@@ -655,7 +749,7 @@ class ProgramGenerator @Inject constructor(
         orderIndex: Int,
         profile: ProfileEntity,
     ): TemplateSlotEntity {
-        if (isCardioFinisher) return finisherSlot(templateId, exercise.id, orderIndex, minutes)
+        if (isCardioFinisher) return finisherSlot(templateId, exercise.id, orderIndex, minutes, cap)
 
         val rx = Prescription.of(profile.goal, spec.compound, profile.readinessFlagged)
         return TemplateSlotEntity(
@@ -750,6 +844,8 @@ class ProgramGenerator @Inject constructor(
         val isCardioFinisher: Boolean = false,
         /** A finisher's duration. Unused for lifts. */
         val minutes: Int = 0,
+        /** The most a finisher builds to. */
+        val cap: Int = 0,
     )
 
     private data class PlannedDay(val label: String, val slots: List<FilledSlot>)
@@ -769,11 +865,19 @@ class ProgramGenerator @Inject constructor(
             MuscleGroup.CALVES, MuscleGroup.ADDUCTORS,
         )
 
-        /** Spare the legs after they have done the day's work. */
+        /** Easy, after the legs have done the day's work. */
         private val LEG_DAY_FINISHERS = listOf(
-            "skierg_intervals", "rower_full_body", "crosstrainer_steady",
-            "treadmill_incline_walk", "airbike_intervals",
+            "treadmill_easy_walk", "crosstrainer_steady", "rower_full_body",
+            "skierg_intervals", "treadmill_incline_walk", "airbike_intervals",
         )
+
+        /** The long, steady walk for days without heavy leg work, in order of preference. */
+        private val LONG_FINISHERS = listOf(
+            "treadmill_incline_walk", "stairmill_climbing", "crosstrainer_steady",
+        )
+
+        const val REST_DAY_WALK_LABEL = "Rest-day walk"
+        private const val REST_DAY_WALK_EXERCISE = "treadmill_incline_walk"
 
         /** Use the legs while they are fresh. */
         private val UPPER_DAY_FINISHERS = listOf(
@@ -791,9 +895,11 @@ class ProgramGenerator @Inject constructor(
          */
         fun explainSlot(slot: TemplateSlotEntity, exerciseName: String, goal: Goal): String {
             if (slot.isCardioFinisher) {
-                return "$exerciseName: ${slot.repRangeLow} min, hard but with something left — " +
-                    "conditioning that burns plenty without eating into tomorrow's lifting. " +
-                    "A minute is added each time it goes well, up to ${FinisherProgression.MAX_MINUTES}."
+                val cap = maxOf(slot.repRangeHigh, slot.repRangeLow)
+                val step = FinisherProgression.stepFor(cap)
+                return "$exerciseName: ${slot.repRangeLow} min — steady work that burns plenty " +
+                    "without eating into tomorrow's lifting. ${if (step == 1) "A minute is" else "$step minutes are"} " +
+                    "added each time it goes well, up to $cap; after that, raise the incline or pace."
             }
             val rest = formatRest(slot.restSeconds)
             val why = when (goal) {

@@ -18,9 +18,13 @@ object CuratedExerciseSeed {
                 "Stand tall and drive through the whole foot; hands off the rails if you can.\n" +
                 "Last two minutes: one level up."))
         add(conditioning("treadmill_incline_walk", "Incline Walking", MuscleGroup.GLUTES, listOf(MuscleGroup.CALVES, MuscleGroup.HAMSTRINGS), "treadmill",
-            "Incline 10–12%, a brisk walk around 5–6 km/h.\n" +
-                "Don't hold the rails — if you need them, drop the incline.\n" +
-                "Easy on recovery and still burns plenty. The best default after a heavy lift."))
+            "Start around 8–10% incline at about 4.8 km/h (3 mph).\n" +
+                "Build the minutes first. Once you're at the full time, add 1% incline a session, up to 12%.\n" +
+                "Don't hold the rails — if you need them, drop the incline back a notch."))
+        add(conditioning("treadmill_easy_walk", "Easy Walk", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill",
+            "Flat to 4% incline, an easy 4.5–5 km/h.\n" +
+                "A cool-down for legs that have just worked — you should be able to hold a conversation.\n" +
+                "Short on purpose: the long walk is for upper days and days off."))
         add(conditioning("treadmill_jog", "Easy Jog", MuscleGroup.QUADS, listOf(MuscleGroup.CALVES, MuscleGroup.GLUTES), "treadmill",
             "Conversational pace — you should be able to speak in full sentences.\n" +
                 "1% incline. Short, quick steps rather than long strides."))

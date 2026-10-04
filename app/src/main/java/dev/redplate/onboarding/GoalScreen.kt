@@ -53,7 +53,8 @@ private val goalOptions = listOf(
     GoalOption(
         Goal.LEAN,
         "Leaner and stronger",
-        "Heavy 5–8 rep compounds, dense accessories, a short cardio finisher every session",
+        "Heavy 5–8 rep compounds, then an incline walk — up to 30 min after upper days, " +
+            "short after legs. Best with 90-minute sessions.",
     ),
     GoalOption(Goal.GENERAL, "Just be fit and healthy", "Full body, moderate reps, nothing brutal"),
 )

@@ -30,7 +30,19 @@ object SessionEstimate {
         minutesOf(
             slots.filterNot { it.isCardioFinisher }.map { it.targetSets to it.restSeconds },
             extraMinutes = slots.filter { it.isCardioFinisher }
-                .sumOf { it.repRangeHigh * it.targetSets.coerceAtLeast(1) },
+                .sumOf { it.repRangeLow * it.targetSets.coerceAtLeast(1) },
+        )
+
+    /**
+     * What a session is allowed to grow to: a finisher counted at its cap rather than
+     * today's target. The plan is fitted to this, so a walk building from 20 to 30 minutes
+     * does not push the session past its ceiling as it grows.
+     */
+    fun budgetMinutes(slots: List<TemplateSlotEntity>): Int =
+        minutesOf(
+            slots.filterNot { it.isCardioFinisher }.map { it.targetSets to it.restSeconds },
+            extraMinutes = slots.filter { it.isCardioFinisher }
+                .sumOf { maxOf(it.repRangeHigh, it.repRangeLow) * it.targetSets.coerceAtLeast(1) },
         )
 
     /**

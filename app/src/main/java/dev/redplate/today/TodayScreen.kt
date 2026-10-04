@@ -97,6 +97,7 @@ fun TodayRoute(
         onResume = { viewModel.resume(onStartWorkout) },
         onFinishOpen = { viewModel.finishOpenSession(onSeeSummary) },
         onBuildPlan = viewModel::buildPlan,
+        onStartRestWalk = { viewModel.startRestDayWalk(onStartWorkout) },
     )
 }
 
@@ -116,6 +117,7 @@ fun TodayScreen(
     onResume: () -> Unit = {},
     onFinishOpen: () -> Unit = {},
     onBuildPlan: () -> Unit = {},
+    onStartRestWalk: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -176,6 +178,7 @@ fun TodayScreen(
 
         is TodayState.RestDay -> RestDayScreen(
             state = state,
+            onStartRestWalk = onStartRestWalk,
             onSeeFullWeek = onSeeFullWeek,
             onTrainAnyway = onTrainAnyway,
             onPickExercise = onPickExercise,
@@ -660,6 +663,7 @@ private fun RestDayScreen(
     onSeeFullWeek: () -> Unit,
     onTrainAnyway: () -> Unit = {},
     onPickExercise: () -> Unit = {},
+    onStartRestWalk: () -> Unit = {},
 ) {
     val colors = RedplateTheme.colors
 
@@ -710,6 +714,14 @@ private fun RestDayScreen(
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 8.dp),
+            )
+        }
+        // A day off from lifting is the walking day: this is the one thing to do today.
+        if (state.restWalkLabel != null) {
+            PrimaryBar(
+                label = state.restWalkLabel,
+                onClick = onStartRestWalk,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
     }

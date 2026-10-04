@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.redplate.data.DatabaseSeeder
+import dev.redplate.data.ProgramGenerator
 import dev.redplate.data.ExerciseMediaMap
 import dev.redplate.data.GymEquipmentSeed
 import dev.redplate.data.RedplateDatabase
@@ -28,7 +29,10 @@ class DatabaseSeederTest {
         db = Room.inMemoryDatabaseBuilder(ctx, RedplateDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        seeder = DatabaseSeeder(ctx, db)
+        val generator = ProgramGenerator(
+            db, db.exerciseDao(), db.equipmentDao(), db.programDao(), db.sessionDao(), db.volumeDao(),
+        )
+        seeder = DatabaseSeeder(ctx, db, generator)
     }
 
     @After

@@ -912,7 +912,7 @@ class SetLoggingViewModel @Inject constructor(
         group?.takeIf { it >= 1 }?.let { "SUPERSET " + ('A' + (it - 1)) }
 
     private fun buildHeaderSubtitle(setNum: Int, total: Int, repLow: Int, repHigh: Int, remaining: Int): String {
-        if (isCardio) return "FINISHER · $repLow MIN TARGET"
+        if (isCardio) return (if (slotIndex > 0) "FINISHER" else "CARDIO") + " · $repLow MIN TARGET"
         if (setNum > total) return "SET $setNum · EXTRA · $repLow–$repHigh REPS"
         return "SET $setNum OF $total · $repLow–$repHigh REPS · $remaining LEFT"
     }
