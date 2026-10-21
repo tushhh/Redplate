@@ -33,18 +33,23 @@ here does not get asked.
 
 ### Deliberately NOT collected
 - **Height.** It does not change any prescription in this engine. Do not ask for it.
-- **Body-fat %, goal weight, calorie targets, BMI.** This is a training app, not a diet app.
-  Do not display BMI, do not set weight-loss targets, do not gamify body composition.
-  Progress is measured in load, reps and consistency.
+- **Body-fat %, calorie targets, BMI.** This is a training app, not a diet app. Do not
+  display BMI, do not count calories or macros, do not gamify body composition.
 
-### Bodyweight and waist: a trend, never a target
-The user asked for "leaner" to be tracked, so bodyweight (and optionally waist) is logged —
-as a trend read beside the strength trend, never as a goal:
+### Bodyweight and waist: a trend toward an optional goal weight
+The user's main priority is losing weight while keeping (or growing) muscle, so bodyweight
+(and optionally waist) is logged as a trend read beside the strength trend, and the user may
+set **one goal weight**:
 - Every figure is built from 7-day averages; a single weigh-in is never interpreted.
 - The rate is stated as kg and % of bodyweight per week, with one rule of thumb: losing
-  more than ~1% a week usually costs strength. No calorie, macro or target figure anywhere.
+  more than ~1% a week usually costs strength. No calorie, macro or BMI figure anywhere.
+- The goal is read against the 7-day average: kg still to go, and — only while the trend is
+  actually heading there — weeks to go and an expected date at the current pace. A flat or
+  wrong-way trend gets no invented date.
 - The screen pairs it with how many lifts' e1RM rose, held or fell over the last four weeks,
-  because "leaner and stronger" is working when the average falls and the lifts keep rising.
+  because the plan is working when the average falls and the lifts keep rising. When the
+  scale falls faster than 1% a week **and** more lifts are falling than rising, the screen
+  says plainly that this is likely muscle loss and to slow the cut.
 - Age and sex are optional and used only to widen default recovery assumptions. Never used to
   scale down prescriptions by default.
 

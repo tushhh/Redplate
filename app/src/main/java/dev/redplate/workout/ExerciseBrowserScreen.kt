@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.data.MuscleGroup
@@ -427,7 +428,7 @@ private val previewState = BrowserState(
     isLoading = false,
 )
 
-@Preview(name = "8c · browser", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "8c · browser", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun ExerciseBrowserPreview() {
     RedplateTheme {
@@ -443,7 +444,7 @@ private fun ExerciseBrowserPreview() {
     }
 }
 
-@Preview(name = "8c · nothing matches", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "8c · nothing matches", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun ExerciseBrowserEmptyPreview() {
     RedplateTheme {

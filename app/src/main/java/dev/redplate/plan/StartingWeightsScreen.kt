@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -177,7 +178,7 @@ private fun WeightRow(row: StartingWeightRow, onClick: () -> Unit) {
     }
 }
 
-@Preview(name = "Starting weights", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Starting weights", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun StartingWeightsPreview() {
     RedplateTheme {

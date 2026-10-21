@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -302,7 +303,7 @@ private val SWATCH_SHAPE = RoundedCornerShape(3.dp)
 
 // ── Previews ─────────────────────────────────────────────────────────────────
 
-@Preview(name = "5a · front", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "5a · front", showBackground = true, backgroundColor = 0xFF101317, device = S24_ULTRA)
 @Composable
 private fun MuscleSelectionPreview() {
     RedplateTheme {
@@ -326,7 +327,7 @@ private fun MuscleSelectionPreview() {
     }
 }
 
-@Preview(name = "5b · back, nothing picked", showBackground = true, backgroundColor = 0xFF101317, widthDp = 384, heightDp = 824)
+@Preview(name = "5b · back, nothing picked", showBackground = true, backgroundColor = 0xFF101317, device = S24_ULTRA)
 @Composable
 private fun MuscleSelectionBackPreview() {
     RedplateTheme {

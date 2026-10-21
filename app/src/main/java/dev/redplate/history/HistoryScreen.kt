@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -452,7 +453,7 @@ private fun HistoryEmpty() {
 
 // ── Previews ────────────────────────────────────────────────────────
 
-@Preview(name = "6c · one lift", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "6c · one lift", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun HistoryPreview() {
     RedplateTheme {
@@ -486,7 +487,7 @@ private fun HistoryPreview() {
     }
 }
 
-@Preview(name = "6c · nothing logged", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "6c · nothing logged", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun HistoryEmptyPreview() {
     RedplateTheme {

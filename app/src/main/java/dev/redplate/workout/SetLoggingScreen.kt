@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -1093,7 +1094,7 @@ private fun PreviewScreen(state: SetLoggingUiState) {
     }
 }
 
-@Preview(name = "8a · logging a set", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "8a · logging a set", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun InputPreview() {
     PreviewScreen(
@@ -1112,7 +1113,7 @@ private fun InputPreview() {
     )
 }
 
-@Preview(name = "8a · weight not loadable", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "8a · weight not loadable", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun InexactLoadPreview() {
     PreviewScreen(
@@ -1130,7 +1131,7 @@ private fun InexactLoadPreview() {
     )
 }
 
-@Preview(name = "2b · rest with a PR", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2b · rest with a PR", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun RestingPrPreview() {
     PreviewScreen(
@@ -1155,7 +1156,7 @@ private fun RestingPrPreview() {
     )
 }
 
-@Preview(name = "2b · rest, lift done", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2b · rest, lift done", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun RestingNextExercisePreview() {
     PreviewScreen(
@@ -1180,7 +1181,7 @@ private fun RestingNextExercisePreview() {
     )
 }
 
-@Preview(name = "8a · loading", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "8a · loading", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun LoadingPreview() {
     PreviewScreen(SetLoggingUiState())

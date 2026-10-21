@@ -32,6 +32,22 @@ data class BodyweightTrend(
     val hasEnoughHistory: Boolean get() = weeklyChangeKg != null
 }
 
+/**
+ * Where the seven-day average stands against the goal weight.
+ *
+ * [weeksToGo] is only stated while the trend is actually heading toward the goal; a flat
+ * or wrong-way trend has no honest arrival date, so it stays null rather than inventing one.
+ */
+data class GoalProgress(
+    val goalKg: Double,
+    /** Average minus goal: positive while there is weight still to lose. */
+    val remainingKg: Double,
+    val reached: Boolean,
+    val weeksToGo: Double?,
+    /** Epoch millis at which the current pace reaches the goal, or null. */
+    val etaMillis: Long?,
+)
+
 object BodyweightTrends {
 
     private val DAY_MS = TimeUnit.DAYS.toMillis(1)
@@ -95,9 +111,53 @@ object BodyweightTrends {
         )
     }
 
+    /** Within this of the goal counts as there — the average itself wobbles about that much. */
+    private const val GOAL_REACHED_BAND_KG = 0.3
+
+    /** Beyond this the date is noise: a pace that slow will change long before it lands. */
+    private const val MAX_ETA_WEEKS = 104.0
+
+    /**
+     * The trend read against the goal weight. Measured from the seven-day average, never a
+     * single weigh-in, for the same reason the rate is.
+     */
+    fun goalProgress(trend: BodyweightTrend, goalKg: Double?, nowMillis: Long): GoalProgress? {
+        if (goalKg == null) return null
+        val average = trend.averageKg ?: return null
+        val remaining = average - goalKg
+        val reached = abs(remaining) <= GOAL_REACHED_BAND_KG
+        val perWeek = trend.weeklyChangeKg
+        // Heading toward the goal means moving in the opposite direction to what remains.
+        val weeks = if (!reached && perWeek != null && perWeek != 0.0 && remaining * perWeek < 0) {
+            (abs(remaining) / abs(perWeek)).takeIf { it <= MAX_ETA_WEEKS }
+        } else {
+            null
+        }
+        return GoalProgress(
+            goalKg = goalKg,
+            remainingKg = remaining,
+            reached = reached,
+            weeksToGo = weeks,
+            etaMillis = weeks?.let { nowMillis + (it * WEEK_MS).toLong() },
+        )
+    }
+
+    /**
+     * Whether the cut looks like it is costing muscle: the scale falling fast while more
+     * lifts are going down than up. Strength is the cheapest honest proxy for muscle the
+     * app has, and losing it during a fast cut is the one outcome worth interrupting for.
+     */
+    fun losingMuscleRisk(trend: BodyweightTrend, liftsUp: Int, liftsDown: Int): Boolean {
+        val percent = trend.weeklyChangePercent ?: return false
+        return percent <= FAST_LOSS_PERCENT && liftsDown > 0 && liftsDown > liftsUp
+    }
+
+    /** More than this percent of bodyweight a week is a fast cut. */
+    private const val FAST_LOSS_PERCENT = -1.0
+
     /**
      * One plain sentence about the rate. Facts and the one rule of thumb that matters for
-     * keeping strength while getting leaner — never a target, never a calorie.
+     * keeping strength while getting leaner — never a calorie.
      */
     fun describe(trend: BodyweightTrend): String {
         val percent = trend.weeklyChangePercent

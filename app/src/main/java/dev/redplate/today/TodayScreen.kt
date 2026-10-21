@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -985,7 +986,7 @@ private fun InProgressScreen(
 
 // ── Previews ────────────────────────────────────────────────────────
 
-@Preview(name = "2a · training day", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2a · training day", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayTrainingDayPreview() {
     RedplateTheme {
@@ -1023,7 +1024,7 @@ private fun TodayTrainingDayPreview() {
     }
 }
 
-@Preview(name = "9d · day one", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "9d · day one", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayFirstDayPreview() {
     RedplateTheme {
@@ -1057,7 +1058,7 @@ private fun TodayFirstDayPreview() {
     }
 }
 
-@Preview(name = "9c · stall detected", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "9c · stall detected", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayStalledPreview() {
     RedplateTheme {
@@ -1088,7 +1089,7 @@ private fun TodayStalledPreview() {
     }
 }
 
-@Preview(name = "Today · rest day", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Today · rest day", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayRestDayPreview() {
     RedplateTheme {
@@ -1105,7 +1106,7 @@ private fun TodayRestDayPreview() {
     }
 }
 
-@Preview(name = "Today · done", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Today · done", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayCompletedPreview() {
     RedplateTheme {
@@ -1130,7 +1131,7 @@ private fun TodayCompletedPreview() {
     }
 }
 
-@Preview(name = "Today · no program", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Today · no program", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun TodayNoProgramPreview() {
     RedplateTheme {

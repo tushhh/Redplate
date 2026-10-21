@@ -155,6 +155,12 @@ data class ProfileEntity(
      */
     @ColumnInfo(defaultValue = "1")
     val stallPromptsEnabled: Boolean = true,
+    /**
+     * The weight the user is working toward, in kg. Null until they set one. Weight loss
+     * while keeping muscle is the priority, so the bodyweight screen reads the trend
+     * against this — but it is never turned into calories or a BMI.
+     */
+    val goalWeightKg: Double? = null,
 )
 
 // ---------------------------------------------------------------------------

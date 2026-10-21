@@ -11,17 +11,15 @@ plugins {
 android {
     namespace = "dev.redplate"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
         applicationId = "dev.redplate"
-        // Nothing in this app needs Android 16. It targets one phone, but there is no
-        // reason a debug build should refuse to install anywhere else.
-        minSdk = 29
-        targetSdk = 36
+        // One phone: a Galaxy S24 Ultra on One UI 9 / Android 17 (API 37). minSdk is that
+        // phone's API level, so there is never a reason to write a version branch.
+        minSdk = 37
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 

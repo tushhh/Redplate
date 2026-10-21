@@ -30,6 +30,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.ui.components.MonoLabel
@@ -237,7 +238,7 @@ private fun NumberChip(
 private val DAY_CHOICES = 2..6
 private val MINUTE_CHOICES = listOf(30, 45, 60, 75, 90)
 
-@Preview(name = "2d · schedule", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2d · schedule", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun ScheduleScreenPreview() {
     RedplateTheme {
@@ -257,7 +258,7 @@ private fun ScheduleScreenPreview() {
     }
 }
 
-@Preview(name = "2d · two short days", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2d · two short days", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun ScheduleScreenMinimalPreview() {
     RedplateTheme {

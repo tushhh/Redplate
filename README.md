@@ -343,8 +343,9 @@ Everything else is a 120 ms fade or nothing.
 history and PR detection, per-muscle volume tracking, exercise guidance, backup and export.
 
 **Out, deliberately:** social feed, program sharing, hosted video, cloud sync, LLM coaching,
-Wear OS. Also out: BMI, body-fat targets, calorie counting, goal weight. This is a training
-app. Progress is measured in load, reps and consistency.
+Wear OS. Also out: BMI, body-fat targets, calorie counting. One optional goal weight is in —
+read against the 7-day average, beside the strength trend, so weight comes off while the lifts
+hold. Progress is still measured in load, reps and consistency.
 
 Redplate coaches training. It does not diagnose, prescribe rehab, or evaluate anyone's body.
 Where an injury is flagged the correct behaviour is to exclude the movement and suggest seeing

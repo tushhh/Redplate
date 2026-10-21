@@ -21,6 +21,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Write access only so the schema step below can push the exported Room schema.
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +48,23 @@ jobs:
           name: redplate-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Room exports each schema version to app/schemas at compile time, and migration
+      # tests need those files committed. Where the code is edited there is often no SDK
+      # to run KSP, so a bumped database version gets its schema written here instead and
+      # pushed back to the same working branch. Never on master: that only gets reviewed merges.
+      - name: Commit exported Room schema
+        if: github.ref != 'refs/heads/master'
+        run: |
+          if [ -n "$(git status --porcelain app/schemas)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/schemas
+            git commit -m "Export Room schema from CI build"
+            git push
+          else
+            echo "Room schema unchanged."
+          fi
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace -Dorg.gradle.jvmargs=-Xmx4g

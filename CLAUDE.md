@@ -19,7 +19,8 @@ This file is the contract. If a request conflicts with something here, say so be
 - Single device, single user. Do not build multi-user abstractions, tenancy, or sync
   reconciliation. There is no "other device."
 - Portrait only. Landscape is locked out.
-- `minSdk` = the target phone's API level. Do **not** write compatibility shims, `VERSION.SDK_INT`
+- `minSdk` = the target phone's API level — currently **37** (One UI 9 / Android 17); raise it
+  with the phone. Previews use `S24_ULTRA` (`ui/PreviewDevices.kt`). Do **not** write compatibility shims, `VERSION.SDK_INT`
   branches, or AppCompat fallbacks. There is exactly one device to support.
 
 ---
@@ -157,7 +158,9 @@ Steps 3 and 4 are the project. If set logging feels wrong at rep 8, nothing down
 ### Added after v1 (at the user's request)
 - **Leaner & stronger** goal with a conditioning finisher — COACHING.md §3.
 - **Bodyweight/waist trend** — logged and shown as 7-day averages beside the strength trend.
-  Never a target: no goal weight, BMI or calories (COACHING.md §1).
+  Weight loss while keeping muscle is the user's priority: one optional goal weight, read
+  against the 7-day average, with an ETA only while the trend heads there. Still no BMI or
+  calories (COACHING.md §1).
 
 ### Explicitly out of scope
 Social feed, program sharing, hosted video, cloud sync, LLM coaching, S Pen integration,

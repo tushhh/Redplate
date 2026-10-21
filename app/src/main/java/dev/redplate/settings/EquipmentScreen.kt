@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -248,7 +249,7 @@ private val previewEquipment = listOf(
     ),
 )
 
-@Preview(name = "Equipment", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Equipment", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun EquipmentScreenPreview() {
     RedplateTheme {
@@ -256,7 +257,7 @@ private fun EquipmentScreenPreview() {
     }
 }
 
-@Preview(name = "Equipment · nothing ticked", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Equipment · nothing ticked", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun EquipmentScreenNoneAvailablePreview() {
     RedplateTheme {
@@ -268,7 +269,7 @@ private fun EquipmentScreenNoneAvailablePreview() {
     }
 }
 
-@Preview(name = "Equipment · empty", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Equipment · empty", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun EquipmentScreenEmptyPreview() {
     RedplateTheme {

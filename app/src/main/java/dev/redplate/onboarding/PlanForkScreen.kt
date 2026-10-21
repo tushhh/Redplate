@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.ui.components.InfoNote
@@ -134,7 +135,7 @@ fun PlanForkScreen(
     }
 }
 
-@Preview(name = "3a · the fork", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "3a · the fork", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun PlanForkScreenPreview() {
     RedplateTheme {
@@ -146,7 +147,7 @@ private fun PlanForkScreenPreview() {
     }
 }
 
-@Preview(name = "3a · I choose", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "3a · I choose", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun PlanForkScreenChoosePreview() {
     RedplateTheme {

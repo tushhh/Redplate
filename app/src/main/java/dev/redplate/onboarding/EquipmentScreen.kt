@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.data.EquipmentCategory
@@ -394,7 +395,7 @@ private val previewEquipment = listOf(
     ),
 )
 
-@Preview(name = "2e · equipment", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2e · equipment", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun EquipmentScreenPreview() {
     RedplateTheme {
@@ -415,7 +416,7 @@ private fun EquipmentScreenPreview() {
     }
 }
 
-@Preview(name = "2e · nothing ticked", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2e · nothing ticked", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun EquipmentScreenEmptyPreview() {
     RedplateTheme {

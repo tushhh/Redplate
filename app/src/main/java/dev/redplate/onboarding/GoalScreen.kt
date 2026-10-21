@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.redplate.data.Goal
@@ -226,7 +227,7 @@ fun ChoiceCard(
     }
 }
 
-@Preview(name = "2c · goal", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2c · goal", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun GoalScreenPreview() {
     RedplateTheme {
@@ -234,7 +235,7 @@ private fun GoalScreenPreview() {
     }
 }
 
-@Preview(name = "2c · nothing picked", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "2c · nothing picked", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun GoalScreenEmptyPreview() {
     RedplateTheme {

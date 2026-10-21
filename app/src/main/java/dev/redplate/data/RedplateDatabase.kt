@@ -18,7 +18,7 @@ import androidx.room.TypeConverters
         VolumeLandmarkEntity::class,
         BodyweightEntryEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -209,7 +210,7 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
-@Preview(name = "9a · You", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "9a · You", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun SettingsPreview() {
     RedplateTheme {
@@ -232,7 +233,7 @@ private fun SettingsPreview() {
     }
 }
 
-@Preview(name = "9a · nothing logged yet", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "9a · nothing logged yet", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun SettingsEmptyPreview() {
     RedplateTheme {

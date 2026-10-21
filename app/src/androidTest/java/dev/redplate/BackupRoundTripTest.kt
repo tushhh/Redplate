@@ -49,6 +49,7 @@ class BackupRoundTripTest {
         excludedPatterns = listOf(MovementPattern.LUNGE),
         readinessFlagged = true,
         useMetric = true,
+        goalWeightKg = 76.0,
     )
 
     private val equipment = listOf(

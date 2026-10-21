@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import dev.redplate.ui.S24_ULTRA
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -660,7 +661,7 @@ private val previewPlan = PlanSettings(
     dayStartHour = 4,
 )
 
-@Preview(name = "Your plan", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Your plan", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun PlanSettingsPreview() {
     RedplateTheme {
@@ -670,7 +671,7 @@ private fun PlanSettingsPreview() {
     }
 }
 
-@Preview(name = "Your plan · rebuilding", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Your plan · rebuilding", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun PlanSettingsRebuildPreview() {
     RedplateTheme {
@@ -684,7 +685,7 @@ private fun PlanSettingsRebuildPreview() {
     }
 }
 
-@Preview(name = "Your plan · no profile", widthDp = 384, heightDp = 824, showBackground = true, backgroundColor = 0xFF101317)
+@Preview(name = "Your plan · no profile", device = S24_ULTRA, showBackground = true, backgroundColor = 0xFF101317)
 @Composable
 private fun PlanSettingsEmptyPreview() {
     RedplateTheme {

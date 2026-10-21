@@ -41,7 +41,15 @@ data class StrengthTrend(val up: Int, val flat: Int, val down: Int) {
 }
 
 /** Which number the keypad is collecting. */
-enum class BodyEntryField { WEIGHT, WAIST }
+enum class BodyEntryField { WEIGHT, WAIST, GOAL }
+
+/** The goal card: the target, how far is left, and when the current pace gets there. */
+data class GoalUi(
+    val goalLabel: String,
+    val remainingLabel: String,
+    val paceLabel: String,
+    val reached: Boolean,
+)
 
 data class BodyweightUiState(
     val isLoading: Boolean = true,
@@ -52,6 +60,10 @@ data class BodyweightUiState(
     val fourWeekWeightLabel: String? = null,
     val waistLabel: String? = null,
     val strength: StrengthTrend? = null,
+    /** Null until a goal weight is set. */
+    val goal: GoalUi? = null,
+    /** The scale is falling fast while the lifts are going down — likely losing muscle. */
+    val muscleWarning: String? = null,
     val rows: List<BodyweightRow> = emptyList(),
     /** Today already has a weigh-in, so a waist can be added to it. */
     val canAddWaist: Boolean = false,
@@ -65,6 +77,7 @@ data class BodyweightUiState(
             when (entryField) {
                 BodyEntryField.WEIGHT -> it in 30.0..300.0
                 BodyEntryField.WAIST -> it in 40.0..200.0
+                BodyEntryField.GOAL -> it in 30.0..300.0
                 null -> false
             }
         } == true
@@ -92,11 +105,12 @@ class BodyweightViewModel @Inject constructor(
 
     val state: StateFlow<BodyweightUiState> = combine(
         bodyweightDao.observeAll(),
+        profileDao.observe(),
         strength,
         keypad,
         removed,
-    ) { entries, strengthTrend, (field, typed), justRemoved ->
-        buildState(entries, strengthTrend, field, typed).copy(justRemoved = justRemoved)
+    ) { entries, profile, strengthTrend, (field, typed), justRemoved ->
+        buildState(entries, profile?.goalWeightKg, strengthTrend, field, typed).copy(justRemoved = justRemoved)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BodyweightUiState())
 
     init {
@@ -105,6 +119,7 @@ class BodyweightViewModel @Inject constructor(
 
     private suspend fun buildState(
         entries: List<BodyweightEntryEntity>,
+        goalKg: Double?,
         strengthTrend: StrengthTrend?,
         field: BodyEntryField?,
         typed: String,
@@ -135,6 +150,14 @@ class BodyweightViewModel @Inject constructor(
                 kg(waist) + " cm" + (trend.waistChangeCm?.let { " (${signed(it)})" } ?: "")
             },
             strength = strengthTrend,
+            goal = goalUi(trend, goalKg),
+            muscleWarning = strengthTrend
+                ?.takeIf { BodyweightTrends.losingMuscleRisk(trend, it.up, it.down) }
+                ?.let {
+                    "The scale is falling fast and ${it.down} of your lifts are going down — " +
+                        "that is likely muscle, not just fat. Slow the cut: aim for under 1% " +
+                        "of bodyweight a week and keep the heavy sets."
+                },
             rows = entries.take(MAX_ROWS).map { e ->
                 BodyweightRow(
                     entry = e,
@@ -149,7 +172,45 @@ class BodyweightViewModel @Inject constructor(
         )
     }
 
+    private fun goalUi(trend: dev.redplate.data.BodyweightTrend, goalKg: Double?): GoalUi? {
+        if (goalKg == null) return null
+        val progress = BodyweightTrends.goalProgress(trend, goalKg, System.currentTimeMillis())
+            ?: return GoalUi(
+                goalLabel = "${kg(goalKg)} kg",
+                remainingLabel = "log a weigh-in",
+                paceLabel = "Distance to go appears with your first weigh-ins.",
+                reached = false,
+            )
+        val remaining = abs(progress.remainingKg)
+        return GoalUi(
+            goalLabel = "${kg(goalKg)} kg",
+            remainingLabel = if (progress.reached) "reached" else "${kg(remaining)} kg to go",
+            paceLabel = when {
+                progress.reached -> "You're there. Hold it and keep the lifts climbing."
+                progress.etaMillis != null && progress.weeksToGo != null -> {
+                    val weeks = progress.weeksToGo.toInt().coerceAtLeast(1)
+                    val date = ETA_DATE.format(Instant.ofEpochMilli(progress.etaMillis).atZone(ZoneId.systemDefault()))
+                    "About $weeks ${if (weeks == 1) "week" else "weeks"} at this pace — around $date."
+                }
+                !trend.hasEnoughHistory -> "A date appears after two to three weeks of weigh-ins."
+                else -> "Not heading there yet at the current pace."
+            },
+            reached = progress.reached,
+        )
+    }
+
     // ── Keypad ──
+
+    fun startGoalEntry() {
+        removed.value = null
+        keypad.update { BodyEntryField.GOAL to "" }
+    }
+
+    fun clearGoal() {
+        viewModelScope.launch {
+            profileDao.get()?.let { profileDao.upsert(it.copy(goalWeightKg = null)) }
+        }
+    }
 
     fun startWeightEntry() {
         removed.value = null
@@ -194,6 +255,9 @@ class BodyweightViewModel @Inject constructor(
                     val latest = bodyweightDao.getLatest() ?: return@launch
                     bodyweightDao.update(latest.copy(waistCm = value))
                 }
+
+                BodyEntryField.GOAL ->
+                    profileDao.get()?.let { profileDao.upsert(it.copy(goalWeightKg = value)) }
             }
         }
     }
@@ -280,5 +344,6 @@ class BodyweightViewModel @Inject constructor(
         const val TREND_WINDOW_DAYS = 28L
         const val FLAT_BAND = 0.01
         val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
+        val ETA_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
     }
 }
