@@ -69,6 +69,20 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace -Dorg.gradle.jvmargs=-Xmx4g
 
+      # Each failed test becomes an annotation on the run, which can be read without
+      # downloading the report artifact.
+      - name: Annotate failed tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for path in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+              for case in ET.parse(path).getroot().iter("testcase"):
+                  for bad in list(case.findall("failure")) + list(case.findall("error")):
+                      msg = (bad.get("message") or bad.text or "").strip().splitlines()[0][:300]
+                      print(f"::error title={case.get('classname')}.{case.get('name')}::{msg}")
+          PY
+
       # The HTML report says which assertion failed; the console only says how many did.
       - name: Upload test report
         if: failure()

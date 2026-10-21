@@ -33,8 +33,11 @@ class BodyweightGoalTest {
 
     @Test
     fun losingTowardGoalGivesADate() {
-        // 0.1 kg a day is 0.7 kg a week.
+        // Losing 0.1 kg a day. The weekly rate is measured between trailing 7-day
+        // averages, so it is read from the trend rather than assumed to be exactly 0.7.
         val trend = BodyweightTrends.compute(log(28, 90.0, -0.1))
+        val perWeek = trend.weeklyChangeKg!!
+        assertTrue(perWeek < -0.5)
         val now = 28 * day
         val progress = BodyweightTrends.goalProgress(trend, 80.0, now)
         assertNotNull(progress)
@@ -43,7 +46,7 @@ class BodyweightGoalTest {
         assertEquals(trend.averageKg!! - 80.0, progress.remainingKg, 1e-9)
         assertFalse(progress.reached)
         val weeks = progress.weeksToGo!!
-        assertEquals(progress.remainingKg / 0.7, weeks, 0.05)
+        assertEquals(progress.remainingKg / -perWeek, weeks, 1e-9)
         assertEquals(now + (weeks * 7 * day).toLong(), progress.etaMillis)
     }
 
